@@ -313,6 +313,10 @@ contract Staking {
         val.commissionRewards = 0;
     }
 
+    function getValidatorCommissionReward(address valAddr) public view returns(uint256) {
+        return validators[valAddr].commissionRewards;
+    }
+
     function undelegate(address valAddr) public returns (uint256) {
         withdrawDelegationReward(valAddr);
 

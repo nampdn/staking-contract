@@ -46,4 +46,20 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("1", "ether"));
     })
+    
+    it("should withdrawl commission rewards", async() => {
+        let instance = await Staking.deployed();
+        // commission rate: 1%
+        await instance.updateValidator(web3.utils.toWei("0.01", "ether"), 0)
+
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
+
+        reward = await instance.getValidatorCommissionReward.call(accounts[0]);
+        assert.equal(reward.toString(), web3.utils.toWei("0.01", "ether"));
+
+        await instance.withdrawValidatorCommissionReward({from: accounts[0]});
+
+        reward = await instance.getValidatorCommissionReward.call(accounts[0]);
+        assert.equal(reward.toString(), "0");
+    })
 })
