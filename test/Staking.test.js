@@ -2,7 +2,7 @@ const Staking = artifacts.require("Staking");
 contract("Staking", async (accounts) => {
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
-        const bond = web3.utils.toWei("10", "ether")
+        const bond = web3.utils.toWei("100", "ether")
         await instance.createValidator(0,1, {from: accounts[0], value: bond});
         const validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
@@ -12,7 +12,7 @@ contract("Staking", async (accounts) => {
 
     it("should delegate to validator", async () => {
         let instance = await Staking.deployed();
-        const bond = web3.utils.toWei("10", "ether")
+        const bond = web3.utils.toWei("100", "ether")
         await instance.delegate(accounts[0], {from:accounts[1], value: bond})
 
         const validatorSet = await instance.getCurrentValidatorSet.call();
@@ -66,7 +66,7 @@ contract("Staking", async (accounts) => {
     it("should undelegate", async () => {
         const instance = await Staking.deployed();
         let stake = await instance.getDelegationStake.call(accounts[1], accounts[0])
-        assert.equal(stake.toString(), web3.utils.toWei("10", "ether"));
+        assert.equal(stake.toString(), web3.utils.toWei("100", "ether"));
 
         await instance.undelegate(accounts[0], {from: accounts[1]});
 
@@ -78,11 +78,20 @@ contract("Staking", async (accounts) => {
     })
 
     it ("should jail validator", async() => {
+        const instance = await Staking.deployed();
+        // update maxMissed block
+        await instance.setParams(0, 1, 0, 0,0, 0);
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
 
+        const val = await instance.getValidator.call(accounts[0]);
+        assert.equal(val[1], true);
     });
 
     it("should unjail", async () => {
         const instance = await Staking.deployed();
         await instance.unjail(accounts[0]);
+
+        const val = await instance.getValidator.call(accounts[0]);
+        assert.equal(val[1], false);
     })
 })

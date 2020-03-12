@@ -183,18 +183,11 @@ contract Staking {
                 addresses,
                 powers
             );
-            //handleValidateSignatures(addresses, signed, powers);
+            handleValidateSignatures(addresses, signed, powers);
         }
         previousProposerAddr = proposerAddr;
     }
 
-    function allocateTokensToVal(address valAddr, uint256 blockReward) private {
-        Validator storage val = validators[valAddr];
-        uint256 commission = blockReward.mulTrun(val.commissionRate);
-        uint256 shared = blockReward.sub(commission);
-        val.commissionRewards += commission;
-        val.rewards += shared;
-    }
 
     function allocateTokens(
         uint256 previousTotalPower,
@@ -229,7 +222,13 @@ contract Staking {
 
     }
 
-
+    function allocateTokensToVal(address valAddr, uint256 blockReward) private {
+        Validator storage val = validators[valAddr];
+        uint256 commission = blockReward.mulTrun(val.commissionRate);
+        uint256 shared = blockReward.sub(commission);
+        val.commissionRewards += commission;
+        val.rewards += shared;
+    }
 
     function handleValidateSignatures(
         address[] memory addresses,
@@ -284,6 +283,10 @@ contract Staking {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
+        if (val.rewards == 0) {
+            return 0;
+        }
+
         val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
 
         if (val.slashFractionDowntimeRatio > 0) {
@@ -301,6 +304,10 @@ contract Staking {
         return rewards;
     }
 
+    function getValidator(address valAddr) public view returns (uint256, bool) {
+        Validator memory val = validators[valAddr];
+        return (val.tokens, val.jailed);
+    }
 
 
     function getDelegationRewards(address delAddr, address valAddr) public view returns(uint256) {
@@ -318,8 +325,7 @@ contract Staking {
         uint256 difference = cumulativeRewardRatio.sub(
             del.cumulativeRewardRatio
         );
-        uint256 rewards = difference.mulTrun(del.stake);
-        return rewards;
+        return stake.mulTrun(difference);
     }
 
     function withdrawDelegationReward(address valAddr)
