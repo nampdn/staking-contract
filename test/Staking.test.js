@@ -76,4 +76,13 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
     })
+
+    it ("should jail validator", async() => {
+
+    });
+
+    it("should unjail", async () => {
+        const instance = await Staking.deployed();
+        await instance.unjail(accounts[0]);
+    })
 })

@@ -43,12 +43,8 @@ contract Staking {
 
     Params params;
 
-    modifier onlyValidatorOwner(address valAddr) {
-        require(
-            validators[valAddr].operatorAddress ==
-                msg.sender,
-            "sender not validator owner"
-        );
+    modifier onlyOwner() {
+        require(msg.sender == address(this), "sender is not owner");
         _;
     }
 
@@ -68,6 +64,34 @@ contract Staking {
             bonusProposerReward: bonusProposerReward,
             slashFractionDowntime: slashFractionDowntime
         });
+    }
+
+    function setParams(
+        uint256 maxValidators,
+        uint256 maxMissed,
+        uint256 downtimeJailDuration,
+        uint256 baseProposerReward,
+        uint256 bonusProposerReward,
+        uint256 slashFractionDowntime
+    ) public {
+        if (maxValidators > 0) {
+            params.maxValidators = maxValidators;
+        }
+        if (maxMissed > 0) {
+            params.maxMissed = maxMissed;
+        }
+        if (downtimeJailDuration > 0) {
+            params.downtimeJailDuration = downtimeJailDuration;
+        }
+        if (baseProposerReward > 0) {
+            params.baseProposerReward = baseProposerReward;
+        }
+        if (bonusProposerReward > 0) {
+            params.bonusProposerReward = bonusProposerReward;
+        }
+        if (slashFractionDowntime > 0) {
+            params.slashFractionDowntime = slashFractionDowntime;
+        }
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
