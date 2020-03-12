@@ -23,7 +23,6 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward, 0);
-       
 
         await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
         await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
@@ -80,14 +79,18 @@ contract("Staking", async (accounts) => {
     it ("should jail validator", async() => {
         const instance = await Staking.deployed();
         // update maxMissed block
-        await instance.setParams(0, 1, 0, 0,0, 0);
+        await instance.setParams(0, 3, 1, 0,0, 0);
         await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
 
-        const val = await instance.getValidator.call(accounts[0]);
+        let val = await instance.getValidator.call(accounts[0]);
+        assert.equal(val[1], false);
+
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
+        val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], true);
     });
 
-    it("should unjail", async () => {
+    it("should unjail validator", async () => {
         const instance = await Staking.deployed();
         await instance.unjail({from: accounts[0]});
 

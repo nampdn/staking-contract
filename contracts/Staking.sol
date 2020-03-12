@@ -43,8 +43,7 @@ contract Staking {
 
     Params params;
 
-    modifier onlyOwner() {
-        require(msg.sender == address(this), "sender is not owner");
+    modifier onlyRoot() {
         _;
     }
 
@@ -166,7 +165,7 @@ contract Staking {
         address[] memory addresses,
         bool[] memory signed,
         uint256[] memory powers
-    ) public {
+    ) public onlyRoot {
         uint256 previousTotalPower = 0;
         uint256 previousPrecommitTotalPower = 0;
 
@@ -247,7 +246,7 @@ contract Staking {
         bool signed
     ) private {
         Validator storage val = validators[valAddr];
-        if (signed) {
+        if (signed && val.missedBlockCounter > 0) {
             val.missedBlockCounter -= 1;
         } else {
             val.missedBlockCounter += 1;
@@ -307,9 +306,9 @@ contract Staking {
         return rewards;
     }
 
-    function getValidator(address valAddr) public view returns (uint256, bool) {
+    function getValidator(address valAddr) public view returns (uint256, bool, uint256) {
         Validator memory val = validators[valAddr];
-        return (val.tokens, val.jailed);
+        return (val.tokens, val.jailed, val.jailedUntil);
     }
 
     function getDelegationRewards(address delAddr, address valAddr)
