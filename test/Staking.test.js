@@ -2,7 +2,7 @@ const Staking = artifacts.require("Staking");
 contract("Staking", async (accounts) => {
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
-        await instance.createValidator(1,1, {from: accounts[0], value: 100});
+        await instance.createValidator(0,1, {from: accounts[0], value: 100});
         const validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0], 100);
@@ -26,6 +26,6 @@ contract("Staking", async (accounts) => {
         await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
 
         reward = await instance.withdrawDelegationReward.call(accounts[0]);
-        assert.equal(reward, 1);
+        assert.equal(reward.toString(), 1);
     })
 })

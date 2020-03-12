@@ -25,23 +25,27 @@ contract Staking {
         uint256 cumulativeRewardRatio;
         uint256 slashFractionDowntimeRatio;
     }
+
+    struct Params {
+        uint256 baseProposerReward;
+        uint256 bonusProposerReward;
+        uint256 maxValidators;
+        uint256 maxMissed;
+        uint256 downtimeJailDuration;
+        uint256 slashFractionDowntime;
+    }
+
     address previousProposerAddr;
-    uint256 baseProposerReward;
-    uint256 bonusProposerReward;
-    uint256 maxValidator;
-    uint256 maxMissed;
-    uint256 downtimeJailDuration;
-    uint256 slashFractionDowntime;
-
-    // A dynamically-sized array of `Validator` structs.
-    Validator[] validators;
-
-    mapping(address => uint256) validateByAddress;
+    mapping(address => Validator) validators;
     mapping(address => mapping(address => Delegation)) delegations;
+
+    address[] validatorSets;
+
+    Params params;
 
     modifier onlyValidatorOwner(address valAddr) {
         require(
-            validators[validateByAddress[valAddr]].operatorAddress ==
+            validators[valAddr].operatorAddress ==
                 msg.sender,
             "sender not validator owner"
         );
@@ -49,40 +53,47 @@ contract Staking {
     }
 
     constructor(
-        uint256 maxVal,
-        uint256 _maxMissed,
-        uint256 _downtimeJailDuration
+        uint256 maxValidators,
+        uint256 maxMissed,
+        uint256 downtimeJailDuration,
+        uint256 baseProposerReward,
+        uint256 bonusProposerReward,
+        uint256 slashFractionDowntime
     ) public {
-        maxValidator = maxVal;
-        maxMissed = _maxMissed;
-        downtimeJailDuration = _downtimeJailDuration;
+        params = Params({
+            maxValidators: maxValidators,
+            maxMissed: maxMissed,
+            downtimeJailDuration: downtimeJailDuration,
+            baseProposerReward: baseProposerReward,
+            bonusProposerReward: bonusProposerReward,
+            slashFractionDowntime: slashFractionDowntime
+        });
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
         public
         payable
     {
-        require(validateByAddress[msg.sender] == 0, "Validator Owner Exists");
+        require(validators[msg.sender].operatorAddress == address(0x0), "Validator Owner Exists");
 
-        validators.push(
-            Validator({
-                operatorAddress: msg.sender,
-                rewards: 0,
-                commissionRewards: 0,
-                jailed: false,
-                tokens: 0,
-                status: Status.Unbonded,
-                commissionRate: commissionRate,
-                updateTime: block.timestamp,
-                cumulativeRewardRatio: 0,
-                missedBlockCounter: 0,
-                jailedUntil: 0,
-                slashFractionDowntimeRatio: 0,
-                minselfDelegation: minselfDelegation
-            })
-        );
+        validators[msg.sender] = Validator({
+            operatorAddress: msg.sender,
+            rewards: 0,
+            commissionRewards: 0,
+            jailed: false,
+            tokens: 0,
+            status: Status.Unbonded,
+            commissionRate: commissionRate,
+            updateTime: block.timestamp,
+            cumulativeRewardRatio: 0,
+            missedBlockCounter: 0,
+            jailedUntil: 0,
+            slashFractionDowntimeRatio: 0,
+            minselfDelegation: minselfDelegation
+        });
 
-        validateByAddress[msg.sender] = validators.length;
+
+        validatorSets.push(msg.sender);
 
         _delegate(msg.sender, msg.sender, msg.value);
     }
@@ -90,7 +101,7 @@ contract Staking {
     function _delegate(address delAddr, address valAddr, uint256 amount)
         private
     {
-        Validator storage val = validators[validateByAddress[valAddr] - 1];
+        Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
         // increment token amount
@@ -113,12 +124,12 @@ contract Staking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        address[] memory addresses = new address[](validators.length);
-        uint256[] memory votingPowers = new uint256[](validators.length);
+        address[] memory addresses = new address[](validatorSets.length);
+        uint256[] memory votingPowers = new uint256[](validatorSets.length);
 
-        for (uint256 i = 0; i < validators.length; i++) {
-            addresses[i] = validators[i].operatorAddress;
-            votingPowers[i] = validators[i].tokens;
+        for (uint256 i = 0; i < validatorSets.length; i++) {
+            addresses[i] = validators[validatorSets[i]].operatorAddress;
+            votingPowers[i] = validators[validatorSets[i]].tokens;
         }
 
         return (addresses, votingPowers);
@@ -168,31 +179,26 @@ contract Staking {
         );
 
         // calculate previous proposer reward
-        uint256 proposerMultiplier = baseProposerReward.add(
-            bonusProposerReward.mulTrun(previousFractionVotes)
+        uint256 proposerMultiplier = params.baseProposerReward.add(
+            params.bonusProposerReward.mulTrun(previousFractionVotes)
         );
         uint256 proposerReward = feeCollected.mulTrun(proposerMultiplier);
-        allocateTokensToVal(previousProposerAddr, proposerReward);
+        validators[previousProposerAddr].rewards += proposerReward;
+        //allocateTokensToVal(previousProposerAddr, proposerReward);
 
-        uint256 voteMultiplier = 1 * 10**18;
-        voteMultiplier = voteMultiplier.sub(proposerMultiplier);
+        //uint256 voteMultiplier = 1 * 10**18;
+        //voteMultiplier = voteMultiplier.sub(proposerMultiplier);
 
-        for (uint256 i = 0; i < addresses.length; i++) {
-            uint256 powerFraction = powers[i].divTrun(previousTotalPower);
-            uint256 reward = feeCollected.mulTrun(voteMultiplier).divTrun(
-                powerFraction
-            );
-            allocateTokensToVal(addresses[i], reward);
-        }
+        // for (uint256 i = 0; i < addresses.length; i++) {
+        //     uint256 powerFraction = powers[i].divTrun(previousTotalPower);
+        //     uint256 reward = feeCollected.mulTrun(voteMultiplier).divTrun(
+        //         powerFraction
+        //     );
+        //     allocateTokensToVal(addresses[i], reward);
+        // }
+
     }
 
-    function allocateTokensToVal(address valAddr, uint256 reward) internal {
-        Validator memory val = validators[validateByAddress[valAddr] - 1];
-        uint256 commission = reward.mulTrun(val.commissionRate);
-        uint256 shared = reward.sub(commission);
-        val.commissionRewards += commission;
-        val.rewards += shared;
-    }
 
     function handleValidateSignatures(
         address[] memory addresses,
@@ -209,27 +215,27 @@ contract Staking {
         uint256 power,
         bool signed
     ) internal {
-        Validator storage val = validators[validateByAddress[valAddr]];
+        Validator storage val = validators[valAddr];
         if (signed) {
             val.missedBlockCounter -= 1;
         } else {
             val.missedBlockCounter += 1;
         }
 
-        if (val.missedBlockCounter >= maxMissed) {
+        if (val.missedBlockCounter >= params.maxMissed) {
             val.jailed = true;
             val.missedBlockCounter = 0;
-            val.jailedUntil += block.timestamp.add(downtimeJailDuration);
+            val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
             slash(valAddr, power);
         }
 
     }
 
     function slash(address valAddr, uint256 power) private {
-        Validator storage val = validators[validateByAddress[valAddr]];
-        uint256 slashAmount = power.mulTrun(slashFractionDowntime);
+        Validator storage val = validators[valAddr];
+        uint256 slashAmount = power.mulTrun(params.slashFractionDowntime);
         val.tokens -= slashAmount;
-        val.slashFractionDowntimeRatio += slashFractionDowntime;
+        val.slashFractionDowntimeRatio += params.slashFractionDowntime;
     }
 
     function transferTo(address payable recipient, uint256 amount)
@@ -244,22 +250,22 @@ contract Staking {
         private
         returns (uint256)
     {
-        Validator storage val = validators[validateByAddress[valAddr] - 1];
+        Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
-        val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
-        del.stake = del.stake.mulTrun(
-            val.slashFractionDowntimeRatio.sub(del.slashFractionDowntimeRatio)
-        );
+        // val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
+        // del.stake = del.stake.mulTrun(
+        //     val.slashFractionDowntimeRatio.sub(del.slashFractionDowntimeRatio)
+        // );
 
-        uint256 difference = val.cumulativeRewardRatio.sub(
-            del.cumulativeRewardRatio
-        );
-        uint256 rewards = del.stake.mulTrun(difference);
-        del.cumulativeRewardRatio = val.cumulativeRewardRatio;
-        del.slashFractionDowntimeRatio = val.slashFractionDowntimeRatio;
-        val.rewards = 0;
-        return rewards;
+        // uint256 difference = val.cumulativeRewardRatio.sub(
+        //     del.cumulativeRewardRatio
+        // );
+        // uint256 rewards = del.stake.mulTrun(difference);
+        // del.cumulativeRewardRatio = val.cumulativeRewardRatio;
+        // del.slashFractionDowntimeRatio = val.slashFractionDowntimeRatio;
+        // val.rewards = 0;
+        return val.rewards;
     }
 
     function withdrawDelegationReward(address valAddr)
@@ -267,12 +273,12 @@ contract Staking {
         returns (uint256)
     {
         uint256 rewards = withdrawDelegationRewards(msg.sender, valAddr);
-        transferTo(msg.sender, rewards);
+        //transferTo(msg.sender, rewards);
         return rewards;
     }
 
     function withdrawValidatorCommissionReward() public returns (uint256) {
-        Validator storage val = validators[validateByAddress[msg.sender]];
+        Validator storage val = validators[msg.sender];
         transferTo(msg.sender, val.commissionRewards);
         val.commissionRewards = 0;
     }
@@ -280,7 +286,7 @@ contract Staking {
     function undelegate(address valAddr) public returns (uint256) {
         withdrawDelegationReward(valAddr);
 
-        Validator storage val = validators[validateByAddress[valAddr]];
+        Validator storage val = validators[msg.sender];
         Delegation storage del = delegations[valAddr][msg.sender];
 
         val.tokens -= del.stake;
@@ -292,7 +298,7 @@ contract Staking {
     function updateValidator(uint256 commissionRate, uint256 minselfDelegation)
         public
     {
-        Validator storage val = validators[validateByAddress[msg.sender]];
+        Validator storage val = validators[msg.sender];
         if (commissionRate > 0) {
             val.commissionRate = commissionRate;
         }
@@ -311,7 +317,7 @@ contract Staking {
     }
 
     function unjail() public {
-        Validator storage val = validators[validateByAddress[msg.sender] - 1];
+        Validator storage val = validators[msg.sender];
         Delegation storage del = delegations[msg.sender][msg.sender];
         require(val.jailed, "validator not jailed");
         require(
