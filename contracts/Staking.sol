@@ -98,7 +98,10 @@ contract Staking {
         public
         payable
     {
-        require(validators[msg.sender].operatorAddress == address(0x0), "Validator Owner Exists");
+        require(
+            validators[msg.sender].operatorAddress == address(0x0),
+            "Validator Owner Exists"
+        );
 
         validators[msg.sender] = Validator({
             operatorAddress: msg.sender,
@@ -115,7 +118,6 @@ contract Staking {
             slashFractionDowntimeRatio: 0,
             minselfDelegation: minselfDelegation
         });
-
 
         validatorSets.push(msg.sender);
 
@@ -188,7 +190,6 @@ contract Staking {
         previousProposerAddr = proposerAddr;
     }
 
-
     function allocateTokens(
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
@@ -209,7 +210,7 @@ contract Staking {
         );
         uint256 proposerReward = feeCollected.mulTrun(proposerMultiplier);
         allocateTokensToVal(previousProposerAddr, proposerReward);
-        
+
         uint256 voteMultiplier = 1 * 10**18;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < addresses.length; i++) {
@@ -235,7 +236,7 @@ contract Staking {
         bool[] memory signed,
         uint256[] memory powers
     ) private {
-        for (uint256 i = 0; i < signed.length; i++) {
+        for (uint256 i = 0; i < addresses.length; i++) {
             handleValidateSignature(addresses[i], powers[i], signed[i]);
         }
     }
@@ -244,7 +245,7 @@ contract Staking {
         address valAddr,
         uint256 power,
         bool signed
-    ) internal {
+    ) private {
         Validator storage val = validators[valAddr];
         if (signed) {
             val.missedBlockCounter -= 1;
@@ -291,7 +292,9 @@ contract Staking {
 
         if (val.slashFractionDowntimeRatio > 0) {
             del.stake = del.stake.mulTrun(
-                val.slashFractionDowntimeRatio.sub(del.slashFractionDowntimeRatio)
+                val.slashFractionDowntimeRatio.sub(
+                    del.slashFractionDowntimeRatio
+                )
             );
         }
         uint256 difference = val.cumulativeRewardRatio.sub(
@@ -309,17 +312,23 @@ contract Staking {
         return (val.tokens, val.jailed);
     }
 
-
-    function getDelegationRewards(address delAddr, address valAddr) public view returns(uint256) {
+    function getDelegationRewards(address delAddr, address valAddr)
+        public
+        view
+        returns (uint256)
+    {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
         uint256 stake = del.stake;
-        uint256 cumulativeRewardRatio = val.cumulativeRewardRatio + val.rewards.divTrun(val.tokens);
+        uint256 cumulativeRewardRatio = val.cumulativeRewardRatio;
+        cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
 
         if (val.slashFractionDowntimeRatio > 0) {
             stake = del.stake.mulTrun(
-                val.slashFractionDowntimeRatio.sub(del.slashFractionDowntimeRatio)
+                val.slashFractionDowntimeRatio.sub(
+                    del.slashFractionDowntimeRatio
+                )
             );
         }
         uint256 difference = cumulativeRewardRatio.sub(
@@ -343,11 +352,19 @@ contract Staking {
         val.commissionRewards = 0;
     }
 
-    function getValidatorCommissionReward(address valAddr) public view returns(uint256) {
+    function getValidatorCommissionReward(address valAddr)
+        public
+        view
+        returns (uint256)
+    {
         return validators[valAddr].commissionRewards;
     }
 
-    function getDelegationStake(address delAddr, address valAddr) public view returns(uint256) {
+    function getDelegationStake(address delAddr, address valAddr)
+        public
+        view
+        returns (uint256)
+    {
         return delegations[valAddr][delAddr].stake;
     }
 

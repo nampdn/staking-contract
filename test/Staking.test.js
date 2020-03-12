@@ -89,7 +89,7 @@ contract("Staking", async (accounts) => {
 
     it("should unjail", async () => {
         const instance = await Staking.deployed();
-        await instance.unjail(accounts[0]);
+        await instance.unjail({from: accounts[0]});
 
         const val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], false);
