@@ -72,7 +72,7 @@ contract Staking {
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime
-    ) public onlyRoot{
+    ) public onlyRoot {
         if (maxValidators > 0) {
             params.maxValidators = maxValidators;
         }
@@ -306,7 +306,11 @@ contract Staking {
         return rewards;
     }
 
-    function getValidator(address valAddr) public view returns (uint256, bool, uint256) {
+    function getValidator(address valAddr)
+        public
+        view
+        returns (uint256, bool, uint256)
+    {
         Validator memory val = validators[valAddr];
         return (val.tokens, val.jailed, val.jailedUntil);
     }
@@ -368,23 +372,40 @@ contract Staking {
         Delegation storage del = delegations[valAddr][delAddr];
         uint256 stake = del.stake;
         if (val.slashFractionDowntimeRatio > 0) {
-            stake = stake.sub(stake.mulTrun(
-                val.slashFractionDowntimeRatio.sub(
-                    del.slashFractionDowntimeRatio
+            stake = stake.sub(
+                stake.mulTrun(
+                    val.slashFractionDowntimeRatio.sub(
+                        del.slashFractionDowntimeRatio
+                    )
                 )
-            ));
+            );
         }
         return stake;
     }
 
-    function undelegate(address valAddr) public returns (uint256) {
+    function undelegate(address valAddr, uint256 amount)
+        public
+        returns (uint256)
+    {
         withdrawDelegationReward(valAddr);
 
         Validator storage val = validators[msg.sender];
         Delegation storage del = delegations[valAddr][msg.sender];
+        del.stake -= amount;
+
+        if (
+            msg.sender == valAddr &&
+            !val.jailed &&
+            del.stake < val.minselfDelegation
+        ) {
+            val.jailed = true;
+        }
 
         val.tokens -= del.stake;
-        del.stake = 0;
+
+        if (del.stake == 0) {
+            delete delegations[valAddr][msg.sender];
+        }
 
         return del.stake;
     }
