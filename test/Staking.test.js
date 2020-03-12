@@ -2,7 +2,7 @@ const Staking = artifacts.require("Staking");
 contract("Staking", async (accounts) => {
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
-        const bond = 10 * Math.pow(10, 18)
+        const bond = web3.utils.toWei("10", "ether")
         await instance.createValidator(0,1, {from: accounts[0], value: bond});
         const validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
@@ -12,7 +12,7 @@ contract("Staking", async (accounts) => {
 
     it("should delegate to validator", async () => {
         let instance = await Staking.deployed();
-        const bond = 10 * Math.pow(10, 18)
+        const bond = web3.utils.toWei("10", "ether")
         await instance.delegate(accounts[0], {from:accounts[1], value: bond})
 
         const validatorSet = await instance.getCurrentValidatorSet.call();
@@ -29,7 +29,7 @@ contract("Staking", async (accounts) => {
         await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), "500000000000000000");
+        assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
 
         await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
 
@@ -40,10 +40,10 @@ contract("Staking", async (accounts) => {
         await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), "500000000000000000");
+        assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
 
         
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
-        assert.equal(reward.toString(), "1000000000000000000");
+        assert.equal(reward.toString(), web3.utils.toWei("1", "ether"));
     })
 })
