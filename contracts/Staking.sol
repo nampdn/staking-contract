@@ -72,7 +72,7 @@ contract Staking {
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime
-    ) public {
+    ) public onlyRoot{
         if (maxValidators > 0) {
             params.maxValidators = maxValidators;
         }
@@ -252,7 +252,7 @@ contract Staking {
             val.missedBlockCounter += 1;
         }
 
-        if (val.missedBlockCounter >= params.maxMissed) {
+        if (val.missedBlockCounter >= params.maxMissed && !val.jailed) {
             val.jailed = true;
             val.missedBlockCounter = 0;
             val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
@@ -364,7 +364,17 @@ contract Staking {
         view
         returns (uint256)
     {
-        return delegations[valAddr][delAddr].stake;
+        Validator storage val = validators[valAddr];
+        Delegation storage del = delegations[valAddr][delAddr];
+        uint256 stake = del.stake;
+        if (val.slashFractionDowntimeRatio > 0) {
+            stake = stake.sub(stake.mulTrun(
+                val.slashFractionDowntimeRatio.sub(
+                    del.slashFractionDowntimeRatio
+                )
+            ));
+        }
+        return stake;
     }
 
     function undelegate(address valAddr) public returns (uint256) {

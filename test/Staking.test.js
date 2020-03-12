@@ -17,6 +17,8 @@ contract("Staking", async (accounts) => {
 
         const validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[1][0], bond * 2);
+
+        
     })
 
     it("should withdrawl delegation reward", async () => {
@@ -78,6 +80,11 @@ contract("Staking", async (accounts) => {
 
     it ("should jail validator", async() => {
         const instance = await Staking.deployed();
+        const boud2to0 = web3.utils.toWei("10", "ether");
+        await instance.delegate(accounts[0], {from:accounts[2], value: boud2to0})
+        let stake = await instance.getDelegationStake.call(accounts[2], accounts[0]);
+        assert.equal(stake.toString(), boud2to0);
+
         // update maxMissed block
         await instance.setParams(0, 3, 1, 0,0, 0);
         await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
@@ -88,6 +95,11 @@ contract("Staking", async (accounts) => {
         await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
         val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], true);
+
+
+        stake = await instance.getDelegationStake.call(accounts[2], accounts[0]);
+        assert.equal(stake.toString(), web3.utils.toWei("9", "ether"));
+
     });
 
     it("should unjail validator", async () => {
