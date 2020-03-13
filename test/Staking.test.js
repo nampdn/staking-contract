@@ -1,6 +1,12 @@
 const Staking = artifacts.require("Staking");
 contract("Staking", async (accounts) => {
     const feeCollected = web3.utils.toWei("1", "ether");
+
+    async function finalizeCommit(signed) {
+        let instance = await Staking.deployed();
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [signed], [200], feeCollected)
+    }
+
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
         const bond = web3.utils.toWei("100", "ether")
@@ -27,8 +33,8 @@ contract("Staking", async (accounts) => {
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward, 0);
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
+        await finalizeCommit(true)
+        await finalizeCommit(true)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
@@ -39,7 +45,7 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), "0");
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
+        await finalizeCommit(true)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
@@ -54,7 +60,7 @@ contract("Staking", async (accounts) => {
         // commission rate: 1%
         await instance.updateValidator(web3.utils.toWei("0.01", "ether"), 0)
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
+        await finalizeCommit(true)
 
         reward = await instance.getValidatorCommissionReward.call(accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.01", "ether"));
@@ -95,12 +101,12 @@ contract("Staking", async (accounts) => {
 
         // update maxMissed block
         await instance.setParams(0, 3, 1, 0,0, 0);
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200], feeCollected)
+        await finalizeCommit(false);
 
         let val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], false);
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200], feeCollected)
+        await finalizeCommit(false);
         val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], true);
 
