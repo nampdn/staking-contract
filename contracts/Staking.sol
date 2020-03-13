@@ -96,7 +96,8 @@ contract Staking {
         for (uint256 i = idx; i > 0; i--) {
             if (
                 validators[validatorByRank[i]].tokens <=
-                validators[validatorByRank[i.sub(1)]].tokens
+                validators[validatorByRank[i.sub(1)]].tokens &&
+                !validators[validatorByRank[i]].jailed
             ) {
                 break;
             }
@@ -107,6 +108,24 @@ contract Staking {
             address tmp = validatorByRank[i];
             validatorByRank[i] = validatorByRank[i.sub(1)];
             validatorByRank[i.sub(1)] = tmp;
+        }
+
+        for (uint256 i = idx; i < validatorByRank.length - 1; i++) {
+            if (
+                validators[validatorByRank[i]].tokens >=
+                validators[validatorByRank[i.add(1)]].tokens &&
+                !validators[validatorByRank[i]].jailed &&
+                !validators[validatorByRank[i.add(1)]].jailed
+            ) {
+                break;
+            }
+            // Swap up the validator rank
+            validators[validatorByRank[i]].rank = i.add(1);
+            validators[validatorByRank[i.add(1)]].rank = i;
+
+            address tmp = validatorByRank[i];
+            validatorByRank[i] = validatorByRank[i.add(1)];
+            validatorByRank[i.add(1)] = tmp;
         }
     }
 

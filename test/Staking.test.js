@@ -9,11 +9,18 @@ contract("Staking", async (accounts) => {
 
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
+
         const bond = web3.utils.toWei("100", "ether")
         await instance.createValidator(0,1, {from: accounts[0], value: bond});
-        const validatorSet = await instance.getCurrentValidatorSet.call();
+        let validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0], bond);
+
+        const bond2 = web3.utils.toWei("100", "ether")
+        await instance.createValidator(0,1, {from: accounts[1], value: bond2});
+        validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0][0], accounts[0]);
+        assert.equal(validatorSet[1][0], bond2);
     })
 
 
