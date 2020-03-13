@@ -133,8 +133,10 @@ contract Staking {
             jailedUntil: 0,
             slashFractionDowntimeRatio: 0,
             minselfDelegation: minselfDelegation,
-            rank: 0
+            rank: validatorByRank.length
         });
+
+        validatorByRank.push(msg.sender);
         _delegate(msg.sender, msg.sender, msg.value);
     }
 
@@ -166,14 +168,14 @@ contract Staking {
         returns (address[] memory, uint256[] memory)
     {
         uint256 maxValidators = params.maxValidators;
-        if (maxValidators < validatorByRank.length) {
+        if (maxValidators > validatorByRank.length) {
             maxValidators = validatorByRank.length;
         }
 
         address[] memory arrProposer = new address[](maxValidators);
         uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
 
-        for (uint256 i = 0; i < params.maxValidators; i++) {
+        for (uint256 i = 0; i < maxValidators; i++) {
             arrProposer[i] = validatorByRank[i];
             arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens;
         }
