@@ -1,5 +1,6 @@
 const Staking = artifacts.require("Staking");
 contract("Staking", async (accounts) => {
+    const feeCollected = web3.utils.toWei("1", "ether");
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
         const bond = web3.utils.toWei("100", "ether")
@@ -26,8 +27,8 @@ contract("Staking", async (accounts) => {
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward, 0);
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
@@ -38,7 +39,7 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), "0");
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
@@ -53,7 +54,7 @@ contract("Staking", async (accounts) => {
         // commission rate: 1%
         await instance.updateValidator(web3.utils.toWei("0.01", "ether"), 0)
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200])
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [true], [200], feeCollected)
 
         reward = await instance.getValidatorCommissionReward.call(accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0.01", "ether"));
@@ -66,15 +67,20 @@ contract("Staking", async (accounts) => {
 
     it("should undelegate", async () => {
         const instance = await Staking.deployed();
-        let stake = await instance.getDelegationStake.call(accounts[1], accounts[0])
-        assert.equal(stake.toString(), web3.utils.toWei("100", "ether"));
+        const boud3to0 = web3.utils.toWei("100", "ether");
+        await instance.delegate(accounts[0], {from: accounts[3], value: boud3to0})
 
-        await instance.undelegate(accounts[0], {from: accounts[1]});
+        let stake = await instance.getDelegationStake.call(accounts[3], accounts[0])
+        assert.equal(stake.toString(), boud3to0);
 
-        stake = await instance.getDelegationStake.call(accounts[1], accounts[0])
-        assert.equal(stake.toString(), web3.utils.toWei("0", "ether"));
+        await instance.undelegate(accounts[0], String(boud3to0/2), {from: accounts[3]});
 
-        reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
+        stake = await instance.getDelegationStake.call(accounts[3], accounts[0])
+        assert.equal(stake.toString(), boud3to0/2);
+
+        await instance.undelegate(accounts[0], String(boud3to0/2), {from: accounts[3]});
+
+        reward = await instance.getDelegationRewards.call(accounts[3], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
     })
 
@@ -87,12 +93,12 @@ contract("Staking", async (accounts) => {
 
         // update maxMissed block
         await instance.setParams(0, 3, 1, 0,0, 0);
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200], feeCollected)
 
         let val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], false);
 
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200]);
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [false], [200], feeCollected)
         val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], true);
 

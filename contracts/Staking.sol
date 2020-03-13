@@ -164,7 +164,8 @@ contract Staking {
         address proposerAddr,
         address[] memory addresses,
         bool[] memory signed,
-        uint256[] memory powers
+        uint256[] memory powers,
+        uint256 feeCollected
     ) public onlyRoot {
         uint256 previousTotalPower = 0;
         uint256 previousPrecommitTotalPower = 0;
@@ -182,7 +183,8 @@ contract Staking {
                 previousTotalPower,
                 previousPrecommitTotalPower,
                 addresses,
-                powers
+                powers,
+                feeCollected
             );
             handleValidateSignatures(addresses, signed, powers);
         }
@@ -193,10 +195,10 @@ contract Staking {
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
         address[] memory addresses,
-        uint256[] memory powers
+        uint256[] memory powers,
+        uint256 feeCollected
     ) internal {
         if (previousTotalPower == 0) return;
-        uint256 feeCollected = 1 * 10**18;
 
         // calculate fraction votes
         uint256 previousFractionVotes = previousPrecommitTotalPower.divTrun(
