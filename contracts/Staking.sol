@@ -195,6 +195,13 @@ contract Staking {
         uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
 
         for (uint256 i = 0; i < maxValidators; i++) {
+            if (
+                validators[validatorByRank[i]].jailed ||
+                validators[validatorByRank[i]].tokens == 0
+            ) {
+                break;
+            }
+
             arrProposer[i] = validatorByRank[i];
             arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens;
         }

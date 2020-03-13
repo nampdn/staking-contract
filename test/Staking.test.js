@@ -1,4 +1,10 @@
 const Staking = artifacts.require("Staking");
+
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 contract("Staking", async (accounts) => {
     const feeCollected = web3.utils.toWei("1", "ether");
 
@@ -132,9 +138,17 @@ contract("Staking", async (accounts) => {
 
     it("should unjail validator", async () => {
         const instance = await Staking.deployed();
-        await instance.unjail({from: accounts[0]});
 
-        const val = await instance.getValidator.call(accounts[0]);
+        let validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0][1], 0);
+
+        await wait(2000);
+        await instance.unjail({from: accounts[0]});
+        val = await instance.getValidator.call(accounts[0]);
         assert.equal(val[1], false);
+
+        validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0].length, 2);
+        assert.equal(validatorSet[0][0], accounts[1]);
     })
 })
