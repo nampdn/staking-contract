@@ -18,6 +18,7 @@ contract Staking {
         uint256 jailedUntil;
         uint256 slashFractionDowntimeRatio;
         uint256 minselfDelegation;
+        uint256 rank;
     }
     struct Delegation {
         uint256 height;
@@ -38,9 +39,7 @@ contract Staking {
     address previousProposerAddr;
     mapping(address => Validator) validators;
     mapping(address => mapping(address => Delegation)) delegations;
-
-    address[] validatorSets;
-
+    address[] public validatorByRank;
     Params params;
 
     modifier onlyRoot() {
@@ -93,6 +92,24 @@ contract Staking {
         }
     }
 
+    function sortRankByVotingPower(uint256 idx) private {
+        for (uint256 i = idx; i > 0; i--) {
+            if (
+                validators[validatorByRank[i]].tokens <=
+                validators[validatorByRank[i.sub(1)]].tokens
+            ) {
+                break;
+            }
+            // Swap up the validator rank
+            validators[validatorByRank[i]].rank = i.sub(1);
+            validators[validatorByRank[i.sub(1)]].rank = i;
+
+            address tmp = validatorByRank[i];
+            validatorByRank[i] = validatorByRank[i.sub(1)];
+            validatorByRank[i.sub(1)] = tmp;
+        }
+    }
+
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
         public
         payable
@@ -115,11 +132,9 @@ contract Staking {
             missedBlockCounter: 0,
             jailedUntil: 0,
             slashFractionDowntimeRatio: 0,
-            minselfDelegation: minselfDelegation
+            minselfDelegation: minselfDelegation,
+            rank: 0
         });
-
-        validatorSets.push(msg.sender);
-
         _delegate(msg.sender, msg.sender, msg.value);
     }
 
@@ -136,6 +151,7 @@ contract Staking {
         del.stake += amount;
         del.slashFractionDowntimeRatio = val.slashFractionDowntimeRatio;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
+        sortRankByVotingPower(val.rank);
     }
 
     function delegate(address valAddr) public payable {
@@ -149,15 +165,20 @@ contract Staking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        address[] memory addresses = new address[](validatorSets.length);
-        uint256[] memory votingPowers = new uint256[](validatorSets.length);
-
-        for (uint256 i = 0; i < validatorSets.length; i++) {
-            addresses[i] = validators[validatorSets[i]].operatorAddress;
-            votingPowers[i] = validators[validatorSets[i]].tokens;
+        uint256 maxValidators = params.maxValidators;
+        if (maxValidators < validatorByRank.length) {
+            maxValidators = validatorByRank.length;
         }
 
-        return (addresses, votingPowers);
+        address[] memory arrProposer = new address[](maxValidators);
+        uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
+
+        for (uint256 i = 0; i < params.maxValidators; i++) {
+            arrProposer[i] = validatorByRank[i];
+            arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens;
+        }
+
+        return (arrProposer, arrProposerVotingPower);
     }
 
     function finalizeCommit(
@@ -259,6 +280,7 @@ contract Staking {
             val.missedBlockCounter = 0;
             val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
             slash(valAddr, power);
+            sortRankByVotingPower(val.rank);
         }
 
     }
@@ -408,7 +430,7 @@ contract Staking {
         if (del.stake == 0) {
             delete delegations[valAddr][msg.sender];
         }
-
+        sortRankByVotingPower(val.rank);
         return del.stake;
     }
 
