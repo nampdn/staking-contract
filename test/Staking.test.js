@@ -16,23 +16,30 @@ contract("Staking", async (accounts) => {
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0], bond);
 
-        const bond2 = web3.utils.toWei("100", "ether")
+        const bond2 = web3.utils.toWei("101", "ether")
         await instance.createValidator(0,1, {from: accounts[1], value: bond2});
         validatorSet = await instance.getCurrentValidatorSet.call();
-        assert.equal(validatorSet[0][0], accounts[0]);
+        assert.equal(validatorSet[0][0], accounts[1]);
         assert.equal(validatorSet[1][0], bond2);
     })
 
 
     it("should delegate to validator", async () => {
         let instance = await Staking.deployed();
-        const bond = web3.utils.toWei("100", "ether")
+        const bond = web3.utils.toWei("0.1", "ether")
         await instance.delegate(accounts[0], {from:accounts[1], value: bond})
 
-        const validatorSet = await instance.getCurrentValidatorSet.call();
-        assert.equal(validatorSet[1][0], bond * 2);
+        let validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0][0], accounts[1]);
 
-        
+        const bond2 = web3.utils.toWei("99.9", "ether")
+        await instance.delegate(accounts[0], {from:accounts[1], value: bond2})
+        validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0][0], accounts[0]);
+        assert.equal(validatorSet[1][0], web3.utils.toWei("200", "ether"));
+
+        const stake = await instance.getDelegationStake.call(accounts[1], accounts[0]);
+        assert.equal(stake.toString(), web3.utils.toWei("100", "ether"));
     })
 
     it("should withdrawl delegation reward", async () => {
