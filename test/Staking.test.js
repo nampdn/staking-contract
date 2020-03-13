@@ -79,6 +79,8 @@ contract("Staking", async (accounts) => {
         assert.equal(stake.toString(), boud3to0/2);
 
         await instance.undelegate(accounts[0], String(boud3to0/2), {from: accounts[3]});
+        stake = await instance.getDelegationStake.call(accounts[3], accounts[0])
+        assert.equal(stake.toString(), "0");
 
         reward = await instance.getDelegationRewards.call(accounts[3], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
