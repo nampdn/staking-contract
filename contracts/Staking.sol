@@ -40,6 +40,8 @@ contract Staking {
     mapping(address => Validator) validators;
     mapping(address => mapping(address => Delegation)) delegations;
     address[] public validatorByRank;
+    uint256 validatorCounter;
+
     Params params;
 
     modifier onlyRoot() {
@@ -109,7 +111,6 @@ contract Staking {
             validatorByRank[i] = validatorByRank[i.sub(1)];
             validatorByRank[i.sub(1)] = tmp;
         }
-
         for (uint256 i = idx; i < validatorByRank.length - 1; i++) {
             if (
                 validators[validatorByRank[i]].tokens >=
@@ -127,6 +128,18 @@ contract Staking {
             validatorByRank[i] = validatorByRank[i.add(1)];
             validatorByRank[i.add(1)] = tmp;
         }
+
+        while (validatorCounter > 0) {
+            if (
+                validators[validatorByRank[validatorCounter]].tokens > 0 &&
+                !validators[validatorByRank[validatorCounter]].jailed
+            ) {
+                break;
+            }
+            delete validatorByRank[validatorCounter];
+            validatorCounter--;
+        }
+
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
@@ -137,7 +150,6 @@ contract Staking {
             validators[msg.sender].operatorAddress == address(0x0),
             "Validator Owner Exists"
         );
-
         validators[msg.sender] = Validator({
             operatorAddress: msg.sender,
             rewards: 0,
@@ -152,7 +164,7 @@ contract Staking {
             jailedUntil: 0,
             slashFractionDowntimeRatio: 0,
             minselfDelegation: minselfDelegation,
-            rank: validatorByRank.length
+            rank: validatorCounter
         });
 
         validatorByRank.push(msg.sender);
@@ -493,8 +505,11 @@ contract Staking {
         );
         require(val.jailedUntil < block.timestamp, "validator jailed");
 
+        validatorCounter++;
+
         val.jailedUntil = 0;
         val.jailed = false;
-
+        val.rank = validatorCounter;
+        sortRankByVotingPower(val.rank);
     }
 }

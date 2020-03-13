@@ -140,7 +140,7 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
 
         let validatorSet = await instance.getCurrentValidatorSet.call();
-        assert.equal(validatorSet[0][1], 0);
+        assert.equal(validatorSet[0][0], accounts[1]);
 
         await wait(2000);
         await instance.unjail({from: accounts[0]});
@@ -148,7 +148,6 @@ contract("Staking", async (accounts) => {
         assert.equal(val[1], false);
 
         validatorSet = await instance.getCurrentValidatorSet.call();
-        assert.equal(validatorSet[0].length, 2);
-        assert.equal(validatorSet[0][0], accounts[1]);
+        assert.equal(validatorSet[0][0], accounts[0]);
     })
 })
