@@ -25,6 +25,13 @@ contract Staking {
         uint256 stake;
         uint256 cumulativeRewardRatio;
         uint256 slashFractionDowntimeRatio;
+        UnbondingDelegationEntry[] ubdEntries;
+    }
+
+    struct UnbondingDelegationEntry {
+        uint256 creationHeight;
+        uint256 completionTime;
+        uint256 balance;
     }
 
     struct Params {
@@ -34,6 +41,7 @@ contract Staking {
         uint256 maxMissed;
         uint256 downtimeJailDuration;
         uint256 slashFractionDowntime;
+        uint256 unboudingTime;
     }
 
     address previousProposerAddr;
@@ -54,7 +62,8 @@ contract Staking {
         uint256 downtimeJailDuration,
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
-        uint256 slashFractionDowntime
+        uint256 slashFractionDowntime,
+        uint256 unboudingTime
     ) public {
         params = Params({
             maxValidators: maxValidators,
@@ -62,7 +71,8 @@ contract Staking {
             downtimeJailDuration: downtimeJailDuration,
             baseProposerReward: baseProposerReward,
             bonusProposerReward: bonusProposerReward,
-            slashFractionDowntime: slashFractionDowntime
+            slashFractionDowntime: slashFractionDowntime,
+            unboudingTime: unboudingTime 
         });
     }
 
@@ -72,7 +82,8 @@ contract Staking {
         uint256 downtimeJailDuration,
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
-        uint256 slashFractionDowntime
+        uint256 slashFractionDowntime,
+        uint256 unboudingTime
     ) public onlyRoot {
         if (maxValidators > 0) {
             params.maxValidators = maxValidators;
@@ -91,6 +102,9 @@ contract Staking {
         }
         if (slashFractionDowntime > 0) {
             params.slashFractionDowntime = slashFractionDowntime;
+        }
+        if (unboudingTime > 0) {
+            params.unboudingTime = unboudingTime;
         }
     }
 
@@ -370,6 +384,39 @@ contract Staking {
         return rewards;
     }
 
+    function completeUnbouding(address valAddr) public payable {
+        Delegation storage del = delegations[valAddr][msg.sender];
+        uint256 balance = 0;
+        for (uint256 i = 0; i < del.ubdEntries.length; i++) {
+            UnbondingDelegationEntry memory entry = del.ubdEntries[i];
+            if (entry.completionTime < block.timestamp) {
+                del.ubdEntries[i] = del.ubdEntries[del.ubdEntries.length - 1];
+                del.ubdEntries.pop();
+                i--;
+                balance += entry.balance;
+            }
+        }
+        transferTo(msg.sender, balance);
+    }
+
+    function getUnboudingDelegation(address delAddr, address valAddr)
+        public
+        view
+        returns (uint256, uint256)
+    {
+        Delegation storage del = delegations[valAddr][delAddr];
+        uint256 balances = 0;
+        uint256 sumTotalBalance = 0;
+        for (uint256 i = 0; i < del.ubdEntries.length; i++) {
+            UnbondingDelegationEntry memory entry = del.ubdEntries[i];
+            sumTotalBalance += entry.balance;
+            if (entry.completionTime < block.timestamp) {
+                balances += entry.balance;
+            }
+        }
+        return (balances, sumTotalBalance);
+    }
+
     function getValidator(address valAddr)
         public
         view
@@ -470,6 +517,15 @@ contract Staking {
         if (del.stake == 0) {
             delete delegations[valAddr][msg.sender];
         }
+
+        del.ubdEntries.push(
+            UnbondingDelegationEntry({
+                balance: amount,
+                creationHeight: block.number,
+                completionTime: block.timestamp + 1
+            })
+        );
+
         sortRankByVotingPower(val.rank);
         return del.stake;
     }
