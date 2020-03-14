@@ -32,6 +32,7 @@ contract Staking {
         uint256 creationHeight;
         uint256 completionTime;
         uint256 balance;
+        uint256 slashFractionDowntimeRatio;
     }
 
     struct Params {
@@ -42,13 +43,13 @@ contract Staking {
         uint256 downtimeJailDuration;
         uint256 slashFractionDowntime;
         uint256 unboudingTime;
+        uint256 slashFractionDoubleSign;
     }
 
     address previousProposerAddr;
     mapping(address => Validator) validators;
     mapping(address => mapping(address => Delegation)) delegations;
     address[] public validatorByRank;
-    uint256 validatorCounter;
 
     Params params;
 
@@ -63,7 +64,8 @@ contract Staking {
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime,
-        uint256 unboudingTime
+        uint256 unboudingTime,
+        uint256 slashFractionDoubleSign
     ) public {
         params = Params({
             maxValidators: maxValidators,
@@ -72,7 +74,8 @@ contract Staking {
             baseProposerReward: baseProposerReward,
             bonusProposerReward: bonusProposerReward,
             slashFractionDowntime: slashFractionDowntime,
-            unboudingTime: unboudingTime 
+            unboudingTime: unboudingTime,
+            slashFractionDoubleSign: slashFractionDoubleSign
         });
     }
 
@@ -83,7 +86,8 @@ contract Staking {
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime,
-        uint256 unboudingTime
+        uint256 unboudingTime,
+        uint256 slashFractionDoubleSign
     ) public onlyRoot {
         if (maxValidators > 0) {
             params.maxValidators = maxValidators;
@@ -105,6 +109,9 @@ contract Staking {
         }
         if (unboudingTime > 0) {
             params.unboudingTime = unboudingTime;
+        }
+        if (slashFractionDoubleSign > 0) {
+            params.slashFractionDoubleSign = slashFractionDoubleSign;
         }
     }
 
@@ -143,17 +150,15 @@ contract Staking {
             validatorByRank[i.add(1)] = tmp;
         }
 
-        while (validatorCounter > 0) {
+        for (uint256 i = validatorByRank.length - 1; i > 0; i--) {
             if (
-                validators[validatorByRank[validatorCounter]].tokens > 0 &&
-                !validators[validatorByRank[validatorCounter]].jailed
+                validators[validatorByRank[i]].tokens > 0 &&
+                !validators[validatorByRank[i]].jailed
             ) {
                 break;
             }
-            delete validatorByRank[validatorCounter];
-            validatorCounter--;
+            validatorByRank.pop();
         }
-
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
@@ -178,7 +183,7 @@ contract Staking {
             jailedUntil: 0,
             slashFractionDowntimeRatio: 0,
             minselfDelegation: minselfDelegation,
-            rank: validatorCounter
+            rank: validatorByRank.length
         });
 
         validatorByRank.push(msg.sender);
@@ -330,20 +335,29 @@ contract Staking {
         }
 
         if (val.missedBlockCounter >= params.maxMissed && !val.jailed) {
-            val.jailed = true;
-            val.missedBlockCounter = 0;
-            val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
-            slash(valAddr, power);
-            sortRankByVotingPower(val.rank);
+            slash(valAddr, power, block.number, params.slashFractionDowntime);
         }
 
     }
 
-    function slash(address valAddr, uint256 power) private {
+    function slash(
+        address valAddr,
+        uint256 votingPower,
+        uint256 infractionHeight,
+        uint256 slashFractor
+    ) private {
         Validator storage val = validators[valAddr];
-        uint256 slashAmount = power.mulTrun(params.slashFractionDowntime);
+        uint256 slashAmount = votingPower.mulTrun(slashFractor);
         val.tokens -= slashAmount;
-        val.slashFractionDowntimeRatio += params.slashFractionDowntime;
+        val.slashFractionDowntimeRatio += slashFractor;
+
+        // jail validator
+        val.jailed = true;
+        val.missedBlockCounter = 0;
+        val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
+
+        sortRankByVotingPower(val.rank);
+
     }
 
     function transferTo(address payable recipient, uint256 amount)
@@ -384,7 +398,8 @@ contract Staking {
         return rewards;
     }
 
-    function completeUnbouding(address valAddr) public payable {
+    function withdraw(address valAddr) public {
+        Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][msg.sender];
         uint256 balance = 0;
         for (uint256 i = 0; i < del.ubdEntries.length; i++) {
@@ -393,7 +408,11 @@ contract Staking {
                 del.ubdEntries[i] = del.ubdEntries[del.ubdEntries.length - 1];
                 del.ubdEntries.pop();
                 i--;
-                balance += entry.balance;
+                balance += entry.balance.mulTrun(
+                    val.slashFractionDowntimeRatio.divTrun(
+                        entry.slashFractionDowntimeRatio
+                    )
+                );
             }
         }
         transferTo(msg.sender, balance);
@@ -404,14 +423,22 @@ contract Staking {
         view
         returns (uint256, uint256)
     {
+        Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
         uint256 balances = 0;
         uint256 sumTotalBalance = 0;
         for (uint256 i = 0; i < del.ubdEntries.length; i++) {
             UnbondingDelegationEntry memory entry = del.ubdEntries[i];
-            sumTotalBalance += entry.balance;
+
+            uint256 balance = entry.balance.mulTrun(
+                val.slashFractionDowntimeRatio.divTrun(
+                    entry.slashFractionDowntimeRatio
+                )
+            );
+
+            sumTotalBalance += balance;
             if (entry.completionTime < block.timestamp) {
-                balances += entry.balance;
+                balances += balance;
             }
         }
         return (balances, sumTotalBalance);
@@ -514,15 +541,16 @@ contract Staking {
 
         val.tokens -= del.stake;
 
-        if (del.stake == 0) {
-            delete delegations[valAddr][msg.sender];
+        if (val.tokens == 0) {
+            delete validators[valAddr];
         }
 
         del.ubdEntries.push(
             UnbondingDelegationEntry({
                 balance: amount,
                 creationHeight: block.number,
-                completionTime: block.timestamp + 1
+                completionTime: block.timestamp + params.unboudingTime,
+                slashFractionDowntimeRatio: val.slashFractionDowntimeRatio
             })
         );
 
@@ -561,11 +589,23 @@ contract Staking {
         );
         require(val.jailedUntil < block.timestamp, "validator jailed");
 
-        validatorCounter++;
-
         val.jailedUntil = 0;
         val.jailed = false;
-        val.rank = validatorCounter;
+        val.rank = validatorByRank.length;
+        validatorByRank.push(msg.sender);
         sortRankByVotingPower(val.rank);
+    }
+
+    function doubleSign(
+        address valAddr,
+        uint256 height,
+        uint256 votingPower,
+        uint256 time
+    ) public onlyRoot {
+        Validator storage val = validators[valAddr];
+        if (val.operatorAddress != address(0x0)) {
+            return;
+        }
+        slash(valAddr, votingPower, height, params.slashFractionDoubleSign);
     }
 }
