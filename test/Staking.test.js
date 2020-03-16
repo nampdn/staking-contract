@@ -175,4 +175,21 @@ contract("Staking", async (accounts) => {
         validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
     })
+
+    it("should check doubleSign", async () => {
+        const instance = await Staking.deployed();
+        const boud4to0 = web3.utils.toWei("10", "ether");
+        await instance.delegate(accounts[0], {from:accounts[4], value: boud4to0})
+        await instance.doubleSign(accounts[0], 1000); 
+        let stake = await instance.getDelegationStake.call(accounts[4], accounts[0]);
+        assert.equal(stake.toString(), String(boud4to0/2));
+    })
+
+    it("should check slash unbounding delegation entries", async () => {
+        const instance = await Staking.deployed();
+        await instance.undelegate(accounts[0], web3.utils.toWei("5", "ether"), {from : accounts[4]});
+        await instance.doubleSign(accounts[0], 1000); 
+        const udb = await instance.getUnboudingDelegation.call(accounts[4], accounts[0])
+        assert.equal(udb[1].toString(), web3.utils.toWei("2.5", "ether"))
+    })
 })
