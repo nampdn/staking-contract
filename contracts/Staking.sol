@@ -16,23 +16,21 @@ contract Staking {
         uint256 cumulativeRewardRatio;
         uint256 missedBlockCounter;
         uint256 jailedUntil;
-        uint256 slashFractionDowntimeRatio;
+        uint256 cumulativeSlashRatio;
         uint256 minselfDelegation;
         uint256 rank;
     }
     struct Delegation {
-        uint256 height;
         uint256 stake;
         uint256 cumulativeRewardRatio;
-        uint256 slashFractionDowntimeRatio;
+        uint256 cumulativeSlashRatio;
         UnbondingDelegationEntry[] ubdEntries;
     }
 
     struct UnbondingDelegationEntry {
-        uint256 creationHeight;
         uint256 completionTime;
         uint256 balance;
-        uint256 slashFractionDowntimeRatio;
+        uint256 cumulativeSlashRatio;
     }
 
     struct Params {
@@ -115,50 +113,44 @@ contract Staking {
         }
     }
 
-    function sortRankByVotingPower(uint256 idx) private {
-        for (uint256 i = idx; i > 0; i--) {
-            if (
-                validators[validatorByRank[i]].tokens <=
-                validators[validatorByRank[i.sub(1)]].tokens &&
-                !validators[validatorByRank[i]].jailed
-            ) {
-                break;
-            }
-            // Swap up the validator rank
-            validators[validatorByRank[i]].rank = i.sub(1);
-            validators[validatorByRank[i.sub(1)]].rank = i;
-
-            address tmp = validatorByRank[i];
-            validatorByRank[i] = validatorByRank[i.sub(1)];
-            validatorByRank[i.sub(1)] = tmp;
+    function tokenByRank(uint idx) private view returns (uint256) {
+        if (validators[validatorByRank[idx]].jailed) {
+            return 0;
         }
-        for (uint256 i = idx; i < validatorByRank.length - 1; i++) {
-            if (
-                validators[validatorByRank[i]].tokens >=
-                validators[validatorByRank[i.add(1)]].tokens &&
-                !validators[validatorByRank[i]].jailed &&
-                !validators[validatorByRank[i.add(1)]].jailed
-            ) {
-                break;
-            }
-            // Swap up the validator rank
-            validators[validatorByRank[i]].rank = i.add(1);
-            validators[validatorByRank[i.add(1)]].rank = i;
+        return validators[validatorByRank[idx]].tokens;
+    }
 
-            address tmp = validatorByRank[i];
-            validatorByRank[i] = validatorByRank[i.add(1)];
-            validatorByRank[i.add(1)] = tmp;
-        }
+    function sortRankByVotingPower(uint idx) private {
+        _sortRankByVotingPower(0, idx);
+        cleanValidatorByRankArr();
+    }
 
-        for (uint256 i = validatorByRank.length - 1; i > 0; i--) {
-            if (
-                validators[validatorByRank[i]].tokens > 0 &&
-                !validators[validatorByRank[i]].jailed
-            ) {
-                break;
-            }
+    function cleanValidatorByRankArr() private {
+        for (uint i = validatorByRank.length - 1; i <= 0; i--) {
+            if (tokenByRank(i) > 0) break;
             validatorByRank.pop();
         }
+    }
+
+    function _sortRankByVotingPower(uint left, uint right) private {
+        uint i = left;
+        uint j = right;
+        if (i == j) return;
+        uint pivot = tokenByRank(left + (right - left) / 2);
+        while (i <= j) {
+            while (tokenByRank(i) > pivot) i++;
+            while (pivot > tokenByRank(j)) j--;
+            if (i <= j) {
+                (validatorByRank[i], validatorByRank[j]) = (validatorByRank[j], validatorByRank[i]);
+                i++;
+                j--;
+            }
+        }
+        if (left < j)
+            _sortRankByVotingPower(left, j);
+
+        if (i < right)
+            _sortRankByVotingPower(i, right);
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
@@ -179,9 +171,9 @@ contract Staking {
             commissionRate: commissionRate,
             updateTime: block.timestamp,
             cumulativeRewardRatio: 0,
+            cumulativeSlashRatio: 0,
             missedBlockCounter: 0,
             jailedUntil: 0,
-            slashFractionDowntimeRatio: 0,
             minselfDelegation: minselfDelegation,
             rank: validatorByRank.length
         });
@@ -201,7 +193,7 @@ contract Staking {
 
         // update delegate starting info
         del.stake += amount;
-        del.slashFractionDowntimeRatio = val.slashFractionDowntimeRatio;
+        del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
         sortRankByVotingPower(val.rank);
     }
@@ -335,21 +327,18 @@ contract Staking {
         }
 
         if (val.missedBlockCounter >= params.maxMissed && !val.jailed) {
-            slash(valAddr, power, block.number, params.slashFractionDowntime);
+            slash(valAddr, power, params.slashFractionDowntime);
         }
 
     }
 
-    function slash(
-        address valAddr,
-        uint256 votingPower,
-        uint256 infractionHeight,
-        uint256 slashFractor
-    ) private {
+    function slash(address valAddr, uint256 votingPower, uint256 slashFractor)
+        private
+    {
         Validator storage val = validators[valAddr];
         uint256 slashAmount = votingPower.mulTrun(slashFractor);
         val.tokens -= slashAmount;
-        val.slashFractionDowntimeRatio += slashFractor;
+        val.cumulativeSlashRatio += slashFractor;
 
         // jail validator
         val.jailed = true;
@@ -381,11 +370,9 @@ contract Staking {
 
         val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
 
-        if (val.slashFractionDowntimeRatio > 0) {
+        if (val.cumulativeSlashRatio > 0) {
             del.stake = del.stake.mulTrun(
-                val.slashFractionDowntimeRatio.sub(
-                    del.slashFractionDowntimeRatio
-                )
+                val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
             );
         }
         uint256 difference = val.cumulativeRewardRatio.sub(
@@ -394,7 +381,7 @@ contract Staking {
         uint256 rewards = difference.mulTrun(del.stake);
         val.rewards = 0;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
-        del.slashFractionDowntimeRatio = val.slashFractionDowntimeRatio;
+        del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         return rewards;
     }
 
@@ -409,9 +396,7 @@ contract Staking {
                 del.ubdEntries.pop();
                 i--;
                 balance += entry.balance.mulTrun(
-                    val.slashFractionDowntimeRatio.divTrun(
-                        entry.slashFractionDowntimeRatio
-                    )
+                    val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
                 );
             }
         }
@@ -431,9 +416,7 @@ contract Staking {
             UnbondingDelegationEntry memory entry = del.ubdEntries[i];
 
             uint256 balance = entry.balance.mulTrun(
-                val.slashFractionDowntimeRatio.divTrun(
-                    entry.slashFractionDowntimeRatio
-                )
+                val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
             );
 
             sumTotalBalance += balance;
@@ -465,11 +448,9 @@ contract Staking {
         uint256 cumulativeRewardRatio = val.cumulativeRewardRatio;
         cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
 
-        if (val.slashFractionDowntimeRatio > 0) {
+        if (val.cumulativeSlashRatio > 0) {
             stake = del.stake.mulTrun(
-                val.slashFractionDowntimeRatio.sub(
-                    del.slashFractionDowntimeRatio
-                )
+                val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
             );
         }
         uint256 difference = cumulativeRewardRatio.sub(
@@ -509,12 +490,10 @@ contract Staking {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
         uint256 stake = del.stake;
-        if (val.slashFractionDowntimeRatio > 0) {
+        if (val.cumulativeSlashRatio > 0) {
             stake = stake.sub(
                 stake.mulTrun(
-                    val.slashFractionDowntimeRatio.sub(
-                        del.slashFractionDowntimeRatio
-                    )
+                    val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
                 )
             );
         }
@@ -548,9 +527,8 @@ contract Staking {
         del.ubdEntries.push(
             UnbondingDelegationEntry({
                 balance: amount,
-                creationHeight: block.number,
                 completionTime: block.timestamp + params.unboudingTime,
-                slashFractionDowntimeRatio: val.slashFractionDowntimeRatio
+                cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
 
@@ -596,16 +574,14 @@ contract Staking {
         sortRankByVotingPower(val.rank);
     }
 
-    function doubleSign(
-        address valAddr,
-        uint256 height,
-        uint256 votingPower,
-        uint256 time
-    ) public onlyRoot {
+    function doubleSign(address valAddr, uint256 votingPower, uint256 time)
+        public
+        onlyRoot
+    {
         Validator storage val = validators[valAddr];
         if (val.operatorAddress != address(0x0)) {
             return;
         }
-        slash(valAddr, votingPower, height, params.slashFractionDoubleSign);
+        slash(valAddr, votingPower, params.slashFractionDoubleSign);
     }
 }
