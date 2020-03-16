@@ -411,9 +411,12 @@ contract Staking {
         for (uint256 i = 0; i < del.ubdEntries.length; i++) {
             UnbondingDelegationEntry memory entry = del.ubdEntries[i];
 
-            uint256 balance = entry.balance.mulTrun(
-                val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
-            );
+            uint256 balance = entry.balance;
+            if (val.cumulativeSlashRatio > 0) {
+                balance = balance.mulTrun(
+                    val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
+                );
+            }
 
             sumTotalBalance += balance;
             if (entry.completionTime < block.timestamp) {
@@ -515,11 +518,6 @@ contract Staking {
         }
 
         val.tokens -= del.stake;
-
-        if (val.tokens == 0) {
-            delete validators[valAddr];
-        }
-
         del.ubdEntries.push(
             UnbondingDelegationEntry({
                 balance: amount,

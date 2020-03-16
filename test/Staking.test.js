@@ -118,6 +118,22 @@ contract("Staking", async (accounts) => {
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
     })
 
+    it("should withdraw", async() => {
+        const instance = await Staking.deployed();
+
+        let udb = await instance.getUnboudingDelegation.call(accounts[3], accounts[0])
+        assert.equal(udb[0], 0)
+        assert.equal(udb[1].toString(), web3.utils.toWei("100", "ether"))
+
+        await wait(2000);
+        await finalizeCommit(true);
+        udb = await instance.getUnboudingDelegation.call(accounts[3], accounts[0])
+        assert.equal(udb[0].toString(), web3.utils.toWei("100", "ether"))
+        assert.equal(udb[1].toString(), web3.utils.toWei("100", "ether"))
+
+        //await instance.withdraw(accounts[3]);
+    })
+
     it ("should jail validator", async() => {
         const instance = await Staking.deployed();
         const boud2to0 = web3.utils.toWei("10", "ether");
@@ -126,7 +142,7 @@ contract("Staking", async (accounts) => {
         assert.equal(stake.toString(), boud2to0);
 
         // update maxMissed block
-        await instance.setParams(0, 3, 1, 0,0, 0, 0, 0);
+        await instance.setParams(0, 2, 1, 0,0, 0, 0, 0);
         await finalizeCommit(false);
 
         let val = await instance.getValidator.call(accounts[0]);
