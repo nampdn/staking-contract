@@ -27,6 +27,12 @@ contract("Staking", async (accounts) => {
         validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[1]);
         assert.equal(validatorSet[1][0], bond2);
+
+        const bond3 = web3.utils.toWei("1", "ether")
+        await instance.createValidator(0,1, {from: accounts[2], value: bond3});
+        validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0][2], accounts[2]);
+        assert.equal(validatorSet[1][2], bond3);
     })
 
 
@@ -120,7 +126,7 @@ contract("Staking", async (accounts) => {
         assert.equal(stake.toString(), boud2to0);
 
         // update maxMissed block
-        await instance.setParams(0, 3, 1, 0,0, 0);
+        await instance.setParams(0, 3, 1, 0,0, 0, 0, 0);
         await finalizeCommit(false);
 
         let val = await instance.getValidator.call(accounts[0]);

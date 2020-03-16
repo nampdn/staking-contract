@@ -121,7 +121,7 @@ contract Staking {
     }
 
     function sortRankByVotingPower(uint idx) private {
-        _sortRankByVotingPower(0, idx);
+        _sortRankByVotingPower(0, validatorByRank.length - 1);
         cleanValidatorByRankArr();
     }
 
@@ -141,7 +141,9 @@ contract Staking {
             while (tokenByRank(i) > pivot) i++;
             while (pivot > tokenByRank(j)) j--;
             if (i <= j) {
-                (validatorByRank[i], validatorByRank[j]) = (validatorByRank[j], validatorByRank[i]);
+                address tmp = validatorByRank[i];
+                validatorByRank[i] = validatorByRank[j];
+                validatorByRank[j] = tmp;
                 i++;
                 j--;
             }
@@ -151,6 +153,7 @@ contract Staking {
 
         if (i < right)
             _sortRankByVotingPower(i, right);
+            
     }
 
     function createValidator(uint256 commissionRate, uint256 minselfDelegation)
@@ -218,13 +221,6 @@ contract Staking {
         uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
 
         for (uint256 i = 0; i < maxValidators; i++) {
-            if (
-                validators[validatorByRank[i]].jailed ||
-                validators[validatorByRank[i]].tokens == 0
-            ) {
-                break;
-            }
-
             arrProposer[i] = validatorByRank[i];
             arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens;
         }
@@ -574,12 +570,12 @@ contract Staking {
         sortRankByVotingPower(val.rank);
     }
 
-    function doubleSign(address valAddr, uint256 votingPower, uint256 time)
+    function doubleSign(address valAddr, uint256 votingPower)
         public
         onlyRoot
     {
         Validator storage val = validators[valAddr];
-        if (val.operatorAddress != address(0x0)) {
+        if (val.operatorAddress == address(0x0)) {
             return;
         }
         slash(valAddr, votingPower, params.slashFractionDoubleSign);
