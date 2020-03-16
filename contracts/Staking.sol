@@ -391,9 +391,12 @@ contract Staking {
                 del.ubdEntries[i] = del.ubdEntries[del.ubdEntries.length - 1];
                 del.ubdEntries.pop();
                 i--;
-                balance += entry.balance.mulTrun(
-                    val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
-                );
+                balance += entry.balance;
+                if (val.cumulativeSlashRatio > 0) {
+                    balance = balance.mulTrun(
+                        val.cumulativeSlashRatio.divTrun(entry.cumulativeSlashRatio)
+                    );
+                }
             }
         }
         transferTo(msg.sender, balance);

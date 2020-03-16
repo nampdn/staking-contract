@@ -131,7 +131,10 @@ contract("Staking", async (accounts) => {
         assert.equal(udb[0].toString(), web3.utils.toWei("100", "ether"))
         assert.equal(udb[1].toString(), web3.utils.toWei("100", "ether"))
 
-        //await instance.withdraw(accounts[3]);
+        await instance.withdraw(accounts[0], {from: accounts[3]});
+        udb = await instance.getUnboudingDelegation.call(accounts[3], accounts[0])
+        assert.equal(udb[0], 0)
+        assert.equal(udb[1], 0)
     })
 
     it ("should jail validator", async() => {
