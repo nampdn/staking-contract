@@ -4,7 +4,7 @@ import {SafeMath} from "./Safemath.sol";
 contract Staking {
     enum Status {Unbonded, Unbonding, Bonded}
     using SafeMath for uint256;
-    uint256 powerReduction = 1 * 10 ** 6;
+    uint256 powerReduction = 1 * 10**6;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
@@ -142,6 +142,9 @@ contract Staking {
             while (tokenByRank(i) > pivot) i++;
             while (pivot > tokenByRank(j)) j--;
             if (i <= j) {
+                validators[validatorByRank[i]].rank = j;
+                validators[validatorByRank[j]].rank = i;
+
                 address tmp = validatorByRank[i];
                 validatorByRank[i] = validatorByRank[j];
                 validatorByRank[j] = tmp;
@@ -221,7 +224,9 @@ contract Staking {
 
         for (uint256 i = 0; i < maxValidators; i++) {
             arrProposer[i] = validatorByRank[i];
-            arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens.div(powerReduction);
+            arrProposerVotingPower[i] = validators[validatorByRank[i]]
+                .tokens
+                .div(powerReduction);
         }
 
         return (arrProposer, arrProposerVotingPower);
@@ -364,17 +369,16 @@ contract Staking {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
-        if (val.rewards == 0) {
-            return 0;
+        if (val.rewards > 0) {
+            val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
         }
 
-        val.cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
+        del.stake = calculateDelegationStakeAmount(
+            del.stake,
+            val.cumulativeSlashRatio,
+            del.cumulativeSlashRatio
+        );
 
-        if (val.cumulativeSlashRatio > 0) {
-            del.stake = del.stake.mulTrun(
-                val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
-            );
-        }
         uint256 difference = val.cumulativeRewardRatio.sub(
             del.cumulativeRewardRatio
         );
@@ -383,6 +387,22 @@ contract Staking {
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         return rewards;
+    }
+
+    function calculateDelegationStakeAmount(
+        uint256 amount,
+        uint256 valCumulativeSlashRatio,
+        uint256 delCumulativeSlashRatio
+    ) private pure returns (uint256) {
+        if (valCumulativeSlashRatio == 0) return amount;
+        uint256 different = valCumulativeSlashRatio.sub(
+            delCumulativeSlashRatio
+        );
+        uint256 slashAmount = amount.mulTrun(different);
+        if (slashAmount > amount) {
+            return amount;
+        }
+        return amount - slashAmount;
     }
 
     function withdraw(address valAddr) public {
@@ -395,20 +415,11 @@ contract Staking {
                 del.ubdEntries[i] = del.ubdEntries[del.ubdEntries.length - 1];
                 del.ubdEntries.pop();
                 i--;
-                balance += entry.balance;
-                if (val.cumulativeSlashRatio > 0) {
-                    uint256 slashAmount = balance.mulTrun(
-                            val.cumulativeSlashRatio.sub(
-                                entry.cumulativeSlashRatio
-                            )
-                        );
-                    if (slashAmount > balance) {
-                        balance = 0;
-                    } else {
-                        balance -= slashAmount;
-                    }
-
-                }
+                balance += calculateDelegationStakeAmount(
+                    entry.balance,
+                    val.cumulativeSlashRatio,
+                    entry.cumulativeSlashRatio
+                );
             }
         }
         transferTo(msg.sender, balance);
@@ -425,18 +436,11 @@ contract Staking {
         uint256 sumTotalBalance = 0;
         for (uint256 i = 0; i < del.ubdEntries.length; i++) {
             UnbondingDelegationEntry memory entry = del.ubdEntries[i];
-            if (val.cumulativeSlashRatio > 0) {
-                uint256 slashAmount = entry.balance.mulTrun(
-                    val.cumulativeSlashRatio.sub(entry.cumulativeSlashRatio)
-                );
-
-                if (slashAmount > entry.balance) {
-                    entry.balance = 0;
-                } else {
-                    entry.balance -= slashAmount;
-                }
-            }
-
+            entry.balance = calculateDelegationStakeAmount(
+                entry.balance,
+                val.cumulativeSlashRatio,
+                entry.cumulativeSlashRatio
+            );
             sumTotalBalance += entry.balance;
             if (entry.completionTime < block.timestamp) {
                 balances += entry.balance;
@@ -462,17 +466,13 @@ contract Staking {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
 
-        uint256 stake = del.stake;
         uint256 cumulativeRewardRatio = val.cumulativeRewardRatio;
         cumulativeRewardRatio += val.rewards.divTrun(val.tokens);
-
-        if (val.cumulativeSlashRatio > 0) {
-            stake = stake.sub(
-                del.stake.mulTrun(
-                    val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
-                )
-            );
-        }
+        uint256 stake = calculateDelegationStakeAmount(
+            del.stake,
+            val.cumulativeSlashRatio,
+            del.cumulativeSlashRatio
+        );
         uint256 difference = cumulativeRewardRatio.sub(
             del.cumulativeRewardRatio
         );
@@ -509,18 +509,15 @@ contract Staking {
     {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][delAddr];
-        uint256 stake = del.stake;
-        if (val.cumulativeSlashRatio > 0) {
-            stake = stake.sub(
-                stake.mulTrun(
-                    val.cumulativeSlashRatio.sub(del.cumulativeSlashRatio)
-                )
-            );
-        }
+        uint256 stake = calculateDelegationStakeAmount(
+            del.stake,
+            val.cumulativeSlashRatio,
+            del.cumulativeSlashRatio
+        );
         return stake;
     }
 
-     event Undelegate(uint256 cumulativeSlashRatio);
+    event Undelegate(uint256 cumulativeSlashRatio);
 
     function undelegate(address valAddr, uint256 amount)
         public
