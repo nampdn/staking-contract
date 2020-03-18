@@ -4,11 +4,12 @@ import {SafeMath} from "./Safemath.sol";
 contract Staking {
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10**6;
+    uint256 onDec = 1 * 10 ** 18;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
         bool jailed;
-        uint256 commissionRate;
+        Commission commission;
         uint256 rewards;
         uint256 commissionRewards;
         uint256 updateTime;
@@ -18,8 +19,23 @@ contract Staking {
         uint256 cumulativeSlashRatio;
         uint256 minselfDelegation;
         uint256 rank;
-        uint unboudingEntryCount;
+        uint256 unboudingEntryCount;
+        Description description;
     }
+
+    struct Commission {
+        uint256 rate;
+        uint256 maxRate;
+        uint256 maxChangeRate;
+    }
+
+    struct Description {
+        string name;
+        string identity;
+        string website;
+        string contact;
+    }
+
     struct Delegation {
         uint256 stake;
         uint256 cumulativeRewardRatio;
@@ -157,21 +173,44 @@ contract Staking {
 
     }
 
-    function createValidator(uint256 commissionRate, uint256 minselfDelegation)
-        public
-        payable
-    {
+    function createValidator(
+        uint256 commissionRate,
+        uint256 commissionMaxChangeRate,
+        uint256 commissionMaxRate,
+        uint256 minselfDelegation,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    ) public payable {
         require(
             validators[msg.sender].operatorAddress == address(0x0),
             "Validator Owner Exists"
         );
+        require(
+            commissionMaxRate <= onDec,
+            "commission can not be more than 100%"
+        );
+        require(
+            commissionRate <= commissionMaxRate,
+            "commission rate can not be more than max rate"
+        );
+        require(
+            commissionMaxChangeRate <= commissionMaxRate,
+            "commission max change can not be more than max rate"
+        );
+
         validators[msg.sender] = Validator({
             operatorAddress: msg.sender,
             rewards: 0,
             commissionRewards: 0,
             jailed: false,
             tokens: 0,
-            commissionRate: commissionRate,
+            commission: Commission({
+                rate: commissionRate,
+                maxRate: commissionMaxChangeRate,
+                maxChangeRate: commissionMaxRate
+            }),
             updateTime: block.timestamp,
             cumulativeRewardRatio: 0,
             cumulativeSlashRatio: 0,
@@ -179,7 +218,13 @@ contract Staking {
             jailedUntil: 0,
             minselfDelegation: minselfDelegation,
             rank: validatorByRank.length,
-            unboudingEntryCount: 0
+            unboudingEntryCount: 0,
+            description: Description({
+                name: name,
+                website: website,
+                contact: contact,
+                identity: identity
+            })
         });
 
         validatorByRank.push(msg.sender);
@@ -297,7 +342,7 @@ contract Staking {
 
     function allocateTokensToVal(address valAddr, uint256 blockReward) private {
         Validator storage val = validators[valAddr];
-        uint256 commission = blockReward.mulTrun(val.commissionRate);
+        uint256 commission = blockReward.mulTrun(val.commission.rate);
         uint256 shared = blockReward.sub(commission);
         val.commissionRewards += commission;
         val.rewards += shared;
@@ -549,14 +594,30 @@ contract Staking {
         return del.stake;
     }
 
-    function updateValidator(uint256 commissionRate, uint256 minselfDelegation)
-        public
-    {
+    function updateValidator(
+        uint256 commissionRate,
+        uint256 minselfDelegation,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    ) public {
         Validator storage val = validators[msg.sender];
         if (commissionRate > 0) {
-            val.commissionRate = commissionRate;
+            require(
+                (block.timestamp - val.updateTime) > 86400,
+                "commission rate can not be changed more than one in 24h"
+            );
+            require(
+                commissionRate < val.commission.maxRate,
+                "commission rate can not be more than the max rate"
+            );
+            require(
+                commissionRate.sub(val.commission.rate) <
+                    val.commission.maxChangeRate,
+                "commision rate can not be more than the max change rate"
+            );
         }
-
         if (minselfDelegation > 0) {
             require(
                 minselfDelegation > val.minselfDelegation,
@@ -567,6 +628,24 @@ contract Staking {
                 "min self delegation below minumum"
             );
             val.minselfDelegation = minselfDelegation;
+        }
+
+        if (commissionRate > 0) {
+            val.commission.rate = commissionRate;
+            val.updateTime = block.timestamp;
+        }
+
+        if (bytes(name).length > 0) {
+            val.description.name = name;
+        }
+        if (bytes(website).length > 0) {
+            val.description.website = website;
+        }
+        if (bytes(identity).length > 0) {
+            val.description.identity = identity;
+        }
+        if (bytes(contact).length > 0) {
+            val.description.contact = contact;
         }
     }
 
