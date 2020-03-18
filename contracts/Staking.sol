@@ -464,7 +464,7 @@ contract Staking {
                 val.unboudingEntryCount--;
             }
         }
-        if (del.stake == 0) {
+        if (del.stake == 0 && del.ubdEntries.length == 0) {
             delete delegations[valAddr][msg.sender];
         }
         if (val.tokens == 0 && val.unboudingEntryCount == 0) {
