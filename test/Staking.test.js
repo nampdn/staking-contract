@@ -7,10 +7,9 @@ function wait(ms) {
 
 contract("Staking", async (accounts) => {
     const feeCollected = web3.utils.toWei("1", "ether");
-
     async function finalizeCommit(signed) {
         let instance = await Staking.deployed();
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [signed], [200], feeCollected)
+        await instance.finalizeCommit(accounts[0], [accounts[0]], [signed], [200], feeCollected, {from: accounts[5]})
     }
 
     it("should create new validator", async () => {

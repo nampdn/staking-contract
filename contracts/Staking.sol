@@ -4,6 +4,7 @@ import {SafeMath} from "./Safemath.sol";
 contract Staking {
     enum Status {Unbonded, Unbonding, Bonded}
     using SafeMath for uint256;
+    uint256 powerReduction = 1 * 10 ** 6;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
@@ -220,7 +221,7 @@ contract Staking {
 
         for (uint256 i = 0; i < maxValidators; i++) {
             arrProposer[i] = validatorByRank[i];
-            arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens;
+            arrProposerVotingPower[i] = validators[validatorByRank[i]].tokens.div(powerReduction);
         }
 
         return (arrProposer, arrProposerVotingPower);
@@ -285,7 +286,10 @@ contract Staking {
             uint256 reward = feeCollected.mulTrun(voteMultiplier).divTrun(
                 powerFraction
             );
-            allocateTokensToVal(addresses[i], reward);
+
+            if (validators[addresses[i]].operatorAddress != address(0x0)) {
+                allocateTokensToVal(addresses[i], reward);
+            }
         }
 
     }
@@ -304,7 +308,9 @@ contract Staking {
         uint256[] memory powers
     ) private {
         for (uint256 i = 0; i < addresses.length; i++) {
-            handleValidateSignature(addresses[i], powers[i], signed[i]);
+            if (validators[addresses[i]].operatorAddress != address(0x0)) {
+                handleValidateSignature(addresses[i], powers[i], signed[i]);
+            }
         }
     }
 
