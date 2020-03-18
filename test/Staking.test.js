@@ -7,9 +7,11 @@ function wait(ms) {
 
 contract("Staking", async (accounts) => {
     const feeCollected = web3.utils.toWei("1", "ether");
+    const powerReduction = Math.pow(10, 6);
     async function finalizeCommit(signed) {
         let instance = await Staking.deployed();
-        await instance.finalizeCommit(accounts[0], [accounts[0]], [signed], [200], feeCollected, {from: accounts[5]})
+        const validatorSet = await instance.getCurrentValidatorSet.call();
+        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1], feeCollected)
     }
 
     it("should create new validator", async () => {
@@ -19,19 +21,19 @@ contract("Staking", async (accounts) => {
         await instance.createValidator(0,1, {from: accounts[0], value: bond});
         let validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
-        assert.equal(validatorSet[1][0], bond);
+        assert.equal(validatorSet[1][0].toString(), bond/powerReduction);
 
         const bond2 = web3.utils.toWei("101", "ether")
         await instance.createValidator(0,1, {from: accounts[1], value: bond2});
         validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[1]);
-        assert.equal(validatorSet[1][0], bond2);
+        assert.equal(validatorSet[1][0].toString(), bond2/powerReduction);
 
         const bond3 = web3.utils.toWei("1", "ether")
         await instance.createValidator(0,1, {from: accounts[2], value: bond3});
         validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][2], accounts[2]);
-        assert.equal(validatorSet[1][2], bond3);
+        assert.equal(validatorSet[1][2].toString(), bond3/powerReduction);
     })
 
 
@@ -47,7 +49,7 @@ contract("Staking", async (accounts) => {
         await instance.delegate(accounts[0], {from:accounts[1], value: bond2})
         validatorSet = await instance.getCurrentValidatorSet.call();
         assert.equal(validatorSet[0][0], accounts[0]);
-        assert.equal(validatorSet[1][0], web3.utils.toWei("200", "ether"));
+        assert.equal(validatorSet[1][0], web3.utils.toWei("200", "ether")/powerReduction);
 
         const stake = await instance.getDelegationStake.call(accounts[1], accounts[0]);
         assert.equal(stake.toString(), web3.utils.toWei("100", "ether"));
@@ -62,7 +64,7 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("0.34970198675496680", "ether"));
 
         await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
 
@@ -73,11 +75,11 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.5", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("0.34970198675496680", "ether"));
 
         
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("1", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("0.69940397350993360", "ether"));
     })
     
     it("should withdrawl commission rewards", async() => {
@@ -88,7 +90,7 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
 
         reward = await instance.getValidatorCommissionReward.call(accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.01", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("0.006994039735099337", "ether"));
 
         await instance.withdrawValidatorCommissionReward({from: accounts[0]});
 

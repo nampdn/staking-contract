@@ -262,7 +262,6 @@ contract Staking {
         }
         previousProposerAddr = proposerAddr;
     }
-
     function allocateTokens(
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
@@ -283,15 +282,13 @@ contract Staking {
         );
         uint256 proposerReward = feeCollected.mulTrun(proposerMultiplier);
         allocateTokensToVal(previousProposerAddr, proposerReward);
-
         uint256 voteMultiplier = 1 * 10**18;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < addresses.length; i++) {
             uint256 powerFraction = powers[i].divTrun(previousTotalPower);
-            uint256 reward = feeCollected.mulTrun(voteMultiplier).divTrun(
+            uint256 reward = feeCollected.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
-
             if (validators[addresses[i]].operatorAddress != address(0x0)) {
                 allocateTokensToVal(addresses[i], reward);
             }
@@ -516,9 +513,6 @@ contract Staking {
         );
         return stake;
     }
-
-    event Undelegate(uint256 cumulativeSlashRatio);
-
     function undelegate(address valAddr, uint256 amount)
         public
         returns (uint256)
@@ -545,7 +539,6 @@ contract Staking {
                 cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
-        emit Undelegate(val.cumulativeSlashRatio);
         sortRankByVotingPower(val.rank);
         return del.stake;
     }
