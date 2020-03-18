@@ -2,7 +2,6 @@ pragma solidity >=0.4.21 <0.7.0;
 import {SafeMath} from "./Safemath.sol";
 
 contract Staking {
-    enum Status {Unbonded, Unbonding, Bonded}
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10**6;
     struct Validator {
@@ -10,7 +9,6 @@ contract Staking {
         uint256 tokens;
         bool jailed;
         uint256 commissionRate;
-        Status status;
         uint256 rewards;
         uint256 commissionRewards;
         uint256 updateTime;
@@ -20,6 +18,7 @@ contract Staking {
         uint256 cumulativeSlashRatio;
         uint256 minselfDelegation;
         uint256 rank;
+        uint unboudingEntryCount;
     }
     struct Delegation {
         uint256 stake;
@@ -121,7 +120,7 @@ contract Staking {
         return validators[validatorByRank[idx]].tokens;
     }
 
-    function sortRankByVotingPower(uint256 idx) private {
+    function sortRankByVotingPower() private {
         _sortRankByVotingPower(0, validatorByRank.length - 1);
         cleanValidatorByRankArr();
     }
@@ -172,7 +171,6 @@ contract Staking {
             commissionRewards: 0,
             jailed: false,
             tokens: 0,
-            status: Status.Unbonded,
             commissionRate: commissionRate,
             updateTime: block.timestamp,
             cumulativeRewardRatio: 0,
@@ -180,7 +178,8 @@ contract Staking {
             missedBlockCounter: 0,
             jailedUntil: 0,
             minselfDelegation: minselfDelegation,
-            rank: validatorByRank.length
+            rank: validatorByRank.length,
+            unboudingEntryCount: 0
         });
 
         validatorByRank.push(msg.sender);
@@ -200,7 +199,7 @@ contract Staking {
         del.stake += amount;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
-        sortRankByVotingPower(val.rank);
+        sortRankByVotingPower();
     }
 
     function delegate(address valAddr) public payable {
@@ -347,7 +346,7 @@ contract Staking {
         val.missedBlockCounter = 0;
         val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
 
-        sortRankByVotingPower(val.rank);
+        sortRankByVotingPower();
 
     }
 
@@ -417,7 +416,14 @@ contract Staking {
                     val.cumulativeSlashRatio,
                     entry.cumulativeSlashRatio
                 );
+                val.unboudingEntryCount--;
             }
+        }
+        if (del.stake == 0) {
+            delete delegations[valAddr][msg.sender];
+        }
+        if (val.tokens == 0 && val.unboudingEntryCount == 0) {
+            delete validators[valAddr];
         }
         transferTo(msg.sender, balance);
     }
@@ -539,7 +545,7 @@ contract Staking {
                 cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
-        sortRankByVotingPower(val.rank);
+        sortRankByVotingPower();
         return del.stake;
     }
 
@@ -578,7 +584,7 @@ contract Staking {
         val.jailed = false;
         val.rank = validatorByRank.length;
         validatorByRank.push(msg.sender);
-        sortRankByVotingPower(val.rank);
+        sortRankByVotingPower();
     }
 
     function doubleSign(address valAddr, uint256 votingPower) public onlyRoot {
