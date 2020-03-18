@@ -396,7 +396,7 @@ contract Staking {
         );
         uint256 slashAmount = amount.mulTrun(different);
         if (slashAmount > amount) {
-            return amount;
+            return 0;
         }
         return amount - slashAmount;
     }
