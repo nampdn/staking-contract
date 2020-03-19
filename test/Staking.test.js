@@ -191,14 +191,18 @@ contract("Staking", async (accounts) => {
     it ("should check delegation reward after unjail", async () => {
         // rewards:
         // pr: 1 *  (10% + 1%) = 0.11
-        // v1r: 1 * 89% * (180/(180 + 101 + 1)) = 0,568085106 + 0.11 = 0,678085106
-        //    - del1: 0,678085106/2 = 0,339042553
+        // v1r: 1 * 89% * (180/(180 + 101 + 1)) = 0,568085106 + 0.11 = 0,678085106 - 0,678085106 * 1% = 0,335652127
+        //    - del1: 0,671304255/2 = 0,339042553
 
         const instance = await Staking.deployed();
+        await instance.withdrawValidatorCommissionReward({ from: accounts[0]})
         await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
         await finalizeCommit(true);
         const reward = await instance.getDelegationRewards.call(accounts[0], accounts[0])
         assert.equal(reward.toString(), web3.utils.toWei("0.335652127659574380", "ether"));
+
+        const commission = await instance.getValidatorCommissionReward.call(accounts[0]);
+        assert.equal(commission.toString(), web3.utils.toWei("0.006780851063829787", "ether"));
     })
 
     it("should check doubleSign", async () => {
