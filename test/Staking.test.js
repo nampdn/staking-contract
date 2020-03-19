@@ -55,6 +55,12 @@ contract("Staking", async (accounts) => {
     })
 
     it("should withdrawl delegation reward", async () => {
+        // rewards:
+        // pr: 1 *  (10% + 1%) = 0.11
+        // v1r: 1 * 89% * (200/(200 + 101 + 1)) = 0,589403974 + 0.11 = 0,699403974
+        //    - del1: 0,699403974/2 = 0,349701987
+
+
         let instance = await Staking.deployed();
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward, 0);
