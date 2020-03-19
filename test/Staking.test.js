@@ -160,6 +160,11 @@ contract("Staking", async (accounts) => {
 
         stake = await instance.getDelegationStake.call(accounts[2], accounts[0]);
         assert.equal(stake.toString(), web3.utils.toWei("9", "ether"));
+        
+        let validatorSet = await instance.getCurrentValidatorSet.call();
+        assert.equal(validatorSet[0].length, 2);
+
+        await instance.undelegate(accounts[0], web3.utils.toWei("9", "ether"), {from: accounts[2]});
 
     });
 
@@ -178,6 +183,14 @@ contract("Staking", async (accounts) => {
         assert.equal(validatorSet[0][0], accounts[0]);
     })
 
+    it ("should check delegation reward after unjail", async () => {
+        const instance = await Staking.deployed();
+        await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
+        await finalizeCommit(true);
+        const reward = await instance.getDelegationRewards.call(accounts[0], accounts[0])
+        assert.equal(reward.toString(), web3.utils.toWei("0.256754184398942760", "ether"));
+    })
+
     it("should check doubleSign", async () => {
         const instance = await Staking.deployed();
         const boud4to0 = web3.utils.toWei("10", "ether");
@@ -185,6 +198,9 @@ contract("Staking", async (accounts) => {
         await instance.doubleSign(accounts[0], 1000); 
         let stake = await instance.getDelegationStake.call(accounts[4], accounts[0]);
         assert.equal(stake.toString(), String(boud4to0/2));
+
+        await utils.advanceTime(2000);
+        await instance.unjail({from: accounts[0]});
     })
 
     it("should check slash unbounding delegation entries", async () => {

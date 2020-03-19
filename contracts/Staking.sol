@@ -4,7 +4,7 @@ import {SafeMath} from "./Safemath.sol";
 contract Staking {
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10**6;
-    uint256 onDec = 1 * 10 ** 18;
+    uint256 onDec = 1 * 10**18;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
@@ -136,41 +136,39 @@ contract Staking {
         return validators[validatorByRank[idx]].tokens;
     }
 
-    function sortRankByVotingPower() private {
-        _sortRankByVotingPower(0, validatorByRank.length - 1);
+    function sortRankByVotingPower(uint idx) private {
+        _sortRankByVotingPower(idx);
         cleanValidatorByRankArr();
     }
-
     function cleanValidatorByRankArr() private {
-        for (uint256 i = validatorByRank.length - 1; i <= 0; i--) {
+        for (uint256 i = validatorByRank.length - 1; i >= 0; i--) {
             if (tokenByRank(i) > 0) break;
             validatorByRank.pop();
         }
     }
 
-    function _sortRankByVotingPower(uint256 left, uint256 right) private {
-        uint256 i = left;
-        uint256 j = right;
-        if (i == j) return;
-        uint256 pivot = tokenByRank(left + (right - left) / 2);
-        while (i <= j) {
-            while (tokenByRank(i) > pivot) i++;
-            while (pivot > tokenByRank(j)) j--;
-            if (i <= j) {
-                validators[validatorByRank[i]].rank = j;
-                validators[validatorByRank[j]].rank = i;
+    function _moveValRank(uint256 i1, uint256 i2) private {
+        validators[validatorByRank[i1]].rank = i2;
+        validators[validatorByRank[i2]].rank = i1;
+        address tmp = validatorByRank[i1];
+        validatorByRank[i1] = validatorByRank[i2];
+        validatorByRank[i2] = tmp;
+    }
 
-                address tmp = validatorByRank[i];
-                validatorByRank[i] = validatorByRank[j];
-                validatorByRank[j] = tmp;
-                i++;
-                j--;
+    function _sortRankByVotingPower(uint256 idx) private {
+        for (uint256 i = idx; i > 0; i--) {
+            if (tokenByRank(i) <= tokenByRank(i - 1)) {
+                break;
             }
+            _moveValRank(i, i - 1);
         }
-        if (left < j) _sortRankByVotingPower(left, j);
 
-        if (i < right) _sortRankByVotingPower(i, right);
-
+        for (uint256 i = idx; i < validatorByRank.length - 1; i++) {
+            if (tokenByRank(i) >= tokenByRank(i + 1)) {
+                break;
+            }
+            _moveValRank(i, i + 1);
+        }
     }
 
     function createValidator(
@@ -244,10 +242,13 @@ contract Staking {
         del.stake += amount;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
-        sortRankByVotingPower();
+        if (!val.jailed) {
+            sortRankByVotingPower(val.rank);
+        }
     }
 
     function delegate(address valAddr) public payable {
+        require(validators[valAddr].operatorAddress != address(0x0), "validator not found");
         // withdrawl reward before redelegate
         withdrawDelegationReward(valAddr);
         _delegate(msg.sender, valAddr, msg.value);
@@ -326,7 +327,7 @@ contract Staking {
         );
         uint256 proposerReward = feeCollected.mulTrun(proposerMultiplier);
         allocateTokensToVal(previousProposerAddr, proposerReward);
-        uint256 voteMultiplier = 1 * 10**18;
+        uint256 voteMultiplier = onDec;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < addresses.length; i++) {
             uint256 powerFraction = powers[i].divTrun(previousTotalPower);
@@ -391,7 +392,7 @@ contract Staking {
         val.missedBlockCounter = 0;
         val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
 
-        sortRankByVotingPower();
+        sortRankByVotingPower(val.rank);
 
     }
 
@@ -564,16 +565,12 @@ contract Staking {
         );
         return stake;
     }
-    function undelegate(address valAddr, uint256 amount)
-        public
-        returns (uint256)
-    {
-        withdrawDelegationReward(valAddr);
 
+    function undelegate(address valAddr, uint256 amount) public {
+        withdrawDelegationReward(valAddr);
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][msg.sender];
         del.stake -= amount;
-
         if (
             msg.sender == valAddr &&
             !val.jailed &&
@@ -581,7 +578,6 @@ contract Staking {
         ) {
             val.jailed = true;
         }
-
         val.tokens -= del.stake;
         del.ubdEntries.push(
             UnbondingDelegationEntry({
@@ -590,8 +586,9 @@ contract Staking {
                 cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
-        sortRankByVotingPower();
-        return del.stake;
+        if (!val.jailed) {
+            sortRankByVotingPower(val.rank);
+        }
     }
 
     function updateValidator(
@@ -663,12 +660,12 @@ contract Staking {
         val.jailed = false;
         val.rank = validatorByRank.length;
         validatorByRank.push(msg.sender);
-        sortRankByVotingPower();
+        sortRankByVotingPower(val.rank);
     }
 
     function doubleSign(address valAddr, uint256 votingPower) public onlyRoot {
         Validator storage val = validators[valAddr];
-        if (val.operatorAddress == address(0x0)) {
+        if (val.operatorAddress == address(0x0) || val.jailed) {
             return;
         }
         slash(valAddr, votingPower, params.slashFractionDoubleSign);
