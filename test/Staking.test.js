@@ -188,7 +188,7 @@ contract("Staking", async (accounts) => {
         await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
         await finalizeCommit(true);
         const reward = await instance.getDelegationRewards.call(accounts[0], accounts[0])
-        assert.equal(reward.toString(), web3.utils.toWei("0.256754184398942760", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("0.310474088549950140", "ether"));
     })
 
     it("should check doubleSign", async () => {
@@ -210,4 +210,15 @@ contract("Staking", async (accounts) => {
         const udb = await instance.getUnboudingDelegation.call(accounts[4], accounts[0])
         assert.equal(udb[1].toString(), web3.utils.toWei("2.5", "ether"))
     })
+
+    it("should check delete delegation and validator when all undelgation is completed", async() => {
+        const instance = await Staking.deployed();
+        const boud = web3.utils.toWei("1", "ether")
+        await instance.createValidator(0,0, 0,0, "val1", "val.com", "val1@gmail.com", "val1", {from: accounts[6], value: boud});
+        await instance.undelegate(accounts[6], boud, {from : accounts[6]});
+        await utils.advanceTime(2000);
+        await instance.withdraw(accounts[6], {from: accounts[6]});
+
+        await instance.createValidator(0,0, 0,0, "val1", "val.com", "val1@gmail.com", "val1", {from: accounts[6], value: boud});
+    });
 })

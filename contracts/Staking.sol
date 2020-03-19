@@ -446,7 +446,6 @@ contract Staking {
         }
         return amount - slashAmount;
     }
-
     function withdraw(address valAddr) public {
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][msg.sender];
@@ -578,7 +577,8 @@ contract Staking {
         ) {
             val.jailed = true;
         }
-        val.tokens -= del.stake;
+        val.tokens -= amount;
+        val.unboudingEntryCount++;
         del.ubdEntries.push(
             UnbondingDelegationEntry({
                 balance: amount,
