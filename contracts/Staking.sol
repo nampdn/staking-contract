@@ -383,7 +383,7 @@ contract Staking {
         private
     {
         Validator storage val = validators[valAddr];
-        uint256 slashAmount = votingPower.mulTrun(slashFractor);
+        uint256 slashAmount = votingPower.mul(powerReduction).mulTrun(slashFractor);
         val.tokens -= slashAmount;
         val.cumulativeSlashRatio += slashFractor;
 
