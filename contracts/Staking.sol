@@ -60,7 +60,7 @@ contract Staking {
         uint256 slashFractionDoubleSign;
 
         uint256 inflationRateChange;
-        uint256 goalBouded;
+        uint256 goalBonded;
         uint256 blocksPerYear;
         uint256 inflationMax;
         uint256 inflationMin;
@@ -685,11 +685,11 @@ contract Staking {
 
 
     function nextInflationRate() {
-        uint256 boudedRatio = totalBounded.divTrun(totalSupply);
+        uint256 bondedRatio = totalBounded.divTrun(totalSupply);
         uint256 inflationChangeRatePerYear = 0;
         uint256 inflationRateChange = 0;
-        if (boudedRatio.divTrun(params.goalBouded) > onDec) {
-            inflationChangeRatePerYear =  boudedRatio.divTrun(params.goalBouded).sub(onDec)
+        if (bondedRatio.divTrun(params.goalBonded) > onDec) {
+            inflationChangeRatePerYear =  bondedRatio.divTrun(params.goalBonded).sub(onDec)
                 .mul(params.inflationRateChange);
             inflationRateChange = inflationRateChange.div(params.blocksPerYear);
             if (inflationRateChange < inflation) {
@@ -698,7 +698,7 @@ contract Staking {
                 inflation = 0;
             }
         } else {
-            inflationChangeRatePerYear =  onDec.sub(boudedRatio.divTrun(params.goalBouded))
+            inflationChangeRatePerYear =  onDec.sub(bondedRatio.divTrun(params.goalBonded))
                 .mul(params.inflationRateChange);
             inflationRateChange = inflationRateChange.div(params.blocksPerYear);
             inflation = inflation.add(inflationRateChange);
