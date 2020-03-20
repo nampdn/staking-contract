@@ -76,7 +76,7 @@ contract Staking {
     
     uint256 totalSupply = 5000000000 * 10 * 6;
     uint256 inflation = 0;
-    uint256 totalBounded = 0;
+    uint256 totalBonded = 0;
     uint256 annualProvision = 0;
 
     modifier onlyRoot() {
@@ -254,6 +254,9 @@ contract Staking {
         del.stake += amount;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
+
+        totalBonded += amount;
+
         if (!val.jailed) {
             sortRankByVotingPower(val.rank);
         }
@@ -403,9 +406,15 @@ contract Staking {
         val.jailed = true;
         val.missedBlockCounter = 0;
         val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
+        burn(slashAmount);
 
         sortRankByVotingPower(val.rank);
 
+    }
+
+    function burn(uint256 amount) private {
+        totalSupply -= amount;
+        totalBonded -= amount;
     }
 
     function transferTo(address payable recipient, uint256 amount)
@@ -474,6 +483,7 @@ contract Staking {
                     entry.cumulativeSlashRatio
                 );
                 val.unboudingEntryCount--;
+                totalBonded -= balance;
             }
         }
         if (del.stake == 0 && del.ubdEntries.length == 0) {
@@ -722,18 +732,6 @@ contract Staking {
     }
     
 }
-
-
-// 100/2000
-
-// 100 * 100 * 100 / 200/ 100 = 50/100
-// 100 % - 0.5%
-
-
-
-// 1 = 100
-
-
 
 
 
