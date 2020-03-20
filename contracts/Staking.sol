@@ -84,25 +84,24 @@ contract Staking {
         _;
     }
 
-    constructor(
-        uint256 maxValidators,
-        uint256 maxMissed,
-        uint256 downtimeJailDuration,
-        uint256 baseProposerReward,
-        uint256 bonusProposerReward,
-        uint256 slashFractionDowntime,
-        uint256 unboudingTime,
-        uint256 slashFractionDoubleSign
-    ) public {
+    constructor() public {
         params = Params({
-            maxValidators: maxValidators,
-            maxMissed: maxMissed,
-            downtimeJailDuration: downtimeJailDuration,
-            baseProposerReward: baseProposerReward,
-            bonusProposerReward: bonusProposerReward,
-            slashFractionDowntime: slashFractionDowntime,
-            unboudingTime: unboudingTime,
-            slashFractionDoubleSign: slashFractionDoubleSign
+            // staking params
+            maxValidators: 21,
+            maxMissed: 5000,
+            downtimeJailDuration: 60*60*24*30 // 30 days,
+            baseProposerReward: 1 * 10 ** 17, // 10%,
+            bonusProposerReward: 1 * 10 ** 16, // 1%,
+            slashFractionDowntime: 1 * 10 ** 17, // 10%,
+            unboudingTime: 1, // 1s
+            slashFractionDoubleSign: 5 * 10 ** 17, // 50%,
+
+            // minted params
+            inflationRateChange: 15 * 10 ** 17, // 15%
+            goalBonded: 67 * 10 ** 17, // 67%
+            blocksPerYear: 60 * 60 * 8766 / 5,
+            inflationMax: 20 * 10 ** 17, // 20%
+            inflationMin: 7 * 10 ** 17 // 7%
         });
     }
 
