@@ -58,6 +58,12 @@ contract Staking {
         uint256 slashFractionDowntime;
         uint256 unboudingTime;
         uint256 slashFractionDoubleSign;
+
+        uint256 inflationRateChange;
+        uint256 goalBouded;
+        uint256 blocksPerYear;
+        uint256 inflationMax;
+        uint256 inflationMin;
     }
 
     address previousProposerAddr;
@@ -66,6 +72,12 @@ contract Staking {
     address[] public validatorByRank;
 
     Params params;
+
+    
+    uint256 totalSupply = 5000000000 * 10 * 6;
+    uint256 inflation = 0;
+    uint256 totalBounded = 0;
+    uint256 annualProvision = 0;
 
     modifier onlyRoot() {
         _;
@@ -670,4 +682,28 @@ contract Staking {
         }
         slash(valAddr, votingPower, params.slashFractionDoubleSign);
     }
+
+
+    function nextInflationRate() {
+        uint256 boudedRatio = totalBounded.divTrun(totalSupply);
+        uint256 inflationChangeRatePerYear =  onDec.sub(boudedRatio.divTrun(params.goalBouded))
+            .mulTrun(params.inflationRateChange);
+        uint256 inflationRateChange = inflationRateChange.div(params.blocksPerYear);
+        inflation = inflation.add(inflationRateChange);
+        if (in > params.inflationMax) {
+            inflation = params.inflationMax;
+        }
+        if (in < params.inflationMin) {
+            inflation = params.inflationMin;
+        }
+    }
+
+    function nextAnnualProvisions() {
+        annualProvision = inflation.mulDiv(totalSupply); 
+    }
+
+    function getBlockProvision() public returns(uint256) {
+        return annualProvision.div(params.blocksPerYear);
+    }
+    
 }
