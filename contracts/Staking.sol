@@ -78,6 +78,7 @@ contract Staking {
     uint256 inflation = 0;
     uint256 totalBonded = 0;
     uint256 annualProvision = 0;
+    uint256 feeCollected = 0;
 
     modifier onlyRoot() {
         _;
@@ -297,7 +298,6 @@ contract Staking {
         address[] memory addresses,
         bool[] memory signed,
         uint256[] memory powers,
-        uint256 feeCollected
     ) public onlyRoot {
         uint256 previousTotalPower = 0;
         uint256 previousPrecommitTotalPower = 0;
@@ -315,8 +315,7 @@ contract Staking {
                 previousTotalPower,
                 previousPrecommitTotalPower,
                 addresses,
-                powers,
-                feeCollected
+                powers
             );
             handleValidateSignatures(addresses, signed, powers);
         }
@@ -327,7 +326,6 @@ contract Staking {
         uint256 previousPrecommitTotalPower,
         address[] memory addresses,
         uint256[] memory powers,
-        uint256 feeCollected
     ) internal {
         if (previousTotalPower == 0) return;
 
@@ -392,6 +390,17 @@ contract Staking {
             slash(valAddr, power, params.slashFractionDowntime);
         }
 
+    }
+
+    // @dev mints new tokens for the previous block. Returns fee collected
+    function mint() public onlyRoot returns(uint256) {
+        // recalculate inflation rate
+        nextInflationRate();
+        // recalculate annual provisions
+        nextAnnualProvisions();
+        // update fee collected
+        feeCollected = getBlockProvision();
+        return feeCollected;
     }
 
     function slash(address valAddr, uint256 votingPower, uint256 slashFractor)
