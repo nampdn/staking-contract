@@ -686,10 +686,25 @@ contract Staking {
 
     function nextInflationRate() {
         uint256 boudedRatio = totalBounded.divTrun(totalSupply);
-        uint256 inflationChangeRatePerYear =  onDec.sub(boudedRatio.divTrun(params.goalBouded))
-            .mulTrun(params.inflationRateChange);
-        uint256 inflationRateChange = inflationRateChange.div(params.blocksPerYear);
-        inflation = inflation.add(inflationRateChange);
+        uint256 inflationChangeRatePerYear = 0;
+        uint256 inflationRateChange = 0;
+        if (boudedRatio.divTrun(params.goalBouded) > onDec) {
+            inflationChangeRatePerYear =  boudedRatio.divTrun(params.goalBouded).sub(onDec)
+                .mul(params.inflationRateChange);
+            inflationRateChange = inflationRateChange.div(params.blocksPerYear);
+            if (inflationRateChange < inflation) {
+                inflation = inflation.sub(inflationRateChange);
+            } else {
+                inflation = 0;
+            }
+        } else {
+            inflationChangeRatePerYear =  onDec.sub(boudedRatio.divTrun(params.goalBouded))
+                .mul(params.inflationRateChange);
+            inflationRateChange = inflationRateChange.div(params.blocksPerYear);
+            inflation = inflation.add(inflationRateChange);
+        }
+
+        
         if (in > params.inflationMax) {
             inflation = params.inflationMax;
         }
@@ -699,7 +714,7 @@ contract Staking {
     }
 
     function nextAnnualProvisions() {
-        annualProvision = inflation.mulDiv(totalSupply); 
+        annualProvision = inflation.mulTrun(totalSupply); 
     }
 
     function getBlockProvision() public returns(uint256) {
@@ -707,3 +722,18 @@ contract Staking {
     }
     
 }
+
+
+// 100/2000
+
+// 100 * 100 * 100 / 200/ 100 = 50/100
+// 100 % - 0.5%
+
+
+
+// 1 = 100
+
+
+
+
+
