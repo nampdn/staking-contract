@@ -384,7 +384,7 @@ contract Staking {
         Validator storage val = validators[valAddr];
         if (signed && val.missedBlockCounter > 0) {
             val.missedBlockCounter -= 1;
-        } else {
+        } else if (!signed) {
             val.missedBlockCounter += 1;
         }
 
