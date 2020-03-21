@@ -8,6 +8,8 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         const validatorSet = await instance.getCurrentValidatorSet.call();
         await instance.mint();
+
+        await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
         await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1])
     }
 
@@ -57,9 +59,9 @@ contract("Staking", async (accounts) => {
     it("should withdrawl delegation reward", async () => {
         // // feeCollected = 7% * 5000000000/6311520 = 55,454153675
         // rewards:
-        // pr: 55,454153675 *  (10% + 1%) = 5,600869521
-        // v1r: 55,454153675 * 89% * (200/(200 + 101 + 1)) = 32,684898524 + 5,600869521 = 38,285768045
-        //    - del1: 88,139052199/2 = 19,142884022
+        // pr: 55,454153675 *  (10+ 1)% = 6,099956904
+        // v1r: 55,454153675 * 89% * (200/(200 + 101 + 1)) = 32,684898524 + 6,099956904 = 38,784855428
+        //    - del1: 88,139052199/2 = 19,392427714
 
 
         let instance = await Staking.deployed();
@@ -104,7 +106,7 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
 
         reward = await instance.getValidatorCommissionReward.call(accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.006994039735099337", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("3.878485843614130792", "ether"));
 
         await instance.withdrawValidatorCommissionReward({from: accounts[0]});
 
@@ -112,7 +114,7 @@ contract("Staking", async (accounts) => {
         assert.equal(reward.toString(), "0");
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.346204966887417200", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("191.985049258899474200", "ether"));
 
     })
 
@@ -196,13 +198,14 @@ contract("Staking", async (accounts) => {
     })
 
     it ("should check delegation reward after unjail", async () => {
+        // feeCollected = 7% * 5000000000/6311520 = 55,454153675
         // rewards:
-        // pr: 1 *  (10% + 1%) = 0.11
-        // v1r: 1 * 89% * (180/(180 + 101 + 1)) = 0,568085106 + 0.11 = 0,678085106 - 0,678085106 * 1% = 0,335652127
-        //    - del1: 0,671304255/2 = 0,339042553
+        // pr: 55,454153675 *  (10 + 1)% = 6,099956904
+        // v1r: 55,454153675 * 89% * (180/(180 + 101 + 1)) = 31,50267879 + 6,099956904 = 37,602635694 - 37,602635694 * 1% = 37,226609337
+        //    - del1: 37,226609337/2 = 18,613304669
         //    - del2 = del1
-        // c2r: 1 * 89% * (101/(180 + 101 + 1)) = 0,318758865
-        // c3r: 1 * 89% * (1/(180 + 101 + 1)) = 0,003156028
+        // c2r: 55,454153675 * 89% * (101/(180 + 101 + 1)) = 17,676503099
+        // c3r: 55,454153675 * 89% * (1/(180 + 101 + 1)) = 0,175014882
 
         const instance = await Staking.deployed();
         await instance.withdrawValidatorCommissionReward({ from: accounts[0]})
@@ -215,23 +218,23 @@ contract("Staking", async (accounts) => {
 
         // v1:d1
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0])
-        assert.equal(reward.toString(), web3.utils.toWei("0.335652127659574380", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("186.133166928702186120", "ether"));
 
         // v1:d2
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0])
-        assert.equal(reward.toString(), web3.utils.toWei("0.335652127659574380", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("186.133166928702186120", "ether"));
 
         // val 1
         let commission = await instance.getValidatorCommissionReward.call(accounts[0]);
-        assert.equal(commission.toString(), web3.utils.toWei("0.006780851063829787", "ether"));
+        assert.equal(commission.toString(), web3.utils.toWei("3.760265998559640124", "ether"));
 
         // v2:d1
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[1])
-        assert.equal(reward.toString(), web3.utils.toWei("0.318758865248226926", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("176.765145178603729159", "ether"));
 
         // v3:d1
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2])
-        assert.equal(reward.toString(), web3.utils.toWei("0.003156028368794325", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("1.750149952263402844", "ether"));
 
     })
 

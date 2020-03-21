@@ -104,7 +104,9 @@ contract Staking {
             inflationMin: 7 * 10 ** 17 // 7%
         });
     }
-
+    // @notice Will receive any eth sent to the contract
+    function () external payable {
+    }
     function setParams(
         uint256 maxValidators,
         uint256 maxMissed,
@@ -320,6 +322,9 @@ contract Staking {
         }
         previousProposerAddr = proposerAddr;
     }
+
+    event Demo(uint256 amount);
+
     function allocateTokens(
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
@@ -432,7 +437,6 @@ contract Staking {
         recipient.transfer(amount);
         //emit Refund(recipient, amount);
     }
-
     function _withdrawDelegationRewards(address delAddr, address valAddr)
         private
         returns (uint256)
