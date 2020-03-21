@@ -3,12 +3,12 @@ const utils = require("./utils");
 
 
 contract("Staking", async (accounts) => {
-    const feeCollected = web3.utils.toWei("1", "ether");
     const powerReduction = Math.pow(10, 6);
     async function finalizeCommit(signed) {
         let instance = await Staking.deployed();
         const validatorSet = await instance.getCurrentValidatorSet.call();
-        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1], feeCollected)
+        await instance.mint();
+        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1])
     }
 
     it("should create new validator", async () => {
@@ -55,10 +55,11 @@ contract("Staking", async (accounts) => {
     })
 
     it("should withdrawl delegation reward", async () => {
+        // // feeCollected = 7% * 5000000000/6311520 = 55,454153675
         // rewards:
-        // pr: 1 *  (10% + 1%) = 0.11
-        // v1r: 1 * 89% * (200/(200 + 101 + 1)) = 0,589403974 + 0.11 = 0,699403974
-        //    - del1: 0,699403974/2 = 0,349701987
+        // pr: 55,454153675 *  (10% + 1%) = 5,600869521
+        // v1r: 55,454153675 * 89% * (200/(200 + 101 + 1)) = 32,684898524 + 5,600869521 = 38,285768045
+        //    - del1: 88,139052199/2 = 19,142884022
 
 
         let instance = await Staking.deployed();
@@ -68,8 +69,12 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
         await finalizeCommit(true)
 
+        const feeCollected = await instance.getBlockProvision.call();
+        assert.equal(feeCollected.toString(), web3.utils.toWei("554.541536745506629147", "ether"))
+
+
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.34970198675496680", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("193.924277138056142500", "ether"));
 
         await instance.withdrawDelegationReward(accounts[0], {from: accounts[0]});
 
@@ -80,11 +85,13 @@ contract("Staking", async (accounts) => {
         await finalizeCommit(true)
 
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.34970198675496680", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("193.924284659381195200", "ether"));
 
         
         reward = await instance.getDelegationRewards.call(accounts[1], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("0.69940397350993360", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("387.848561797437337700", "ether"));
+
+        
     })
     
     it("should withdrawl commission rewards", async() => {

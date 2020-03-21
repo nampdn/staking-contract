@@ -74,11 +74,11 @@ contract Staking {
     Params params;
 
     
-    uint256 totalSupply = 5000000000 * 10 * 6;
+    uint256 totalSupply = 5000000000 * 10 ** 18;
     uint256 inflation = 0;
     uint256 totalBonded = 0;
     uint256 annualProvision = 0;
-    uint256 feeCollected = 0;
+    uint256 public feeCollected = 0;
 
     modifier onlyRoot() {
         _;
@@ -89,7 +89,7 @@ contract Staking {
             // staking params
             maxValidators: 21,
             maxMissed: 5000,
-            downtimeJailDuration: 60*60*24*30 // 30 days,
+            downtimeJailDuration: 60*60*24*30, // 30 days,
             baseProposerReward: 1 * 10 ** 17, // 10%,
             bonusProposerReward: 1 * 10 ** 16, // 1%,
             slashFractionDowntime: 1 * 10 ** 17, // 10%,
@@ -296,7 +296,7 @@ contract Staking {
         address proposerAddr,
         address[] memory addresses,
         bool[] memory signed,
-        uint256[] memory powers,
+        uint256[] memory powers
     ) public onlyRoot {
         uint256 previousTotalPower = 0;
         uint256 previousPrecommitTotalPower = 0;
@@ -324,7 +324,7 @@ contract Staking {
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
         address[] memory addresses,
-        uint256[] memory powers,
+        uint256[] memory powers
     ) internal {
         if (previousTotalPower == 0) return;
 
@@ -570,8 +570,8 @@ contract Staking {
 
     function withdrawValidatorCommissionReward() public returns (uint256) {
         Validator storage val = validators[msg.sender];
-        totalSupply += val.commissionRewards;
         transferTo(msg.sender, val.commissionRewards);
+        totalSupply += val.commissionRewards;
         val.commissionRewards = 0;
     }
 
@@ -705,8 +705,8 @@ contract Staking {
     }
 
 
-    function nextInflationRate() {
-        uint256 bondedRatio = totalBounded.divTrun(totalSupply);
+    function nextInflationRate() private {
+        uint256 bondedRatio = totalBonded.divTrun(totalSupply);
         uint256 inflationChangeRatePerYear = 0;
         uint256 inflationRateChange = 0;
         if (bondedRatio.divTrun(params.goalBonded) > oneDec) {
@@ -726,19 +726,19 @@ contract Staking {
         }
 
         
-        if (in > params.inflationMax) {
+        if (inflation > params.inflationMax) {
             inflation = params.inflationMax;
         }
-        if (in < params.inflationMin) {
+        if (inflation < params.inflationMin) {
             inflation = params.inflationMin;
         }
     }
 
-    function nextAnnualProvisions() {
+    function nextAnnualProvisions() private {
         annualProvision = inflation.mulTrun(totalSupply); 
     }
 
-    function getBlockProvision() public returns(uint256) {
+    function getBlockProvision() public view returns(uint256) {
         return annualProvision.div(params.blocksPerYear);
     }
     
