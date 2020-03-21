@@ -457,6 +457,8 @@ contract Staking {
         val.rewards = 0;
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
+        totalSupply += rewards;
+
         return rewards;
     }
 
@@ -568,6 +570,7 @@ contract Staking {
 
     function withdrawValidatorCommissionReward() public returns (uint256) {
         Validator storage val = validators[msg.sender];
+        totalSupply += val.commissionRewards;
         transferTo(msg.sender, val.commissionRewards);
         val.commissionRewards = 0;
     }
