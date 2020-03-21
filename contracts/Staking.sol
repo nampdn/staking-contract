@@ -4,7 +4,7 @@ import {SafeMath} from "./Safemath.sol";
 contract Staking {
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10**6;
-    uint256 onDec = 1 * 10**18;
+    uint256 oneDec = 1 * 10**18;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
@@ -198,7 +198,7 @@ contract Staking {
             "Validator Owner Exists"
         );
         require(
-            commissionMaxRate <= onDec,
+            commissionMaxRate <= oneDec,
             "commission can not be more than 100%"
         );
         require(
@@ -339,7 +339,7 @@ contract Staking {
         );
         uint256 proposerReward = feeCollected.mulTrun(proposerMultiplier);
         allocateTokensToVal(previousProposerAddr, proposerReward);
-        uint256 voteMultiplier = onDec;
+        uint256 voteMultiplier = oneDec;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < addresses.length; i++) {
             uint256 powerFraction = powers[i].divTrun(previousTotalPower);
@@ -709,8 +709,8 @@ contract Staking {
         uint256 bondedRatio = totalBounded.divTrun(totalSupply);
         uint256 inflationChangeRatePerYear = 0;
         uint256 inflationRateChange = 0;
-        if (bondedRatio.divTrun(params.goalBonded) > onDec) {
-            inflationChangeRatePerYear =  bondedRatio.divTrun(params.goalBonded).sub(onDec)
+        if (bondedRatio.divTrun(params.goalBonded) > oneDec) {
+            inflationChangeRatePerYear =  bondedRatio.divTrun(params.goalBonded).sub(oneDec)
                 .mul(params.inflationRateChange);
             inflationRateChange = inflationRateChange.div(params.blocksPerYear);
             if (inflationRateChange < inflation) {
@@ -719,7 +719,7 @@ contract Staking {
                 inflation = 0;
             }
         } else {
-            inflationChangeRatePerYear =  onDec.sub(bondedRatio.divTrun(params.goalBonded))
+            inflationChangeRatePerYear =  oneDec.sub(bondedRatio.divTrun(params.goalBonded))
                 .mul(params.inflationRateChange);
             inflationRateChange = inflationRateChange.div(params.blocksPerYear);
             inflation = inflation.add(inflationRateChange);
