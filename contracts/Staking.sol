@@ -97,11 +97,11 @@ contract Staking {
             slashFractionDoubleSign: 5 * 10 ** 17, // 50%,
 
             // minted params
-            inflationRateChange: 15 * 10 ** 17, // 15%
-            goalBonded: 67 * 10 ** 17, // 67%
+            inflationRateChange: 15 * 10 ** 16, // 15%
+            goalBonded: 67 * 10 ** 16, // 67%
             blocksPerYear: 60 * 60 * 8766 / 5,
-            inflationMax: 20 * 10 ** 17, // 20%
-            inflationMin: 7 * 10 ** 17 // 7%
+            inflationMax: 20 * 10 ** 16, // 20%
+            inflationMin: 7 * 10 ** 16 // 7%
         });
     }
     // @notice Will receive any eth sent to the contract
