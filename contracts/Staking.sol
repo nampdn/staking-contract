@@ -104,7 +104,6 @@ contract Staking {
     event Withdraw(address delAddr, address valAddr, uint256 amount);
     event WithdrawRewards(address delAddr, address valAddr, uint256 amount);
     event WithdrawlCommissionReward(address valAddr, uint256 amount);
-    event DeletedValidator(address valAddr);
     event Jailed(address valAddr);
     event Unjail(address valAddr);
     event Burn(uint256 amount);
@@ -480,7 +479,6 @@ contract Staking {
         payable
     {
         recipient.transfer(amount);
-        //emit Refund(recipient, amount);
     }
     function _withdrawDelegationRewards(address delAddr, address valAddr)
         private
@@ -610,15 +608,15 @@ contract Staking {
 
     function withdrawDelegationReward(address valAddr)
         public
-        returns (uint256)
     {
+        require(validators[valAddr].operatorAddress != address(0x0), "validator not found");
         uint256 rewards = _withdrawDelegationRewards(msg.sender, valAddr);
         transferTo(msg.sender, rewards);
         emit WithdrawRewards(msg.sender, valAddr, rewards);
-        return rewards;
     }
 
     function withdrawValidatorCommissionReward() public returns (uint256) {
+        require(validators[msg.sender].operatorAddress != address(0x0), "validator not found");
         Validator storage val = validators[msg.sender];
         uint256 rewards = val.commissionRewards;
         transferTo(msg.sender, rewards);
@@ -651,6 +649,7 @@ contract Staking {
     }
 
     function undelegate(address valAddr, uint256 amount) public {
+        require(validators[valAddr].operatorAddress != address(0x0), "validator not found");
         withdrawDelegationReward(valAddr);
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][msg.sender];
@@ -691,6 +690,7 @@ contract Staking {
         string memory contact,
         string memory identity
     ) public {
+        require(validators[msg.sender].operatorAddress != address(0x0), "validator not found");
         Validator storage val = validators[msg.sender];
         if (commissionRate > 0) {
             require(
@@ -740,6 +740,7 @@ contract Staking {
     }
 
     function unjail() public {
+        require(validators[msg.sender].operatorAddress != address(0x0), "validator not found");
         Validator storage val = validators[msg.sender];
         Delegation storage del = delegations[msg.sender][msg.sender];
         require(val.jailed, "validator not jailed");
