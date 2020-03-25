@@ -80,6 +80,35 @@ contract Staking {
     uint256 annualProvision = 0;
     uint256 public feeCollected = 0;
 
+    // Events
+    // ---------------------------------------------------
+    event CreatedValidator(
+        address valAddr,
+        uint256 commissionRate,
+        uint256 commissionMaxRate,
+        uint256 commissionMaxChangeRate,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    );
+    event UpdateValidator(
+        uint256 commissionRate,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    )
+    event Delegate(address delAddr, address valAddr, uint256 amount);
+    event UnDelegate(address delAddr, address valAddr, uint256 amount);
+    event Withdraw(address delAddr, address valAddr, uint256 amount);
+    event WithdrawRewards(address delAddr, address valAddr, uint256 amount);
+    event WithdrawlCommissionReward(address valAddr, uint256 amount);
+    event DeletedValidator(address valAddr);
+    event Jailed(address valAddr);
+    event Unjail(address valAddr);
+    event Burn(uint256 amount);
+
     modifier onlyRoot() {
         _;
     }
@@ -240,6 +269,18 @@ contract Staking {
         });
 
         validatorByRank.push(msg.sender);
+
+        emit CreatedValidator(
+            msg.sender,
+            commissionRate,
+            commissionMaxRate,
+            commissionMaxChangeRate,
+            name,
+            website,
+            contact,
+            identity
+        );
+
         _delegate(msg.sender, msg.sender, msg.value);
     }
 
@@ -258,10 +299,11 @@ contract Staking {
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
 
         totalBonded += amount;
-
         if (!val.jailed) {
             sortRankByVotingPower(val.rank);
         }
+
+        emit Delegate(delAddr, valAddr, amount);
     }
 
     function delegate(address valAddr) public payable {
@@ -423,11 +465,14 @@ contract Staking {
 
         sortRankByVotingPower(val.rank);
 
+        emit Jailed(valAddr);
+
     }
 
     function burn(uint256 amount) private {
         totalSupply -= amount;
         totalBonded -= amount;
+        emit Burn(amount);
     }
 
     function transferTo(address payable recipient, uint256 amount)
@@ -462,7 +507,6 @@ contract Staking {
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
         del.cumulativeSlashRatio = val.cumulativeSlashRatio;
         totalSupply += rewards;
-
         return rewards;
     }
 
@@ -507,6 +551,7 @@ contract Staking {
             delete validators[valAddr];
         }
         transferTo(msg.sender, balance);
+        emit Withdraw(msg.sender, valAddr, balance);
     }
 
     function getUnboudingDelegation(address delAddr, address valAddr)
@@ -569,14 +614,17 @@ contract Staking {
     {
         uint256 rewards = _withdrawDelegationRewards(msg.sender, valAddr);
         transferTo(msg.sender, rewards);
+        emit WithdrawRewards(msg.sender, valAddr, rewards);
         return rewards;
     }
 
     function withdrawValidatorCommissionReward() public returns (uint256) {
         Validator storage val = validators[msg.sender];
-        transferTo(msg.sender, val.commissionRewards);
-        totalSupply += val.commissionRewards;
+        uint256 rewards = val.commissionRewards;
+        transferTo(msg.sender, rewards);
+        totalSupply += rewards;
         val.commissionRewards = 0;
+        emit WithdrawlCommissionReward(msg.sender, rewards)
     }
 
     function getValidatorCommissionReward(address valAddr)
@@ -612,7 +660,7 @@ contract Staking {
             !val.jailed &&
             del.stake < val.minselfDelegation
         ) {
-            val.jailed = true;
+            jail(valAddr);
         }
         val.tokens -= amount;
         val.unboudingEntryCount++;
@@ -626,6 +674,13 @@ contract Staking {
         if (!val.jailed) {
             sortRankByVotingPower(val.rank);
         }
+
+        emit UnDelegate(msg.sender, valAddr, amount);
+    }
+
+    function jail(address valAddr) {
+        validators[valAddr].jailed = true;
+        emit Jailed(valAddr);
     }
 
     function updateValidator(
@@ -681,6 +736,7 @@ contract Staking {
         if (bytes(contact).length > 0) {
             val.description.contact = contact;
         }
+        emit UpdateValidator(commissionRate, minselfDelegation, name, website, contact, identity);
     }
 
     function unjail() public {
@@ -698,6 +754,7 @@ contract Staking {
         val.rank = validatorByRank.length;
         validatorByRank.push(msg.sender);
         sortRankByVotingPower(val.rank);
+        emit Unjail(msg.sender);
     }
 
     function doubleSign(address valAddr, uint256 votingPower) public onlyRoot {
