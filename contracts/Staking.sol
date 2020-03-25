@@ -87,26 +87,28 @@ contract Staking {
         uint256 commissionRate,
         uint256 commissionMaxRate,
         uint256 commissionMaxChangeRate,
-        string memory name,
-        string memory website,
-        string memory contact,
-        string memory identity
+        string name,
+        string website,
+        string contact,
+        string identity
     );
     event UpdateValidator(
         uint256 commissionRate,
-        string memory name,
-        string memory website,
-        string memory contact,
-        string memory identity
-    )
+        uint256 minselfDelegation,
+        string name,
+        string website,
+        string contact,
+        string identity
+    );
     event Delegate(address delAddr, address valAddr, uint256 amount);
-    event UnDelegate(address delAddr, address valAddr, uint256 amount);
+    event UnDelegate(address delAddr, address valAddr, uint256 amount, uint256 completionTime);
     event Withdraw(address delAddr, address valAddr, uint256 amount);
     event WithdrawRewards(address delAddr, address valAddr, uint256 amount);
     event WithdrawlCommissionReward(address valAddr, uint256 amount);
-    event Jailed(address valAddr);
+    event Jailed(address valAddr, uint reason);
     event Unjail(address valAddr);
-    event Burn(uint256 amount);
+    event ValidatorCommission(address valAddr, uint256 amount);
+    event DelegationRewards(address valAddr, uint256 amount);
 
     modifier onlyRoot() {
         _;
@@ -364,8 +366,6 @@ contract Staking {
         previousProposerAddr = proposerAddr;
     }
 
-    event Demo(uint256 amount);
-
     function allocateTokens(
         uint256 previousTotalPower,
         uint256 previousPrecommitTotalPower,
@@ -405,6 +405,9 @@ contract Staking {
         uint256 shared = blockReward.sub(commission);
         val.commissionRewards += commission;
         val.rewards += shared;
+
+        emit DelegationRewards(valAddr, shared);
+        emit ValidatorCommission(valAddr, commission);
     }
 
     function handleValidateSignatures(
@@ -433,6 +436,8 @@ contract Staking {
 
         if (val.missedBlockCounter >= params.maxMissed && !val.jailed) {
             slash(valAddr, power, params.slashFractionDowntime);
+            // 1: missing signature
+            emit Jailed(valAddr, 1);
         }
 
     }
@@ -463,15 +468,11 @@ contract Staking {
         burn(slashAmount);
 
         sortRankByVotingPower(val.rank);
-
-        emit Jailed(valAddr);
-
     }
 
     function burn(uint256 amount) private {
         totalSupply -= amount;
         totalBonded -= amount;
-        emit Burn(amount);
     }
 
     function transferTo(address payable recipient, uint256 amount)
@@ -622,7 +623,7 @@ contract Staking {
         transferTo(msg.sender, rewards);
         totalSupply += rewards;
         val.commissionRewards = 0;
-        emit WithdrawlCommissionReward(msg.sender, rewards)
+        emit WithdrawlCommissionReward(msg.sender, rewards);
     }
 
     function getValidatorCommissionReward(address valAddr)
@@ -663,10 +664,11 @@ contract Staking {
         }
         val.tokens -= amount;
         val.unboudingEntryCount++;
+        uint256 completionTime = block.timestamp.add(params.unboudingTime);
         del.ubdEntries.push(
             UnbondingDelegationEntry({
                 balance: amount,
-                completionTime: block.timestamp + params.unboudingTime,
+                completionTime: completionTime,
                 cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
@@ -674,12 +676,11 @@ contract Staking {
             sortRankByVotingPower(val.rank);
         }
 
-        emit UnDelegate(msg.sender, valAddr, amount);
+        emit UnDelegate(msg.sender, valAddr, amount, completionTime);
     }
 
-    function jail(address valAddr) {
+    function jail(address valAddr) private{
         validators[valAddr].jailed = true;
-        emit Jailed(valAddr);
     }
 
     function updateValidator(
@@ -764,6 +765,8 @@ contract Staking {
             return;
         }
         slash(valAddr, votingPower, params.slashFractionDoubleSign);
+        // 2: double sign
+        emit Jailed(valAddr, 2);
     }
 
 
