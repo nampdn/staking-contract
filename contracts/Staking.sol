@@ -66,17 +66,10 @@ contract Staking {
         uint256 inflationMin;
     }
 
-    struct LastValidator struct {
-        address operatorAddress
-        uint256 power;
-    }
-
     address previousProposerAddr;
     mapping(address => Validator) validators;
     mapping(address => mapping(address => Delegation)) delegations;
     address[] public validatorByRank;
-    LastValidator[] lastValidators;
-    
 
     Params params;
 
@@ -321,38 +314,28 @@ contract Staking {
         _delegate(msg.sender, valAddr, msg.value);
     }
 
-
-    function updateValidatorSet () public onlyRoot returns(address[] memory, uint256[] memory) {
-        address[] memory arrProposer = new address[];
-        uint256[] memory arrProposerVotingPower = new uint256[];
-        mapping (address => uint256) last;
-        for (uint i = 0; i < lastValidators.length; i ++) {
-            last[lastValidators[i].address] = lastValidators[i].power;
+    function getCurrentValidatorSet()
+        public
+        view
+        returns (address[] memory, uint256[] memory)
+    {
+        uint256 maxValidators = params.maxValidators;
+        if (maxValidators > validatorByRank.length) {
+            maxValidators = validatorByRank.length;
         }
 
-        for (uint i =0; i < maxValidators; i ++) {
-            Validator memory val = validators[validatorByRank[i]];
-            if (val.tokens != last[val.operatorAddress]) {
-                arrProposer.push(val.operatorAddress);
-                arrProposerVotingPower.push(val.tokens.div(powerReduction));
-                lastValidators.push(LastValidator({operatorAddress: val.operatorAddress, power: val.tokens}));
-            }
-            delete last[val.operatorAddress];
-        }
-        
+        address[] memory arrProposer = new address[](maxValidators);
+        uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
 
-        for (uint i = 0; i < lastValidators.length; i ++) {
-            if (last[lastValidators[i].operatorAddress] == 0) {
-                lastValidators[i] = lastValidators[lastValidators.length - 1];
-                lastValidators.pop();
-                arrProposer.push(lastValidators[i].operatorAddress);
-                arrProposerVotingPower.push(0);
-            }
+        for (uint256 i = 0; i < maxValidators; i++) {
+            arrProposer[i] = validatorByRank[i];
+            arrProposerVotingPower[i] = validators[validatorByRank[i]]
+                .tokens
+                .div(powerReduction);
         }
 
         return (arrProposer, arrProposerVotingPower);
     }
-    
 
     function finalizeCommit(
         address proposerAddr,
