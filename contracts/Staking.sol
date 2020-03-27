@@ -225,6 +225,7 @@ contract Staking {
         string memory contact,
         string memory identity
     ) public payable {
+        require (msg.value > 0, "invalid delegation amount");
         require(
             validators[msg.sender].operatorAddress == address(0x0),
             "Validator Owner Exists"
@@ -309,6 +310,7 @@ contract Staking {
 
     function delegate(address valAddr) public payable {
         require(validators[valAddr].operatorAddress != address(0x0), "validator not found");
+        require (msg.value > 0, "invalid delegation amount");
         // withdrawl reward before redelegate
         withdrawDelegationReward(valAddr);
         _delegate(msg.sender, valAddr, msg.value);
