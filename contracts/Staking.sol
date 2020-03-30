@@ -184,9 +184,27 @@ contract Staking {
         _sortRankByVotingPower(idx);
         cleanValidatorByRankArr();
     }
+
+    function updateValidatorRank(address valAddr) private {
+        Validator storage val = validators[valAddr];
+        if (val.jailed == true) return;
+        if (val.tokens == 0) return;
+        if (val.rank  == 0 && val.operatorAddress != validatorByRank[0]) {
+            val.rank = validatorByRank.length;
+            validatorByRank.push(val.operatorAddress);
+        }
+        sortRankByVotingPower(val.rank);
+    }
+
     function cleanValidatorByRankArr() private {
         for (uint256 i = validatorByRank.length - 1; i >= 0; i--) {
             if (tokenByRank(i) > 0) break;
+            validators[validatorByRank[i]].rank = 0;
+            validatorByRank.pop();
+        }
+
+        for (uint256 i = validatorByRank.length - 1; i  > params.maxValidators; i--) {
+            validators[validatorByRank[i]].rank = 0;
             validatorByRank.pop();
         }
     }
@@ -301,10 +319,7 @@ contract Staking {
         del.cumulativeRewardRatio = val.cumulativeRewardRatio;
 
         totalBonded += amount;
-        if (!val.jailed) {
-            sortRankByVotingPower(val.rank);
-        }
-
+        updateValidatorRank(valAddr);
         emit Delegate(delAddr, valAddr, amount);
     }
 
@@ -321,14 +336,9 @@ contract Staking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        uint256 maxValidators = params.maxValidators;
-        if (maxValidators > validatorByRank.length) {
-            maxValidators = validatorByRank.length;
-        }
-
+        uint256 maxValidators = validatorByRank.length;
         address[] memory arrProposer = new address[](maxValidators);
         uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
-
         for (uint256 i = 0; i < maxValidators; i++) {
             arrProposer[i] = validatorByRank[i];
             arrProposerVotingPower[i] = validators[validatorByRank[i]]
@@ -674,10 +684,7 @@ contract Staking {
                 cumulativeSlashRatio: val.cumulativeSlashRatio
             })
         );
-        if (!val.jailed) {
-            sortRankByVotingPower(val.rank);
-        }
-
+        updateValidatorRank(valAddr);
         emit UnDelegate(msg.sender, valAddr, amount, completionTime);
     }
 
@@ -755,9 +762,7 @@ contract Staking {
 
         val.jailedUntil = 0;
         val.jailed = false;
-        val.rank = validatorByRank.length;
-        validatorByRank.push(msg.sender);
-        sortRankByVotingPower(val.rank);
+        updateValidatorRank(msg.sender);
         emit Unjail(msg.sender);
     }
 
