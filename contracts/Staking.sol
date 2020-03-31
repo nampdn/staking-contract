@@ -370,7 +370,11 @@ contract Staking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        uint256 maxValidators = validatorByRank.length;
+        uint256 maxValidators = params.maxValidators;
+        if (maxValidators > validatorByRank.length) {
+            maxValidators = validatorByRank.length;
+        }
+
         address[] memory arrProposer = new address[](maxValidators);
         uint256[] memory arrProposerVotingPower = new uint256[](maxValidators);
         for (uint256 i = 0; i < maxValidators; i++) {
