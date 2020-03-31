@@ -278,6 +278,8 @@ contract Staking {
         string memory identity
     ) public payable {
         require (msg.value > 0, "invalid delegation amount");
+        require (msg.value > minselfDelegation, "minimum self delegation must be a positive integer");
+        
         require(
             validators[msg.sender].operatorAddress == address(0x0),
             "Validator Owner Exists"
