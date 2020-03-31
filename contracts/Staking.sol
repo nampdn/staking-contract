@@ -5,6 +5,7 @@ contract Staking {
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10**6;
     uint256 oneDec = 1 * 10**18;
+    address root;
     struct Validator {
         address operatorAddress;
         uint256 tokens;
@@ -111,25 +112,26 @@ contract Staking {
     event DelegationRewards(address valAddr, uint256 amount);
 
     modifier onlyRoot() {
+        require (msg.sender == root, "permission denied");
         _;
     }
 
     constructor() public {
         params = Params({
             // staking params
-            maxValidators: 21,
-            maxMissed: 5000,
-            downtimeJailDuration: 60*60*24*30, // 30 days,
-            baseProposerReward: 1 * 10 ** 17, // 10%,
-            bonusProposerReward: 1 * 10 ** 16, // 1%,
-            slashFractionDowntime: 1 * 10 ** 17, // 10%,
-            unboudingTime: 1, // 1s
-            slashFractionDoubleSign: 5 * 10 ** 17, // 50%,
+            maxValidators: 100,
+            maxMissed: 10000,
+            downtimeJailDuration: 600, // 10 minutes,
+            baseProposerReward: 1 * 10 ** 16, // 1%,
+            bonusProposerReward: 4 * 10 ** 16, // 4%,
+            slashFractionDowntime: 1 * 10 ** 14, // 0.01%,
+            unboudingTime: 1814400, // 21 days
+            slashFractionDoubleSign: 5 * 10 ** 16, // 5%,
 
             // minted params
-            inflationRateChange: 15 * 10 ** 16, // 15%
+            inflationRateChange: 13 * 10 ** 16, // 13%
             goalBonded: 67 * 10 ** 16, // 67%
-            blocksPerYear: 60 * 60 * 8766 / 5,
+            blocksPerYear: 6311520,
             inflationMax: 20 * 10 ** 16, // 20%
             inflationMin: 7 * 10 ** 16 // 7%
         });
@@ -173,6 +175,38 @@ contract Staking {
         }
     }
 
+    function setMintParams (
+        uint256 inflationRateChange,
+        uint256 goalBonded,
+        uint256 blocksPerYear,
+        uint256 inflationMax,
+        uint256 inflationMin
+    ) public onlyRoot {
+        if (inflationRateChange > 0) {
+            params.inflationRateChange = inflationRateChange;
+        }
+        if (goalBonded > 0) {
+            params.goalBonded = goalBonded;
+        }
+        if (blocksPerYear > 0) {
+            params.blocksPerYear = blocksPerYear;
+        }
+        if (inflationMax > 0) {
+            params.inflationMax = inflationMax;
+        }
+        if (inflationMin > 0) {
+            params.inflationMin = inflationMin;
+        }
+    }
+
+
+    function setRoot(address newRoot) public {
+        if (root != address(0x0)) {
+            require (msg.sender == root, "permission denied");
+        }
+        root = newRoot;
+    }
+
     function tokenByRank(uint256 idx) private view returns (uint256) {
         if (validators[validatorByRank[idx]].jailed) {
             return 0;
@@ -203,7 +237,7 @@ contract Staking {
             validatorByRank.pop();
         }
 
-        for (uint256 i = validatorByRank.length - 1; i  > params.maxValidators; i--) {
+        for (uint256 i = validatorByRank.length - 1; i  > 500; i--) {
             validators[validatorByRank[i]].rank = 0;
             validatorByRank.pop();
         }

@@ -8,10 +8,25 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         const validatorSet = await instance.getCurrentValidatorSet.call();
         await instance.mint();
-
         await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
-        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1])
+        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1], {from: accounts[0]})
     }
+
+    it ("should set root", async() => {
+        let instance = await Staking.deployed();
+        await instance.setRoot(accounts[0], {from: accounts[0]});
+    });
+
+    it ("should set params", async() => {
+        const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
+        const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
+        const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
+        const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 1%
+        const unboudingTime = 1;
+        let instance = await Staking.deployed(); 
+        await instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
+            slashFractionDowntime, unboudingTime, slashFractionDoubleSign)
+    });
 
     it("should create new validator", async () => {
         let instance = await Staking.deployed();
