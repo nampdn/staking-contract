@@ -6,10 +6,16 @@ contract("Staking", async (accounts) => {
     const powerReduction = Math.pow(10, 6);
     async function finalizeCommit(signed) {
         let instance = await Staking.deployed();
-        const validatorSet = await instance.getCurrentValidatorSet.call();
+        const validatorSet = await getCurrentValidatorSet();
         await instance.mint();
         await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
         await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1], {from: accounts[0]})
+    }
+
+    async function getCurrentValidatorSet() {
+        const instance = await Staking.deployed();
+        await instance.applyAndRetunValSetUpdates({from: accounts[0]});
+        return instance.getCurrentValidatorSet.call();
     }
 
     it ("should set root", async() => {
@@ -35,19 +41,19 @@ contract("Staking", async (accounts) => {
 
         const bond = web3.utils.toWei("100", "ether")
         await instance.createValidator(0, maxChangeRate, maxRate ,0 , "val1", "val.com", "val1@gmail.com", "val1", {from: accounts[0], value: bond});
-        let validatorSet = await instance.getCurrentValidatorSet.call();
+        let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0].toString(), bond/powerReduction);
 
         const bond2 = web3.utils.toWei("101", "ether")
         await instance.createValidator(0,maxChangeRate, maxRate,0, "val1", "val.com", "val1@gmail.com", "val1", {from: accounts[1], value: bond2});
-        validatorSet = await instance.getCurrentValidatorSet.call();
+        validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[1]);
         assert.equal(validatorSet[1][0].toString(), bond2/powerReduction);
 
         const bond3 = web3.utils.toWei("1", "ether")
         await instance.createValidator(0,maxChangeRate, maxRate,0, "val1", "val.com", "val1@gmail.com", "val1", {from: accounts[2], value: bond3});
-        validatorSet = await instance.getCurrentValidatorSet.call();
+        validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][2], accounts[2]);
         assert.equal(validatorSet[1][2].toString(), bond3/powerReduction);
     })
@@ -58,12 +64,12 @@ contract("Staking", async (accounts) => {
         const bond = web3.utils.toWei("0.1", "ether")
         await instance.delegate(accounts[0], {from:accounts[1], value: bond})
 
-        let validatorSet = await instance.getCurrentValidatorSet.call();
+        let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[1]);
 
         const bond2 = web3.utils.toWei("99.9", "ether")
         await instance.delegate(accounts[0], {from:accounts[1], value: bond2})
-        validatorSet = await instance.getCurrentValidatorSet.call();
+        validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0], web3.utils.toWei("200", "ether")/powerReduction);
 
@@ -190,7 +196,7 @@ contract("Staking", async (accounts) => {
         stake = await instance.getDelegationStake.call(accounts[0], accounts[0]);
         assert.equal(stake.toString(), web3.utils.toWei("90", "ether"));
         
-        let validatorSet = await instance.getCurrentValidatorSet.call();
+        let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0].length, 2);
 
 
@@ -199,7 +205,7 @@ contract("Staking", async (accounts) => {
     it("should unjail validator", async () => {
         const instance = await Staking.deployed();
 
-        let validatorSet = await instance.getCurrentValidatorSet.call();
+        let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[1]);
 
         await utils.advanceTime(2000);
@@ -208,7 +214,7 @@ contract("Staking", async (accounts) => {
         assert.equal(val[1], false);
         assert.equal(val[0].toString(), web3.utils.toWei("180", "ether"));
 
-        validatorSet = await instance.getCurrentValidatorSet.call();
+        validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[0]);
     })
 

@@ -81,6 +81,8 @@ contract Staking {
     uint256 annualProvision = 0;
     uint256 public feeCollected = 0;
 
+    address[] sortQ;
+
     // Events
     // ---------------------------------------------------
     event CreatedValidator(
@@ -227,7 +229,8 @@ contract Staking {
             val.rank = validatorByRank.length;
             validatorByRank.push(val.operatorAddress);
         }
-        sortRankByVotingPower(val.rank);
+
+        sortQ.push(val.operatorAddress);
     }
 
     function cleanValidatorByRankArr() private {
@@ -325,7 +328,7 @@ contract Staking {
         });
 
         validatorByRank.push(msg.sender);
-
+ 
         emit CreatedValidator(
             msg.sender,
             commissionRate,
@@ -366,6 +369,15 @@ contract Staking {
         withdrawDelegationReward(valAddr);
         _delegate(msg.sender, valAddr, msg.value);
     }
+
+    function applyAndRetunValSetUpdates () public onlyRoot returns (address[] memory, uint256[] memory){
+        for (uint i = sortQ.length; i > 0; i--) {
+            sortRankByVotingPower(validators[sortQ[i-1]].rank);
+            sortQ.pop();
+        }
+        return getCurrentValidatorSet();
+    }
+    
 
     function getCurrentValidatorSet()
         public
@@ -518,8 +530,7 @@ contract Staking {
         val.missedBlockCounter = 0;
         val.jailedUntil += block.timestamp.add(params.downtimeJailDuration);
         burn(slashAmount);
-
-        sortRankByVotingPower(val.rank);
+        sortQ.push(val.operatorAddress);
     }
 
     function burn(uint256 amount) private {
@@ -703,6 +714,8 @@ contract Staking {
 
     function undelegate(address valAddr, uint256 amount) public {
         require(validators[valAddr].operatorAddress != address(0x0), "validator not found");
+        require (amount <= delegations[valAddr][msg.sender].stake, "invalid undelegate amount");
+        
         withdrawDelegationReward(valAddr);
         Validator storage val = validators[valAddr];
         Delegation storage del = delegations[valAddr][msg.sender];
