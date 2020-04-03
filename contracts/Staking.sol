@@ -235,7 +235,7 @@ contract Staking {
 
     function cleanValidatorByRankArr() private {
         for (uint256 i = validatorByRank.length - 1; i >= 0; i--) {
-            if (tokenByRank(i) > 0) break;
+            if (tokenByRank(i).div(powerReduction) > 0) break;
             validators[validatorByRank[i]].rank = 0;
             validatorByRank.pop();
         }
