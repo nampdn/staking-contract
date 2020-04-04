@@ -80,6 +80,10 @@ contract StakingNew {
         
     }
     
+    function delegate(address valAddr, uint256 amount) public payable{
+        _delegate(msg.sender, valAddr, amount);
+    }
+    
     
     function delegate(address valAddr) public payable {
         require(validators[valAddr].owner != address(0x0), "validator does not exists");
@@ -107,6 +111,10 @@ contract StakingNew {
         
     }
     
+    function undelegate(address valAddr, uint256 amount) public {
+        _undelegate(msg.sender, valAddr, amount);
+    }
+    
     
     function _slash(address valAddr, uint256 infrationHeight, uint256 power, uint256 slashFactor) private {
         require(infrationHeight <= block.number, "");
@@ -129,7 +137,7 @@ contract StakingNew {
     }
     
     
-    function _withdrawl(address valAddr, address delAddr, uint256) private returns (uint256){
+    function _withdrawl(address valAddr, address payable delAddr) private returns (uint256){
         UBDEntry[] storage entries= unbondingEntries[valAddr][delAddr];
         uint256 amount = 0;
         for (uint i = 0; i < entries.length; i ++) {
@@ -139,7 +147,12 @@ contract StakingNew {
                 entries.pop();
             }
         }
+        delAddr.transfer(amount);
         return amount;
+    }
+    
+    function withdrawl(address valAddr) public {
+        _withdrawl(valAddr, msg.sender);
     }
     
     
@@ -195,4 +208,42 @@ contract StakingNew {
          validatorHistoricalRewards[valAddr][period].reference_count++;
     }
     
+    
+    function _initializeDelegation(address valAddr, address delAddr) private {
+        uint256 delegationIndex = delegationsIndex[valAddr][delAddr]-1;
+        Validator memory val = validators[valAddr];
+        uint256 previousPeriod = validatorCurrentRewards[valAddr].period +1;
+        _incrementReferenceCount(valAddr, previousPeriod);
+        delegatorStartingInfo[valAddr][delAddr].height = block.number;
+        delegatorStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
+        uint256 stake = val.delegations[delegationIndex].shares.div(val.delegationShares);
+        delegatorStartingInfo[valAddr][delAddr].stake = stake;
+    }
+    
+    function _initializeValidator(address valAddr) private {
+        validatorHistoricalRewards[valAddr][0].reference_count = 1;
+        validatorCurrentRewards[valAddr].period = 1;
+        validatorCurrentRewards[valAddr].reward = 0;
+    }
+    
+    
+    function _beforeDelegationCreated(address valAddr) private {
+        _incrementValidatorPeriod(valAddr);
+    }
+    
+    function _beforeDelegationSharesModified(address valAddr, address payable delAddr) private {
+        _withdrawRewards(valAddr, delAddr);
+    }
+    
+    function _withdrawRewards(address valAddr, address payable delAddr) private {
+        uint256 endingPeriod = _incrementValidatorPeriod(valAddr);
+        uint256 rewards = _calculateDelegationRewards(valAddr, delAddr, endingPeriod);
+        _decrementReferenceCount(valAddr, delegatorStartingInfo[valAddr][delAddr].previousPeriod);
+        delete delegatorStartingInfo[valAddr][delAddr];
+        delAddr.transfer(rewards);
+    }
+    
+    function withdrawReward(address valAddr) public {
+        _withdrawRewards(valAddr, msg.sender);
+    }
 }
