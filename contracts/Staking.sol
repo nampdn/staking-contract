@@ -26,13 +26,34 @@ contract StakingNew {
     
     struct DelegatorStartingInfo {
         uint256 stake;
+        uint256 previousPeriod;
+        uint256 height;
         
+    }
+    
+    struct ValidatorSlashEvent {
+        uint256 validatorPeriod;
+        uint256 fraction;
+        uint256 height;
+    }
+    
+    struct ValidatorCurrentReward {
+        uint256 period;
+        uint256 reward;
+    }
+    
+    struct ValidatorHistoricalRewards {
+        uint256 cumulativeRewardRatio;
+        uint reference_count;
     }
     
     mapping(address => Validator) validators;
     mapping(address => mapping(address => uint)) delegationsIndex;
     mapping(address => mapping(address => UBDEntry[])) unbondingEntries;
-    mapping(address => mapping(address => DelegatorStartingInfo)) delegationStartingInfo;
+    mapping(address => mapping(address => DelegatorStartingInfo)) delegatorStartingInfo;
+    mapping(address => ValidatorSlashEvent[]) validatorSlashEvents;
+    mapping(address => ValidatorCurrentReward) validatorCurrentRewards;
+    mapping(address => mapping(uint256 => ValidatorHistoricalRewards)) validatorHistoricalRewards;
     
     
     function _delegate(address delAddr, address valAddr, uint256 amount) private {
@@ -67,14 +88,16 @@ contract StakingNew {
     }
     
     function _undelegate(address valAddr, address delAddr, uint256 amount) private {
-        uint256 delegationIndex = delegationsIndex[valAddr][delAddr];
+        uint delegationIndex = delegationsIndex[valAddr][delAddr];
+        require(delegationIndex > 0, "delegation not found");
         Validator storage val = validators[valAddr];
         Delegation storage del = val.delegations[delegationIndex -1];
         uint256 shares = val.delegationShares.mul(amount).div(val.tokens);
+        require(del.shares > shares, "invalid undelegate amount");
         uint256 token = shares.mul(val.tokens).div(val.delegationShares);
         val.delegationShares -= shares;
-        val.tokens -=token;
-        del.shares -=shares;
+        val.tokens -= token;
+        del.shares -= shares;
         
         unbondingEntries[valAddr][delAddr].push(UBDEntry({
             completionTime: 1,
@@ -120,8 +143,56 @@ contract StakingNew {
     }
     
     
-    function _withdrawlReward(address valAddr, address delAddr) private returns(uint256) {
+    function _calculateDelegationRewards(address valAddr, address delAddr, uint256 endingPeriod) private view returns(uint256) {
+        DelegatorStartingInfo memory startingInfo = delegatorStartingInfo[valAddr][delAddr];
+        uint256 rewards = 0;
+        for (uint256 i = 0; i < validatorSlashEvents[valAddr].length; i ++) {
+            ValidatorSlashEvent memory slashEvent = validatorSlashEvents[valAddr][i];
+             if (slashEvent.height > startingInfo.height &&
+                slashEvent.height < block.number) {
+                    endingPeriod = slashEvent.validatorPeriod;
+                    if (endingPeriod > startingInfo.previousPeriod) {
+                        rewards  += _calculateDelegationRewardsBetween(valAddr, startingInfo.previousPeriod, slashEvent.validatorPeriod, startingInfo.stake);
+                        startingInfo.stake = startingInfo.stake.mul(slashEvent.fraction);
+                        startingInfo.previousPeriod = endingPeriod;
+                    }
+                }
+        }
+        rewards += _calculateDelegationRewardsBetween(valAddr, startingInfo.previousPeriod, endingPeriod, startingInfo.stake);
+        return rewards;
         
+    }
+    
+    function _calculateDelegationRewardsBetween(address valAddr, uint startingPeriod, uint endingPeriod, uint256 stake) private view returns(uint256){
+        ValidatorHistoricalRewards memory starting = validatorHistoricalRewards[valAddr][startingPeriod];
+        ValidatorHistoricalRewards memory ending = validatorHistoricalRewards[valAddr][endingPeriod];
+        uint256 difference = ending.cumulativeRewardRatio.sub(starting.cumulativeRewardRatio);
+        return stake.mul(difference);
+    }
+    
+    
+    function _incrementValidatorPeriod(address valAddr) private returns(uint256){
+        Validator memory val = validators[valAddr];
+        ValidatorCurrentReward storage rewards = validatorCurrentRewards[valAddr];
+        uint256 current = rewards.reward.div(val.tokens);
+        uint256 historical = validatorHistoricalRewards[valAddr][rewards.period - 1].cumulativeRewardRatio;
+        _decrementReferenceCount(valAddr, rewards.period);
+        validatorHistoricalRewards[valAddr][rewards.period].cumulativeRewardRatio = historical + current;
+        rewards.period++;
+        rewards.reward = 0;
+        return rewards.period;
+        
+    }
+    
+    function _decrementReferenceCount(address valAddr, uint256 period) private {
+        validatorHistoricalRewards[valAddr][period].reference_count--;
+        if (validatorHistoricalRewards[valAddr][period].reference_count == 0) {
+            delete validatorHistoricalRewards[valAddr][period];
+        }
+    }
+    
+    function _incrementReferenceCount(address valAddr, uint256 period) private {
+         validatorHistoricalRewards[valAddr][period].reference_count++;
     }
     
 }
