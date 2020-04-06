@@ -22,6 +22,7 @@ contract StakingNew {
         uint256 tokens;
         uint256 delegationShares;
         Delegation[] delegations;
+        bool jailed;
     }
     
     struct DelegatorStartingInfo {
@@ -47,6 +48,36 @@ contract StakingNew {
         uint reference_count;
     }
     
+    struct ValidatorSigningInfo {
+        uint256 startHeight;
+        uint256 indexOffset;
+        bool tombstoned;
+        uint missedBlockCounter;
+        uint256 jailedUntil;
+    }
+    
+    
+    struct Params {
+        uint256 baseProposerReward;
+        uint256 bonusProposerReward;
+        uint256 maxValidators;
+        uint256 maxMissed;
+        uint256 downtimeJailDuration;
+        uint256 slashFractionDowntime;
+        uint256 unboudingTime;
+        uint256 slashFractionDoubleSign;
+        uint256 signedBlockWindown;
+        uint256 minSignedPerWindown;
+    
+        // mint params
+        uint256 inflationRateChange;
+        uint256 goalBonded;
+        uint256 blocksPerYear;
+        uint256 inflationMax;
+        uint256 inflationMin;
+    }
+    
+    
     mapping(address => Validator) validators;
     mapping(address => mapping(address => uint)) delegationsIndex;
     mapping(address => mapping(address => UBDEntry[])) unbondingEntries;
@@ -54,6 +85,9 @@ contract StakingNew {
     mapping(address => ValidatorSlashEvent[]) validatorSlashEvents;
     mapping(address => ValidatorCurrentReward) validatorCurrentRewards;
     mapping(address => mapping(uint256 => ValidatorHistoricalRewards)) validatorHistoricalRewards;
+    mapping(address => bool[]) validatorMissedBlockBitArray;
+    mapping(address => ValidatorSigningInfo) validatorSigningInfos;
+    Params _params;
     
     
     function _delegate(address delAddr, address valAddr, uint256 amount) private {
@@ -79,11 +113,6 @@ contract StakingNew {
         val.delegationShares += shared;
         
     }
-    
-    function delegate(address valAddr, uint256 amount) public payable{
-        _delegate(msg.sender, valAddr, amount);
-    }
-    
     
     function delegate(address valAddr) public payable {
         require(validators[valAddr].owner != address(0x0), "validator does not exists");
@@ -113,6 +142,10 @@ contract StakingNew {
     
     function undelegate(address valAddr, uint256 amount) public {
         _undelegate(msg.sender, valAddr, amount);
+    }
+    
+    function _jail(address valAddr) private {
+        validators[valAddr].jailed = true;
     }
     
     
@@ -245,5 +278,44 @@ contract StakingNew {
     
     function withdrawReward(address valAddr) public {
         _withdrawRewards(valAddr, msg.sender);
+    }
+    
+    
+    function _doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) private {
+        _slash(valAddr, distributionHeight, votingPower, 0); 
+    }
+    
+    function doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) public {
+        _doubleSign(valAddr, votingPower, distributionHeight);
+    }
+    
+    function _validateSignature(address valAddr, uint256 votingPower, bool signed) private{
+        Validator storage val = validators[valAddr];
+        ValidatorSigningInfo storage signInfo = validatorSigningInfos[valAddr];
+        uint index = signInfo.indexOffset % _params.signedBlockWindown;
+        signInfo.indexOffset++;
+        bool previous = validatorMissedBlockBitArray[valAddr][index];
+        bool missed = !signed;
+        if (!previous && missed) {
+            signInfo.missedBlockCounter++;
+            validatorMissedBlockBitArray[valAddr][index] = true;
+        } else if (previous && !missed) {
+            signInfo.missedBlockCounter--;
+            validatorMissedBlockBitArray[valAddr][index] = false;
+        }
+        
+        uint256 minHeight = signInfo.startHeight + _params.signedBlockWindown;
+        uint maxMissed = _params.signedBlockWindown - _params.minSignedPerWindown;
+        if (block.number > minHeight && signInfo.missedBlockCounter > maxMissed) {
+            if (!val.jailed) {
+                _slash(valAddr, block.number, votingPower, 1);
+                _jail(valAddr);
+                signInfo.jailedUntil = block.timestamp.add(_params.slashFractionDowntime);
+                signInfo.missedBlockCounter = 0;
+                signInfo.indexOffset = 0;
+                validatorMissedBlockBitArray[valAddr] = new bool[](_params.signedBlockWindown);
+            }
+        }
+        
     }
 }
