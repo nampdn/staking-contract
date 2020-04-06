@@ -117,8 +117,12 @@ contract StakingNew {
         _initializeValidator(valAddr);
     }
     
+    function _afterDelegationModified(address valAddr, address delAddr) private {
+        _initializeDelegation(valAddr, delAddr);
+    }
     
-    function _delegate(address delAddr, address valAddr, uint256 amount) private {
+    
+    function _delegate(address payable delAddr, address valAddr, uint256 amount) private {
         Validator storage val = validators[validatorsIndex[valAddr]-1];
         uint delIndex = delegationsIndex[valAddr][delAddr];
         
@@ -130,6 +134,9 @@ contract StakingNew {
             }));
             
             delegationsIndex[valAddr][delAddr] = delegations[valAddr].length;
+            _beforeDelegationCreated(valAddr);
+        } else {
+            _beforeDelegationSharesModified(valAddr, delAddr);
         }
         
         uint256 shared = val.delegationShares.mul(amount).div(val.tokens);
@@ -139,6 +146,7 @@ contract StakingNew {
         del.shares = shared;
         val.tokens += amount;
         val.delegationShares += shared;
+        _afterDelegationModified(valAddr, delAddr);
         
     }
     
@@ -226,16 +234,24 @@ contract StakingNew {
         Delegation memory lastDelegation = delegations[valAddr][lastDelegationIndex -1];
         delegations[valAddr][delegationIndex-1] = lastDelegation;
         delegations[valAddr].pop();
+        delete delegatorStartingInfo[valAddr][delAddr];
     }
     
     function _removeValidator(address valAddr) private{
-        delete validators[validatorsIndex[valAddr]-1];
         delete validatorSlashEvents[valAddr];
         delete validatorAccumulatedCommission[valAddr];
         for (uint i = 0; i < validatorCurrentRewards[valAddr].period; i ++) {
             delete validatorHistoricalRewards[valAddr][i];
         }
         delete validatorCurrentRewards[valAddr];
+        
+        uint valIndex = validatorsIndex[valAddr];
+        uint lastIndex = validators.length;
+        Validator memory lastVal = validators[lastIndex -1];
+        validators[valIndex-1] = lastVal;
+        validators.pop();
+        validatorsIndex[lastVal.owner] = valIndex;
+        delete validatorsIndex[valAddr];
     }
     
     
