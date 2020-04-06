@@ -17,12 +17,18 @@ contract StakingNew {
         uint256 completionTime;
     }
     
+    
+    struct ValidatorCommission {
+        uint256 rate;
+    }
+    
     struct Validator {
         address owner;
         uint256 tokens;
         uint256 delegationShares;
         Delegation[] delegations;
         bool jailed;
+        ValidatorCommission commission;
     }
     
     struct DelegatorStartingInfo {
@@ -87,7 +93,10 @@ contract StakingNew {
     mapping(address => mapping(uint256 => ValidatorHistoricalRewards)) validatorHistoricalRewards;
     mapping(address => bool[]) validatorMissedBlockBitArray;
     mapping(address => ValidatorSigningInfo) validatorSigningInfos;
+    mapping(address => uint256) validatorAccumulatedCommission;
+    
     Params _params;
+    address _previousProposer;
     
     
     function _delegate(address delAddr, address valAddr, uint256 amount) private {
@@ -317,5 +326,52 @@ contract StakingNew {
             }
         }
         
+    }
+    
+    function _allocateTokens(uint256 sumPreviousPrecommitPower, uint256 totalPreviousVotingPower, 
+        address previousProposer, address[] memory vals, uint256[] memory powers) private{
+        uint256 feesCollected = 100;
+        uint256 previousFractionVotes = sumPreviousPrecommitPower.div(totalPreviousVotingPower);
+        uint256 proposerMultiplier = _params.baseProposerReward.add(_params.baseProposerReward.mul(previousFractionVotes));
+        uint256 proposerReward = feesCollected.mul(proposerMultiplier);
+        _allocateTokensToValidator(previousProposer, proposerReward);
+        feesCollected -= proposerReward;
+        
+        uint256 voteMultiplier = 1 - proposerMultiplier;
+        for (uint i = 0; i < vals.length; i ++) {
+            uint256 powerFraction = powers[i].div(totalPreviousVotingPower);
+            uint256 rewards = feesCollected.mul(voteMultiplier).mul(powerFraction);
+            _allocateTokensToValidator(vals[0], rewards);
+            feesCollected - rewards;
+        }
+    }
+    
+    function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
+        uint256 commission = rewards.mul(validators[valAddr].commission.rate);
+        uint256 shared = rewards.sub(commission);
+        validatorAccumulatedCommission[valAddr] += commission;
+        validatorCurrentRewards[valAddr].reward += shared;
+    }
+    
+    
+    function _finalizeCommit(address[] memory vals, uint256[] memory powers, bool[] memory signed) private {
+        uint256 previousTotalPower = 0;
+        uint256 sumPreviousPrecommitPower = 0;
+        for (uint i = 0; i < powers.length; i ++) {
+            _validateSignature(vals[i], powers[i], signed[i]);
+            previousTotalPower += powers[i];
+            if (signed[i]) {
+                sumPreviousPrecommitPower += powers[i];
+            }
+        }
+        if (block.number > 1) {
+            _allocateTokens(sumPreviousPrecommitPower, previousTotalPower, _previousProposer, vals, powers);
+        }
+        _previousProposer = block.coinbase;
+    }
+    
+    
+    function finalizeCommit(address[] memory vals, uint256[] memory powers, bool[] memory signed) public {
+        _finalizeCommit(vals, powers, signed);
     }
 }
