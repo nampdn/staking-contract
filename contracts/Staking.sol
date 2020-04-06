@@ -178,7 +178,6 @@ contract StakingNew {
         val.tokens -= slashAmount;
     }
     
-    
     function _withdrawl(address valAddr, address payable delAddr) private returns (uint256){
         UBDEntry[] storage entries= unbondingEntries[valAddr][delAddr];
         uint256 amount = 0;
@@ -266,6 +265,8 @@ contract StakingNew {
         validatorHistoricalRewards[valAddr][0].reference_count = 1;
         validatorCurrentRewards[valAddr].period = 1;
         validatorCurrentRewards[valAddr].reward = 0;
+        validatorMissedBlockBitArray[valAddr] = new bool[](_params.signedBlockWindown);
+        validatorAccumulatedCommission[valAddr] = 0;
     }
     
     
@@ -287,6 +288,18 @@ contract StakingNew {
     
     function withdrawReward(address valAddr) public {
         _withdrawRewards(valAddr, msg.sender);
+    }
+    
+    
+    function _withdrawValidatorCommission(address payable valAddr) private {
+        require(validators[valAddr].owner != address(0x0), "validator does not exists");
+        require(validatorAccumulatedCommission[valAddr] > 0, "no validator commission to reward");
+        valAddr.transfer(validatorAccumulatedCommission[valAddr]);
+        validatorAccumulatedCommission[valAddr] = 0;
+    }
+    
+    function withdrawValidatorCommission() public {
+        _withdrawValidatorCommission(msg.sender);
     }
     
     
