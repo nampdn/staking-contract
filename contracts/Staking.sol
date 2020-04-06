@@ -147,6 +147,14 @@ contract StakingNew {
             amount: token
         }));
         
+        if (del.shares == 0) {
+            _removeDelegation(valAddr, delAddr);
+        }
+        
+        if (val.delegationShares == 0) {
+            _removeValidator(valAddr);
+        }
+        
     }
     
     function undelegate(address valAddr, uint256 amount) public {
@@ -178,7 +186,7 @@ contract StakingNew {
         val.tokens -= slashAmount;
     }
     
-    function _withdrawl(address valAddr, address payable delAddr) private returns (uint256){
+    function _withdraw(address valAddr, address payable delAddr) private{
         UBDEntry[] storage entries= unbondingEntries[valAddr][delAddr];
         uint256 amount = 0;
         for (uint i = 0; i < entries.length; i ++) {
@@ -188,12 +196,32 @@ contract StakingNew {
                 entries.pop();
             }
         }
+        require(amount > 0, "no unbonding amount to withdraw");
         delAddr.transfer(amount);
-        return amount;
     }
     
-    function withdrawl(address valAddr) public {
-        _withdrawl(valAddr, msg.sender);
+    function _removeDelegation(address valAddr, address delAddr) private {
+        Validator storage val = validators[valAddr];
+        uint delegationIndex = delegationsIndex[valAddr][delAddr];
+        uint lastDelegationIndex = val.delegations.length;
+        Delegation memory lastDelegation = val.delegations[lastDelegationIndex -1];
+        val.delegations[delegationIndex-1] = lastDelegation;
+        val.delegations.pop();
+    }
+    
+    function _removeValidator(address valAddr) private{
+        delete validators[valAddr];
+        delete validatorSlashEvents[valAddr];
+        delete validatorAccumulatedCommission[valAddr];
+        for (uint i = 0; i < validatorCurrentRewards[valAddr].period; i ++) {
+            delete validatorHistoricalRewards[valAddr][i];
+        }
+        delete validatorCurrentRewards[valAddr];
+    }
+    
+    
+    function withdraw(address valAddr) public {
+        _withdraw(valAddr, msg.sender);
     }
     
     
@@ -304,7 +332,7 @@ contract StakingNew {
     
     
     function _doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) private {
-        _slash(valAddr, distributionHeight, votingPower, 0); 
+        _slash(valAddr, distributionHeight, votingPower, _params.slashFractionDoubleSign); 
     }
     
     function doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) public {
@@ -330,7 +358,7 @@ contract StakingNew {
         uint maxMissed = _params.signedBlockWindown - _params.minSignedPerWindown;
         if (block.number > minHeight && signInfo.missedBlockCounter > maxMissed) {
             if (!val.jailed) {
-                _slash(valAddr, block.number, votingPower, 1);
+                _slash(valAddr, block.number, votingPower, _params.slashFractionDowntime);
                 _jail(valAddr);
                 signInfo.jailedUntil = block.timestamp.add(_params.slashFractionDowntime);
                 signInfo.missedBlockCounter = 0;
@@ -355,7 +383,7 @@ contract StakingNew {
             uint256 powerFraction = powers[i].div(totalPreviousVotingPower);
             uint256 rewards = feesCollected.mul(voteMultiplier).mul(powerFraction);
             _allocateTokensToValidator(vals[0], rewards);
-            feesCollected - rewards;
+            feesCollected -= rewards;
         }
     }
     
