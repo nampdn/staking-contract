@@ -89,7 +89,7 @@ contract StakingNew {
     mapping(address => mapping(address => DelegatorStartingInfo)) delegatorStartingInfo;
     mapping(address => ValidatorSlashEvent[]) validatorSlashEvents;
     mapping(address => ValidatorCurrentReward) validatorCurrentRewards;
-    mapping(address => mapping(uint256 => ValidatorHistoricalRewards)) validatorHistoricalRewards;
+    mapping(address => ValidatorHistoricalRewards[]) validatorHistoricalRewards;
     mapping(address => bool[]) validatorMissedBlockBitArray;
     mapping(address => ValidatorSigningInfo) validatorSigningInfos;
     mapping(address => uint256) validatorAccumulatedCommission;
@@ -234,24 +234,26 @@ contract StakingNew {
         Delegation memory lastDelegation = delegations[valAddr][lastDelegationIndex -1];
         delegations[valAddr][delegationIndex-1] = lastDelegation;
         delegations[valAddr].pop();
+        
+        delegationsIndex[valAddr][lastDelegation.owner] = delegationIndex;
+        
+        delete delegationsIndex[valAddr][delAddr];
         delete delegatorStartingInfo[valAddr][delAddr];
     }
     
     function _removeValidator(address valAddr) private{
-        delete validatorSlashEvents[valAddr];
-        delete validatorAccumulatedCommission[valAddr];
-        for (uint i = 0; i < validatorCurrentRewards[valAddr].period; i ++) {
-            delete validatorHistoricalRewards[valAddr][i];
-        }
-        delete validatorCurrentRewards[valAddr];
-        
-        uint valIndex = validatorsIndex[valAddr];
-        uint lastIndex = validators.length;
-        Validator memory lastVal = validators[lastIndex -1];
-        validators[valIndex-1] = lastVal;
+        uint validatorIndex = validatorsIndex[valAddr];
+        uint lastValidatorIndex = validators.length;
+        Validator memory lastValidator = validators[lastValidatorIndex -1];
+        validators[validatorIndex-1] = lastValidator;
         validators.pop();
-        validatorsIndex[lastVal.owner] = valIndex;
+        validatorsIndex[lastValidator.owner] = validatorIndex;
+        
         delete validatorsIndex[valAddr];
+         delete validatorSlashEvents[valAddr];
+        delete validatorAccumulatedCommission[valAddr];
+        delete validatorHistoricalRewards[valAddr];
+        delete validatorCurrentRewards[valAddr];
     }
     
     
@@ -294,7 +296,7 @@ contract StakingNew {
         uint256 current = rewards.reward.div(val.tokens);
         uint256 historical = validatorHistoricalRewards[valAddr][rewards.period - 1].cumulativeRewardRatio;
         _decrementReferenceCount(valAddr, rewards.period);
-        validatorHistoricalRewards[valAddr][rewards.period].cumulativeRewardRatio = historical + current;
+        validatorHistoricalRewards[valAddr].push(ValidatorHistoricalRewards({cumulativeRewardRatio: historical.add(current), reference_count:1 }));
         rewards.period++;
         rewards.reward = 0;
         return rewards.period;
@@ -325,7 +327,7 @@ contract StakingNew {
     }
     
     function _initializeValidator(address valAddr) private {
-        validatorHistoricalRewards[valAddr][0].reference_count = 1;
+        validatorHistoricalRewards[valAddr].push(ValidatorHistoricalRewards({reference_count: 1, cumulativeRewardRatio: 0}));
         validatorCurrentRewards[valAddr].period = 1;
         validatorCurrentRewards[valAddr].reward = 0;
         validatorMissedBlockBitArray[valAddr] = new bool[](_params.signedBlockWindown);
@@ -449,5 +451,17 @@ contract StakingNew {
     
     function finalizeCommit(address[] memory vals, uint256[] memory powers, bool[] memory signed) public {
         _finalizeCommit(vals, powers, signed);
+    }
+    
+    
+    function getValidators() public view returns (address[] memory, uint256[] memory) {
+        address[] memory vals = new address[](validators.length);
+        uint256[] memory powers = new uint256[](validators.length);
+        
+        for (uint i = 0; i < validators.length; i ++) {
+            vals[i] = validators[i].owner;
+            powers[i] = validators[i].tokens/(1 * 10 ** 6);
+        }
+        return (vals, powers);
     }
 }
