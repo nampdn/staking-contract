@@ -585,16 +585,16 @@ contract Staking {
     function _allocateTokens(uint256 sumPreviousPrecommitPower, uint256 totalPreviousVotingPower, 
         address previousProposer, address[] memory vals, uint256[] memory powers) private{
         uint256 feesCollected = 100;
-        uint256 previousFractionVotes = sumPreviousPrecommitPower.div(totalPreviousVotingPower);
+        uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(totalPreviousVotingPower);
         uint256 proposerMultiplier = _params.baseProposerReward.add(_params.baseProposerReward.mul(previousFractionVotes));
-        uint256 proposerReward = feesCollected.mul(proposerMultiplier);
+        uint256 proposerReward = feesCollected.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(previousProposer, proposerReward);
         feesCollected -= proposerReward;
         
         uint256 voteMultiplier = 1 - proposerMultiplier;
         for (uint i = 0; i < vals.length; i ++) {
-            uint256 powerFraction = powers[i].div(totalPreviousVotingPower);
-            uint256 rewards = feesCollected.mul(voteMultiplier).mul(powerFraction);
+            uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
+            uint256 rewards = feesCollected.mul(voteMultiplier).mulTrun(powerFraction);
             _allocateTokensToValidator(vals[0], rewards);
             feesCollected -= rewards;
         }
