@@ -211,9 +211,9 @@ contract StakingNew {
         require(delegationIndex > 0, "delegation not found");
         Validator storage val = validators[validatorsIndex[valAddr]-1];
         Delegation storage del = delegations[valAddr][delegationIndex -1];
-        uint256 shares = val.delegationShares.mul(amount).div(val.tokens);
+        uint256 shares = _shareFromToken(valAddr, amount);
         require(del.shares > shares, "invalid undelegate amount");
-        uint256 token = shares.mul(val.tokens).div(val.delegationShares);
+        uint256 token = _tokenFromShare(valAddr, shares);
         val.delegationShares -= shares;
         val.tokens -= token;
         del.shares -= shares;
@@ -373,12 +373,11 @@ contract StakingNew {
     
     function _initializeDelegation(address valAddr, address delAddr) private {
         uint256 delegationIndex = delegationsIndex[valAddr][delAddr]-1;
-        Validator memory val = validators[validatorsIndex[valAddr]-1];
         uint256 previousPeriod = validatorCurrentRewards[valAddr].period -1;
         _incrementReferenceCount(valAddr, previousPeriod);
         delegatorStartingInfo[valAddr][delAddr].height = block.number;
         delegatorStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
-        uint256 stake = delegations[valAddr][delegationIndex].shares.div(val.delegationShares);
+        uint256 stake = _tokenFromShare(valAddr,delegations[valAddr][delegationIndex].shares);
         delegatorStartingInfo[valAddr][delAddr].stake = stake;
     }
     
@@ -416,7 +415,9 @@ contract StakingNew {
     }
     
     function getDelegationRewards(address valAddr, address delAddr) public view returns(uint256){
+        Validator memory val = validators[validatorsIndex[valAddr] - 1];
         uint rewards =  _calculateDelegationRewards(valAddr, delAddr, validatorCurrentRewards[valAddr].period);
+        rewards += delegatorStartingInfo[valAddr][delAddr].stake.mul(validatorCurrentRewards[valAddr].reward.divTrun(val.tokens));
         return rewards;
     }
     
@@ -505,6 +506,17 @@ contract StakingNew {
         uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
        return val.delegationShares.mul(amount).divTrun(val.tokens);
+    }
+    
+    
+    function getUBDEntries(address valAddr, address delAddr) public view returns (uint256[] memory, uint256[] memory) {
+        uint256[] memory balances = new uint256[](unbondingEntries[valAddr][delAddr].length);
+        uint256[] memory completionTime = new uint256[](unbondingEntries[valAddr][delAddr].length);
+        for (uint i =0; i < unbondingEntries[valAddr][delAddr].length; i ++) {
+            completionTime[i] = unbondingEntries[valAddr][delAddr][i].completionTime;
+            balances[i] = unbondingEntries[valAddr][delAddr][i].amount;
+        }
+        return (balances, completionTime);
     }
     
     
