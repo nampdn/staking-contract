@@ -3,7 +3,7 @@ import {SafeMath} from "./Safemath.sol";
 
 
 
-contract StakingNew {
+contract Staking {
     using SafeMath for uint256;
 
     struct Delegation {
@@ -144,7 +144,7 @@ contract StakingNew {
         validators.push(Validator({
             owner: valAddr, 
             tokens: 0, 
-            delegationShares: 1, 
+            delegationShares: 0, 
             jailed: false, 
             commission: commission
         }));
@@ -172,6 +172,11 @@ contract StakingNew {
             }));
             delIndex = delegations[valAddr].length;
             delegationsIndex[valAddr][delAddr] = delIndex;
+            
+            // delegator validators index
+            delegatorValidators[delAddr].push(valAddr);
+            delegatorValidatorsIndex[delAddr][valAddr] = delegatorValidators[delAddr].length;
+            
             _beforeDelegationCreated(valAddr);
         } else {
             _beforeDelegationSharesModified(valAddr, delAddr);
@@ -196,6 +201,7 @@ contract StakingNew {
         }
         val.tokens +=amount;
         val.delegationShares += issuedShares;
+        return issuedShares;
     }
     
     
@@ -493,6 +499,7 @@ contract StakingNew {
     
     function getDelegatorStake(address valAddr, address delAddr) public view returns (uint256) {
         uint delIndex = delegationsIndex[valAddr][delAddr];
+        require(delIndex > 0, "delegation not found");
         Delegation memory del = delegations[valAddr][delIndex-1];
         return _tokenFromShare(valAddr, del.shares);
     }
@@ -508,13 +515,13 @@ contract StakingNew {
     function _tokenFromShare(address valAddr, uint256 shares) private view returns (uint256) {
        uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return shares.mul(val.tokens).divTrun(val.delegationShares);
+       return shares.mul(val.tokens).div(val.delegationShares);
     }
     
     function _shareFromToken(address valAddr, uint256 amount) private view returns (uint256) {
         uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return val.delegationShares.mul(amount).divTrun(val.tokens);
+       return val.delegationShares.mulTrun(amount).div(val.tokens);
     }
     
     
