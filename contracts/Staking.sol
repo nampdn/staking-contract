@@ -105,7 +105,7 @@ contract Staking {
     uint256 public totalBonded;
     uint256 public inflation;
     uint256 public annualProvision;
-    uint256 _feeCollected;
+    uint256 _feesCollected;
     
     
     
@@ -618,19 +618,18 @@ contract Staking {
     
     function _allocateTokens(uint256 sumPreviousPrecommitPower, uint256 totalPreviousVotingPower, 
         address previousProposer, address[] memory vals, uint256[] memory powers) private{
-        uint256 feesCollected = 100;
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(totalPreviousVotingPower);
         uint256 proposerMultiplier = _params.baseProposerReward.add(_params.baseProposerReward.mul(previousFractionVotes));
-        uint256 proposerReward = feesCollected.mulTrun(proposerMultiplier);
+        uint256 proposerReward = _feesCollected.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(previousProposer, proposerReward);
-        feesCollected -= proposerReward;
+        _feesCollected -= proposerReward;
         
         uint256 voteMultiplier = 1 - proposerMultiplier;
         for (uint i = 0; i < vals.length; i ++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
-            uint256 rewards = feesCollected.mulTrun(voteMultiplier).mulTrun(powerFraction);
+            uint256 rewards = _feesCollected.mulTrun(voteMultiplier).mulTrun(powerFraction);
             _allocateTokensToValidator(vals[0], rewards);
-            feesCollected -= rewards;
+            _feesCollected -= rewards;
         }
     }
     
@@ -686,8 +685,9 @@ contract Staking {
         // recalculate annual provisions
         nextAnnualProvisions();
         // update fee collected
-        _feeCollected = getBlockProvision();
-        return _feeCollected;
+        _feesCollected = getBlockProvision();
+        totalSupply += _feesCollected;
+        return _feesCollected;
     }
     
     function nextInflationRate() private {
