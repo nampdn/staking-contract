@@ -5,6 +5,8 @@ import {SafeMath} from "./Safemath.sol";
 
 contract Staking {
     using SafeMath for uint256;
+    
+    uint256 oneDec = 1 * 10 ** 18;
 
     struct Delegation {
         uint256 shares;
@@ -98,6 +100,17 @@ contract Staking {
     mapping(address => address[]) delegatorValidators;
     mapping(address => mapping(address => uint)) delegatorValidatorsIndex;
     
+    // supply
+    uint256 public totalSupply = 5000000000 * 10 ** 18;
+    uint256 public totalBonded;
+    uint256 public inflation;
+    uint256 public annualProvision;
+    uint256 _feeCollected;
+    
+    
+    
+    // mint
+    
     Params _params;
     address _previousProposer;
     
@@ -184,6 +197,8 @@ contract Staking {
         
         uint256 shared = _addTokenFromDel(valAddr, amount);
         
+        totalBonded += amount;
+        
         // increment stake amount
         Delegation storage del = delegations[valAddr][delIndex -1];
         del.shares += shared;
@@ -211,10 +226,12 @@ contract Staking {
         _delegate(msg.sender, valAddr, msg.value);
     }
     
-    function _undelegate(address valAddr, address delAddr, uint256 amount) private {
+    function _undelegate(address valAddr, address payable delAddr, uint256 amount) private {
         require(unbondingEntries[valAddr][delAddr].length < 7, "too many unbonding delegation entries");
         uint delegationIndex = delegationsIndex[valAddr][delAddr];
         require(delegationIndex > 0, "delegation not found");
+        _beforeDelegationSharesModified(valAddr, delAddr);
+        
         Validator storage val = validators[validatorsIndex[valAddr]-1];
         Delegation storage del = delegations[valAddr][delegationIndex -1];
         uint256 shares = _shareFromToken(valAddr, amount);
@@ -232,6 +249,8 @@ contract Staking {
         
         if (del.shares == 0) {
             _removeDelegation(valAddr, delAddr);
+        } else {
+            _afterDelegationModified(valAddr, delAddr);
         }
         
         if (val.delegationShares == 0) {
@@ -241,7 +260,7 @@ contract Staking {
     }
     
     function undelegate(address valAddr, uint256 amount) public {
-        _undelegate(msg.sender, valAddr, amount);
+        _undelegate(valAddr, msg.sender, amount);
     }
     
     function _jail(address valAddr) private {
@@ -268,6 +287,13 @@ contract Staking {
         }
         val.tokens -= slashAmount;
         _updateValidatorSlashFraction(valAddr, slashFactor);
+        _burn(slashAmount);
+    }
+    
+    
+    function _burn(uint256 amount) private {
+        totalBonded -= amount;
+        totalSupply -= amount;
     }
     
     function _updateValidatorSlashFraction(address valAddr, uint256 fraction) private {
@@ -289,6 +315,7 @@ contract Staking {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         delAddr.transfer(amount);
+        totalBonded -= amount;
     }
     
     function _removeDelegation(address valAddr, address delAddr) private {
@@ -314,14 +341,16 @@ contract Staking {
     }
     
     function _removeValidator(address valAddr) private{
+        // remove validator
         uint validatorIndex = validatorsIndex[valAddr];
         uint lastValidatorIndex = validators.length;
         Validator memory lastValidator = validators[lastValidatorIndex -1];
         validators[validatorIndex-1] = lastValidator;
         validators.pop();
         validatorsIndex[lastValidator.owner] = validatorIndex;
-        
         delete validatorsIndex[valAddr];
+
+        // remove other index
         delete validatorSlashEvents[valAddr];
         delete validatorAccumulatedCommission[valAddr];
         delete validatorHistoricalRewards[valAddr];
@@ -435,12 +464,17 @@ contract Staking {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         require(delegationsIndex[valAddr][msg.sender] > 0, "delegator not found");
         _withdrawRewards(valAddr, msg.sender);
+        _initializeDelegation(valAddr, msg.sender);
     }
     
     function getDelegationRewards(address valAddr, address delAddr) public view returns(uint256){
+        require(validatorsIndex[valAddr] > 0, "validator not found");
+        require(delegationsIndex[valAddr][delAddr] > 0, "delegation not found");
         Validator memory val = validators[validatorsIndex[valAddr] - 1];
+        Delegation memory del = delegations[valAddr][delegationsIndex[valAddr][delAddr]-1];
         uint rewards =  _calculateDelegationRewards(valAddr, delAddr, validatorCurrentRewards[valAddr].period);
-        rewards += delegatorStartingInfo[valAddr][delAddr].stake.mul(validatorCurrentRewards[valAddr].reward.divTrun(val.tokens));
+        // current reward
+        rewards += _tokenFromShare(valAddr, del.shares).mulTrun(validatorCurrentRewards[valAddr].reward.divTrun(val.tokens));
         return rewards;
     }
     
@@ -456,16 +490,16 @@ contract Staking {
         _withdrawValidatorCommission(msg.sender);
     }
     
-    function getValidator(address valAddr) public view returns(address, uint256, uint256, uint256) {
+    function getValidator(address valAddr) public view returns(address, uint256, uint256) {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         uint256 valIndex = validatorsIndex[valAddr] - 1;
         return (
             validators[valIndex].owner,
             validators[valIndex].tokens,
-            validators[valIndex].delegationShares,
-            validatorAccumulatedCommission[valAddr]
+            validators[valIndex].delegationShares
         );
     }
+    
     
     function getValidatorDelegations(address valAddr) public view returns (address[] memory, uint256[] memory) {
         require(validatorsIndex[valAddr] > 0, "validator not found");
@@ -594,14 +628,14 @@ contract Staking {
         uint256 voteMultiplier = 1 - proposerMultiplier;
         for (uint i = 0; i < vals.length; i ++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
-            uint256 rewards = feesCollected.mul(voteMultiplier).mulTrun(powerFraction);
+            uint256 rewards = feesCollected.mulTrun(voteMultiplier).mulTrun(powerFraction);
             _allocateTokensToValidator(vals[0], rewards);
             feesCollected -= rewards;
         }
     }
     
     function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
-        uint256 commission = rewards.mul(validators[validatorsIndex[valAddr]-1].commission.rate);
+        uint256 commission = rewards.mulTrun(validators[validatorsIndex[valAddr]-1].commission.rate);
         uint256 shared = rewards.sub(commission);
         validatorAccumulatedCommission[valAddr] += commission;
         validatorCurrentRewards[valAddr].reward += shared;
@@ -639,5 +673,57 @@ contract Staking {
             powers[i] = validators[i].tokens/(1 * 10 ** 6);
         }
         return (vals, powers);
+    }
+    
+    
+    // Mint
+    //  --------------------------------------------------
+    
+    // @dev mints new tokens for the previous block. Returns fee collected
+    function mint() public onlyRoot returns(uint256) {
+        // recalculate inflation rate
+        nextInflationRate();
+        // recalculate annual provisions
+        nextAnnualProvisions();
+        // update fee collected
+        _feeCollected = getBlockProvision();
+        return _feeCollected;
+    }
+    
+    function nextInflationRate() private {
+        uint256 bondedRatio = totalBonded.divTrun(totalSupply);
+        uint256 inflationChangeRatePerYear = 0;
+        uint256 inflationRateChange = 0;
+        if (bondedRatio.divTrun(_params.goalBonded) > oneDec) {
+            inflationChangeRatePerYear =  bondedRatio.divTrun(_params.goalBonded).sub(oneDec)
+                .mul(_params.inflationRateChange);
+            inflationRateChange = inflationRateChange.div(_params.blocksPerYear);
+            if (inflationRateChange < inflation) {
+                inflation = inflation.sub(inflationRateChange);
+            } else {
+                inflation = 0;
+            }
+        } else {
+            inflationChangeRatePerYear =  oneDec.sub(bondedRatio.divTrun(_params.goalBonded))
+                .mul(_params.inflationRateChange);
+            inflationRateChange = inflationRateChange.div(_params.blocksPerYear);
+            inflation = inflation.add(inflationRateChange);
+        }
+
+        
+        if (inflation > _params.inflationMax) {
+            inflation = _params.inflationMax;
+        }
+        if (inflation < _params.inflationMin) {
+            inflation = _params.inflationMin;
+        }
+    }
+
+    function nextAnnualProvisions() private {
+        annualProvision = inflation.mulTrun(totalSupply); 
+    }
+
+    function getBlockProvision() public view returns(uint256) {
+        return annualProvision.div(_params.blocksPerYear);
     }
 }
