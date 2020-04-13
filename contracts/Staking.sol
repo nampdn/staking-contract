@@ -267,7 +267,15 @@ contract Staking {
             }
         }
         val.tokens -= slashAmount;
+        _updateValidatorSlashFraction(valAddr, slashFactor);
     }
+    
+    function _updateValidatorSlashFraction(address valAddr, uint256 fraction) private {
+        uint256 newPeriod = _incrementValidatorPeriod(valAddr);
+        _incrementReferenceCount(valAddr, newPeriod);
+        validatorSlashEvents[valAddr].push(ValidatorSlashEvent({validatorPeriod: newPeriod, fraction: fraction, height: block.number}));
+    }
+    
     
     function _withdraw(address valAddr, address payable delAddr) private{
         UBDEntry[] storage entries= unbondingEntries[valAddr][delAddr];
