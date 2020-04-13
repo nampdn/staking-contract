@@ -278,16 +278,25 @@ contract StakingNew {
     }
     
     function _removeDelegation(address valAddr, address delAddr) private {
+        
+        // delete delegation and delegation index
         uint delegationIndex = delegationsIndex[valAddr][delAddr];
         uint lastDelegationIndex = delegations[valAddr].length;
         Delegation memory lastDelegation = delegations[valAddr][lastDelegationIndex -1];
         delegations[valAddr][delegationIndex-1] = lastDelegation;
         delegations[valAddr].pop();
-        
         delegationsIndex[valAddr][lastDelegation.owner] = delegationIndex;
         
+        // delete other info
         delete delegationsIndex[valAddr][delAddr];
         delete delegatorStartingInfo[valAddr][delAddr];
+        
+        
+        // delete delegator validator index
+        uint delValIndex = delegatorValidatorsIndex[delAddr][valAddr];
+        delegatorValidators[delAddr][delValIndex-1] = delegatorValidators[delAddr][delegatorValidators[delAddr].length-1];
+        delegatorValidators[delAddr].pop();
+        delete delegatorValidatorsIndex[delAddr][valAddr];
     }
     
     function _removeValidator(address valAddr) private{
