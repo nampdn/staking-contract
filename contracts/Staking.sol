@@ -236,16 +236,7 @@ contract Staking {
         Delegation storage del = delegations[valAddr][delegationIndex -1];
         uint256 shares = _shareFromToken(valAddr, amount);
         require(del.shares > shares, "invalid undelegate amount");
-        uint256 token = _tokenFromShare(valAddr, shares);
-        val.delegationShares -= shares;
-        val.tokens -= token;
         del.shares -= shares;
-        
-        unbondingEntries[valAddr][delAddr].push(UBDEntry({
-            completionTime: block.timestamp.add(_params.unboudingTime),
-            blockHeight: block.number,
-            amount: token
-        }));
         
         if (del.shares == 0) {
             _removeDelegation(valAddr, delAddr);
@@ -253,13 +244,35 @@ contract Staking {
             _afterDelegationModified(valAddr, delAddr);
         }
         
+        uint256 amountRemoved = _removeDelShares(valAddr, shares);
         if (val.delegationShares == 0) {
             _removeValidator(valAddr);
         }
         
+        unbondingEntries[valAddr][delAddr].push(UBDEntry({
+            completionTime: block.timestamp.add(_params.unboudingTime),
+            blockHeight: block.number,
+            amount: amountRemoved
+        }));
+    }
+    
+    function _removeDelShares(address valAddr, uint256 shares) private returns (uint256) {
+        Validator storage val = validators[validatorsIndex[valAddr] - 1];
+        uint256 remainingShares = val.delegationShares;
+        uint256 issuedTokens = 0;
+        remainingShares = remainingShares.sub(shares);
+        if (remainingShares == 0) {
+            val.tokens = 0;
+        } else {
+            issuedTokens = _tokenFromShare(valAddr, shares);
+            val.tokens = val.tokens.sub(issuedTokens);
+        }
+        val.delegationShares = remainingShares;
+        return issuedTokens;
     }
     
     function undelegate(address valAddr, uint256 amount) public {
+        require(amount > 0, "invalid undelegate amount");
         _undelegate(valAddr, msg.sender, amount);
     }
     
@@ -563,7 +576,7 @@ contract Staking {
     function _shareFromToken(address valAddr, uint256 amount) private view returns (uint256) {
         uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return val.delegationShares.mulTrun(amount).div(val.tokens);
+       return val.delegationShares.mul(amount).div(val.tokens);
     }
     
     
