@@ -95,6 +95,8 @@ contract StakingNew {
     mapping(address => uint256) validatorAccumulatedCommission;
     mapping(address => Delegation[]) delegations;
     mapping(address => uint) validatorsIndex;
+    mapping(address => address[]) delegatorValidators;
+    mapping(address => mapping(address => uint)) delegatorValidatorsIndex;
     
     Params _params;
     address _previousProposer;
@@ -462,8 +464,47 @@ contract StakingNew {
         );
     }
     
+    function getDelegatorValidators(address delAddr) public view returns (address[] memory) {
+        return delegatorValidators[delAddr];
+    }
+    
     function getValidatorCommission(address valAddr) public view returns (uint256) {
         return validatorAccumulatedCommission[valAddr];
+    }
+    
+    
+    function getAllDelegatorRewards(address delAddr) public view returns (uint256) {
+        uint256 rewards = 0;
+        for (uint i = 0; i < delegatorValidators[delAddr].length; i ++) {
+            rewards += getDelegationRewards(delegatorValidators[delAddr][i], delAddr);
+        }
+        return rewards;
+    }
+    
+    function getDelegatorStake(address valAddr, address delAddr) public view returns (uint256) {
+        uint delIndex = delegationsIndex[valAddr][delAddr];
+        Delegation memory del = delegations[valAddr][delIndex-1];
+        return _tokenFromShare(valAddr, del.shares);
+    }
+    
+    function getAllDelegatorStake(address delAddr) public view returns (uint256) {
+        uint256 stake = 0;
+        for (uint i = 0; i < delegatorValidators[delAddr].length; i ++) {
+            stake += getDelegatorStake(delegatorValidators[delAddr][i], delAddr);
+        }
+        return stake;
+    }
+    
+    function _tokenFromShare(address valAddr, uint256 shares) private view returns (uint256) {
+       uint valIndex = validatorsIndex[valAddr];
+       Validator memory val = validators[valIndex-1];
+       return shares.mul(val.tokens).divTrun(val.delegationShares);
+    }
+    
+    function _shareFromToken(address valAddr, uint256 amount) private view returns (uint256) {
+        uint valIndex = validatorsIndex[valAddr];
+       Validator memory val = validators[valIndex-1];
+       return val.delegationShares.mul(amount).divTrun(val.tokens);
     }
     
     
