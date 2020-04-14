@@ -2,6 +2,7 @@ pragma solidity >=0.4.21 <0.7.0;
 import {SafeMath} from "./Safemath.sol";
 
 
+
 contract Staking {
     using SafeMath for uint256;
     
@@ -102,8 +103,10 @@ contract Staking {
     
     
     // sort
-    address[] validatorSorted;
+    address[] validatorsRank;
     mapping(address => uint256) validatorRankIndex;
+    
+    address[] validatorUpdateRankQueue;
     
     // supply
     uint256 public totalSupply = 5000000000 * 10 ** 18;
@@ -279,6 +282,8 @@ contract Staking {
         del.shares += shared;
         _afterDelegationModified(valAddr, delAddr);
         
+        validatorUpdateRankQueue.push(valAddr);
+        
     }
     
     function _addTokenFromDel(address valAddr, uint256 amount) private returns (uint256) {
@@ -329,6 +334,8 @@ contract Staking {
             blockHeight: block.number,
             amount: amountRemoved
         }));
+        
+        validatorUpdateRankQueue.push(valAddr);
     }
     
     function _removeDelShares(address valAddr, uint256 shares) private returns (uint256) {
@@ -353,6 +360,7 @@ contract Staking {
     
     function _jail(address valAddr) private {
         validators[validatorsIndex[valAddr]-1].jailed = true;
+        validatorUpdateRankQueue.push(valAddr); 
     }
     
     
@@ -578,13 +586,14 @@ contract Staking {
         _withdrawValidatorCommission(msg.sender);
     }
     
-    function getValidator(address valAddr) public view returns(address, uint256, uint256) {
+    function getValidator(address valAddr) public view returns(address, uint256, uint256, bool) {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         uint256 valIndex = validatorsIndex[valAddr] - 1;
         return (
             validators[valIndex].owner,
             validators[valIndex].tokens,
-            validators[valIndex].delegationShares
+            validators[valIndex].delegationShares,
+            validators[valIndex].jailed
         );
     }
     
@@ -678,7 +687,9 @@ contract Staking {
     
     
     function _doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) private {
-        _slash(valAddr, distributionHeight, votingPower, _params.slashFractionDoubleSign); 
+        if (validatorsIndex[valAddr] == 0) return; 
+        _slash(valAddr, distributionHeight - 1, votingPower, _params.slashFractionDoubleSign); 
+        _jail(valAddr);
     }
     
     function doubleSign(address valAddr, uint256 votingPower, uint256 distributionHeight) public {
@@ -704,7 +715,7 @@ contract Staking {
         uint maxMissed = _params.signedBlockWindown - _params.minSignedPerWindown;
         if (block.number > minHeight && signInfo.missedBlockCounter > maxMissed) {
             if (!val.jailed) {
-                _slash(valAddr, block.number, votingPower, _params.slashFractionDowntime);
+                _slash(valAddr, block.number - 2, votingPower, _params.slashFractionDowntime);
                 _jail(valAddr);
                 signInfo.jailedUntil = block.timestamp.add(_params.downtimeJailDuration);
                 signInfo.missedBlockCounter = 0;
@@ -723,7 +734,7 @@ contract Staking {
         _allocateTokensToValidator(previousProposer, proposerReward);
         _feesCollected -= proposerReward;
         
-        uint256 voteMultiplier = 1 - proposerMultiplier;
+        uint256 voteMultiplier = oneDec.sub(proposerMultiplier); 
         for (uint i = 0; i < vals.length; i ++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
             uint256 rewards = _feesCollected.mulTrun(voteMultiplier).mulTrun(powerFraction);
@@ -771,6 +782,10 @@ contract Staking {
             powers[i] = validators[i].tokens.div(powerReduction);
         }
         return (vals, powers);
+    }
+    
+    function getMissedBlock(address valAddr) public view returns (bool[1000] memory) {
+        return validatorMissedBlockBitArray[valAddr];
     }
     
     
@@ -824,5 +839,100 @@ contract Staking {
 
     function getBlockProvision() public view returns(uint256) {
         return annualProvision.div(_params.blocksPerYear);
+    }
+    
+    
+    // validator rank
+    
+    function addValidatorRank(address valAddr) private {
+        if (validatorRankIndex[valAddr] == 0){
+            if (validatorsRank.length == 500) {
+                address last = validatorsRank[validatorsRank.length - 1];
+                delete validatorRankIndex[last];
+                validatorsRank[validatorsRank.length -1] = valAddr;
+                validatorRankIndex[valAddr] = validatorsRank.length;
+            } else {
+                validatorsRank.push(valAddr);
+                validatorRankIndex[valAddr] = validatorsRank.length;
+            }
+        }
+    }
+    
+    function removeValidatorRank(address valAddr) private {
+        if (validatorRankIndex[valAddr] > 0) {
+            address lastValAddr = validatorsRank[validatorsRank.length - 1];
+            validatorsRank[validatorRankIndex[valAddr] - 1] = lastValAddr;
+            validatorRankIndex[lastValAddr] = validatorRankIndex[valAddr];
+            delete validatorRankIndex[valAddr];
+        }
+    }
+    
+    
+    function getValidatorTokenByRank(uint rank) private view returns (uint256) {
+        return validators[validatorsIndex[validatorsRank[rank]] - 1].tokens.div(powerReduction);
+    }
+    
+     function _sortValidatorRank(int left, int right) internal{
+        int i = left;
+        int j = right;
+        if(i==j) return;
+        uint pivot = getValidatorTokenByRank(uint(left + (right - left) / 2));
+        while (i <= j) {
+            while (getValidatorTokenByRank(uint(i)) > pivot) i++;
+            while (pivot > getValidatorTokenByRank(uint(j))) j--;
+            if (i <= j) {
+                address tmp = validatorsRank[uint(i)];
+                validatorsRank[uint(i)] = validatorsRank[uint(j)];
+                validatorsRank[uint(j)] = tmp;
+                
+                validatorRankIndex[tmp] = uint(j + 1);
+                validatorRankIndex[validatorsRank[uint(i)]] = uint(i+1); 
+                
+                
+                i++;
+                j--;
+            }
+        }
+        if (left < j)
+            _sortValidatorRank(left, j);
+        if (i < right)
+            _sortValidatorRank(i, right);
+    }
+    
+    
+    function applyAndReturnValidatorSets() public onlyRoot returns (address[] memory, uint256[] memory) {
+        for (uint i = 0; i < validatorUpdateRankQueue.length; i ++) {
+            if (validatorsIndex[validatorUpdateRankQueue[i]] > 0) {
+                if (validators[validatorsIndex[validatorUpdateRankQueue[i]]-1].jailed == true) {
+                    removeValidatorRank(validatorUpdateRankQueue[i]); 
+                } else {
+                    addValidatorRank(validatorUpdateRankQueue[i]);
+                }
+            } else {
+                removeValidatorRank(validatorUpdateRankQueue[i]); 
+            }
+            validatorUpdateRankQueue[i] = validatorUpdateRankQueue[validatorUpdateRankQueue.length -1];
+            validatorUpdateRankQueue.pop();
+            i--;
+        }
+        _sortValidatorRank(0, int(validatorsRank.length - 1)); 
+        return getValidatorSets(); 
+    }
+    
+    
+    function getValidatorSets() public view returns (address[] memory, uint256[] memory) {
+        uint256 maxValidators = _params.maxValidators;
+        if (maxValidators > validatorsRank.length) {
+            maxValidators = validatorsRank.length;
+        }
+        
+        address[] memory vals = new address[](maxValidators);
+        uint256[] memory powers = new uint256[](maxValidators);
+        
+        for (uint i = 0; i < maxValidators; i ++) {
+            vals[i] = validatorsRank[i];
+            powers[i] = validators[validatorsIndex[vals[i]] - 1].tokens.div(powerReduction);
+        }
+        return (vals, powers);
     }
 }
