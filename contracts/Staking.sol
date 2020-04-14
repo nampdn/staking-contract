@@ -361,7 +361,7 @@ contract Staking {
                 for (uint j = 0; j < entries.length; j ++) {
                     UBDEntry storage entry = entries[j];
                     if (entry.blockHeight > infrationHeight) {
-                        uint256 amountSlashed = entry.amount.mul(slashFactor);
+                        uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
                         entry.amount -= amountSlashed;
                         slashAmount -= amountSlashed;
                     }
@@ -658,6 +658,16 @@ contract Staking {
             balances[i] = unbondingEntries[valAddr][delAddr][i].amount;
         }
         return (balances, completionTime);
+    }
+    
+    function getValidatorSlashEvents(address valAddr) public view returns (uint256[] memory, uint256[] memory) {
+        uint256[] memory fraction = new uint256[](validatorSlashEvents[valAddr].length);
+        uint256[] memory height = new uint256[](validatorSlashEvents[valAddr].length);
+        for (uint i =0; i < validatorSlashEvents[valAddr].length; i ++) {
+            fraction[i] = validatorSlashEvents[valAddr][i].fraction;
+            height[i] = validatorSlashEvents[valAddr][i].height;
+        }
+        return (height,fraction);
     }
     
     
