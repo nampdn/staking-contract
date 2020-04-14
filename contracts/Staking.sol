@@ -469,7 +469,7 @@ contract Staking {
                     endingPeriod = slashEvent.validatorPeriod;
                     if (endingPeriod > startingInfo.previousPeriod) {
                         rewards  += _calculateDelegationRewardsBetween(valAddr, startingInfo.previousPeriod, slashEvent.validatorPeriod, startingInfo.stake);
-                        startingInfo.stake = startingInfo.stake.mul(slashEvent.fraction);
+                        startingInfo.stake = startingInfo.stake.mulTrun(slashEvent.fraction);
                         startingInfo.previousPeriod = endingPeriod;
                     }
                 }
@@ -483,7 +483,7 @@ contract Staking {
         ValidatorHistoricalRewards memory starting = validatorHistoricalRewards[valAddr][startingPeriod];
         ValidatorHistoricalRewards memory ending = validatorHistoricalRewards[valAddr][endingPeriod];
         uint256 difference = ending.cumulativeRewardRatio.sub(starting.cumulativeRewardRatio);
-        return stake.mul(difference);
+        return stake.mulTrun(difference);
     }
     
     
