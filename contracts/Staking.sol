@@ -108,6 +108,8 @@ contract Staking {
     uint256 _feesCollected;
     
     
+    address _root;
+    
     
     // mint
     
@@ -142,6 +144,74 @@ contract Staking {
         //require (msg.sender == root, "permission denied");
         _;
     }
+    
+    function setRoot(address newRoot) public {
+        if (_root != address(0x0)) {
+            require (msg.sender == _root, "permission denied");
+        }
+        _root = newRoot;
+    }
+    
+     function setParams(
+        uint256 maxValidators,
+        uint256 maxMissed,
+        uint256 downtimeJailDuration,
+        uint256 baseProposerReward,
+        uint256 bonusProposerReward,
+        uint256 slashFractionDowntime,
+        uint256 unboudingTime,
+        uint256 slashFractionDoubleSign
+    ) public onlyRoot {
+        if (maxValidators > 0) {
+            _params.maxValidators = maxValidators;
+        }
+        if (maxMissed > 0) {
+            _params.maxMissed = maxMissed;
+        }
+        if (downtimeJailDuration > 0) {
+            _params.downtimeJailDuration = downtimeJailDuration;
+        }
+        if (baseProposerReward > 0) {
+            _params.baseProposerReward = baseProposerReward;
+        }
+        if (bonusProposerReward > 0) {
+            _params.bonusProposerReward = bonusProposerReward;
+        }
+        if (slashFractionDowntime > 0) {
+            _params.slashFractionDowntime = slashFractionDowntime;
+        }
+        if (unboudingTime > 0) {
+            _params.unboudingTime = unboudingTime;
+        }
+        if (slashFractionDoubleSign > 0) {
+            _params.slashFractionDoubleSign = slashFractionDoubleSign;
+        }
+    }
+
+    function setMintParams (
+        uint256 inflationRateChange,
+        uint256 goalBonded,
+        uint256 blocksPerYear,
+        uint256 inflationMax,
+        uint256 inflationMin
+    ) public onlyRoot {
+        if (inflationRateChange > 0) {
+            _params.inflationRateChange = inflationRateChange;
+        }
+        if (goalBonded > 0) {
+            _params.goalBonded = goalBonded;
+        }
+        if (blocksPerYear > 0) {
+            _params.blocksPerYear = blocksPerYear;
+        }
+        if (inflationMax > 0) {
+            _params.inflationMax = inflationMax;
+        }
+        if (inflationMin > 0) {
+            _params.inflationMin = inflationMin;
+        }
+    }
+
     
     
     function createValidator(uint256 commssionRate) public payable {
@@ -570,13 +640,13 @@ contract Staking {
     function _tokenFromShare(address valAddr, uint256 shares) private view returns (uint256) {
        uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return shares.mulTrun(val.tokens).divTrun(val.delegationShares);
+       return shares.mul(val.tokens).div(val.delegationShares);
     }
     
     function _shareFromToken(address valAddr, uint256 amount) private view returns (uint256) {
         uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return val.delegationShares.mulTrun(amount).divTrun(val.tokens);
+       return val.delegationShares.mul(amount).div(val.tokens);
     }
     
     
@@ -632,7 +702,7 @@ contract Staking {
     function _allocateTokens(uint256 sumPreviousPrecommitPower, uint256 totalPreviousVotingPower, 
         address previousProposer, address[] memory vals, uint256[] memory powers) private{
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(totalPreviousVotingPower);
-        uint256 proposerMultiplier = _params.baseProposerReward.add(_params.baseProposerReward.mul(previousFractionVotes));
+        uint256 proposerMultiplier = _params.baseProposerReward.add(_params.baseProposerReward.mulTrun(previousFractionVotes));
         uint256 proposerReward = _feesCollected.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(previousProposer, proposerReward);
         _feesCollected -= proposerReward;
@@ -671,7 +741,7 @@ contract Staking {
     }
     
     
-    function finalizeCommit(address[] memory vals, uint256[] memory powers, bool[] memory signed) public {
+    function finalizeCommit(address[] memory vals, uint256[] memory powers, bool[] memory signed) public onlyRoot {
         _finalizeCommit(vals, powers, signed);
     }
     
