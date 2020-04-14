@@ -210,9 +210,9 @@ contract Staking {
         Validator storage val = validators[validatorsIndex[valAddr]-1];
         uint256 issuedShares = 0;
         if (val.tokens == 0) {
-            issuedShares = 1 * 10 **18;
+            issuedShares = oneDec;
         } else {
-            issuedShares = val.delegationShares.mul(amount).divTrun(val.tokens);
+            issuedShares = _shareFromToken(valAddr, amount);
         }
         val.tokens +=amount;
         val.delegationShares += issuedShares;
@@ -221,7 +221,7 @@ contract Staking {
     
     
     function delegate(address valAddr) public payable {
-        require(validators[validatorsIndex[valAddr]-1].owner != address(0x0), "validator does not exists");
+        require(validatorsIndex[valAddr] > 0, "validator not found");
         require(msg.value > 0, "invalid delegation amount");
         _delegate(msg.sender, valAddr, msg.value);
     }
@@ -235,7 +235,7 @@ contract Staking {
         Validator storage val = validators[validatorsIndex[valAddr]-1];
         Delegation storage del = delegations[valAddr][delegationIndex -1];
         uint256 shares = _shareFromToken(valAddr, amount);
-        require(del.shares > shares, "invalid undelegate amount");
+        require(del.shares >= shares, "invalid undelegate amount");
         del.shares -= shares;
         
         if (del.shares == 0) {
@@ -570,13 +570,13 @@ contract Staking {
     function _tokenFromShare(address valAddr, uint256 shares) private view returns (uint256) {
        uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return shares.mul(val.tokens).div(val.delegationShares);
+       return shares.mulTrun(val.tokens).divTrun(val.delegationShares);
     }
     
     function _shareFromToken(address valAddr, uint256 amount) private view returns (uint256) {
         uint valIndex = validatorsIndex[valAddr];
        Validator memory val = validators[valIndex-1];
-       return val.delegationShares.mul(amount).div(val.tokens);
+       return val.delegationShares.mulTrun(amount).divTrun(val.tokens);
     }
     
     
