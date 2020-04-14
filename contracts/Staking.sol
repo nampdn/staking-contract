@@ -2,11 +2,11 @@ pragma solidity >=0.4.21 <0.7.0;
 import {SafeMath} from "./Safemath.sol";
 
 
-
 contract Staking {
     using SafeMath for uint256;
     
     uint256 oneDec = 1 * 10 ** 18;
+    uint256 powerReduction = 1 * 10 ** 6;
 
     struct Delegation {
         uint256 shares;
@@ -99,6 +99,11 @@ contract Staking {
     mapping(address => uint) validatorsIndex;
     mapping(address => address[]) delegatorValidators;
     mapping(address => mapping(address => uint)) delegatorValidatorsIndex;
+    
+    
+    // sort
+    address[] validatorSorted;
+    mapping(address => uint256) validatorRankIndex;
     
     // supply
     uint256 public totalSupply = 5000000000 * 10 ** 18;
@@ -354,7 +359,7 @@ contract Staking {
     function _slash(address valAddr, uint256 infrationHeight, uint256 power, uint256 slashFactor) private {
         require(infrationHeight <= block.number, "");
         Validator storage val = validators[validatorsIndex[valAddr]-1];
-        uint256 slashAmount = power.mul(slashFactor);
+        uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
         if (infrationHeight < block.number) {
             for (uint i = 0; i < delegations[valAddr].length; i ++) {
                 UBDEntry[] storage entries = unbondingEntries[valAddr][delegations[valAddr][i].owner];
@@ -595,13 +600,14 @@ contract Staking {
         return (dels, shares);
     }
     
-    function getDelegation(address valAddr, address delAddr) public view returns (address, uint256) {
+    function getDelegation(address valAddr, address delAddr) public view returns (address, uint256, uint256) {
         uint delIndex = delegationsIndex[valAddr][delAddr];
         require(delIndex > 0, "delegation not found");
         Delegation memory del = delegations[valAddr][delIndex - 1];
         return (
             del.owner,
-            del.shares
+            del.shares,
+            _tokenFromShare(valAddr, del.shares)
         );
     }
     
@@ -762,7 +768,7 @@ contract Staking {
         
         for (uint i = 0; i < validators.length; i ++) {
             vals[i] = validators[i].owner;
-            powers[i] = validators[i].tokens/(1 * 10 ** 6);
+            powers[i] = validators[i].tokens.div(powerReduction);
         }
         return (vals, powers);
     }
