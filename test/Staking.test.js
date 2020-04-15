@@ -35,6 +35,16 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         await assertRevert(instance.setRoot(accounts[0], {from: accounts[1]}));
     });
+
+    it ("should set previous proposer", async () => {
+        let instance = await Staking.deployed();
+        await instance.setPreviousProposer(accounts[0])
+    });
+
+    it ("should not set previous proposer", async () => {
+        let instance = await Staking.deployed();
+        await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}));
+    });
     
 
     async function setParams(owner, isOk) {

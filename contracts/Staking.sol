@@ -1037,6 +1037,10 @@ contract Staking {
         _finalizeCommit(vals, powers, signed);
     }
 
+    function setPreviousProposer(address previousProposer) public onlyRoot {
+        _previousProposer = previousProposer;
+    }
+
     function getValidators()
         public
         view
