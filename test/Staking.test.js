@@ -36,10 +36,10 @@ contract("Staking", async (accounts) => {
         const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
         const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
         const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 1%
-        const unboudingTime = 1;
+        const unBondingTime = 1;
         let instance = await Staking.deployed(); 
         await instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
-            slashFractionDowntime, unboudingTime, slashFractionDoubleSign)
+            slashFractionDowntime, unBondingTime, slashFractionDoubleSign)
     });
 
     it("should create validator", async () => {
@@ -159,6 +159,14 @@ contract("Staking", async (accounts) => {
 
     it ("should not withdraw", async () => {
         const instance = await Staking.deployed();
+        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
+    });
+
+    it ("should withdraw", async () => {
+        const instance = await Staking.deployed();
+        await utils.advanceTime(2000);
+        await instance.withdraw(accounts[0], {from: accounts[0]}); 
+
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
     });
 

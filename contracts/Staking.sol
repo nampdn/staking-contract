@@ -72,7 +72,7 @@ contract Staking {
         uint256 maxMissed;
         uint256 downtimeJailDuration;
         uint256 slashFractionDowntime;
-        uint256 unboudingTime;
+        uint256 unbondingTime;
         uint256 slashFractionDoubleSign;
         uint256 signedBlockWindown;
         uint256 minSignedPerWindown;
@@ -127,7 +127,7 @@ contract Staking {
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
             slashFractionDowntime: 1 * 10**14,
-            unboudingTime: 1814400,
+            unbondingTime: 1814400,
             slashFractionDoubleSign: 5 * 10**16,
             signedBlockWindown: 1000,
             minSignedPerWindown: 10,
@@ -158,7 +158,7 @@ contract Staking {
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime,
-        uint256 unboudingTime,
+        uint256 unbondingTime,
         uint256 slashFractionDoubleSign
     ) public onlyRoot {
         if (maxValidators > 0) {
@@ -179,8 +179,8 @@ contract Staking {
         if (slashFractionDowntime > 0) {
             _params.slashFractionDowntime = slashFractionDowntime;
         }
-        if (unboudingTime > 0) {
-            _params.unboudingTime = unboudingTime;
+        if (unbondingTime > 0) {
+            _params.unbondingTime = unbondingTime;
         }
         if (slashFractionDoubleSign > 0) {
             _params.slashFractionDoubleSign = slashFractionDoubleSign;
@@ -387,7 +387,7 @@ contract Staking {
 
         unbondingEntries[valAddr][delAddr].push(
             UBDEntry({
-                completionTime: block.timestamp.add(_params.unboudingTime),
+                completionTime: block.timestamp.add(_params.unbondingTime),
                 blockHeight: block.number,
                 amount: amountRemoved
             })
@@ -403,6 +403,7 @@ contract Staking {
         uint256 issuedTokens = 0;
         remainingShares = remainingShares.sub(shares);
         if (remainingShares == 0) {
+            issuedTokens = val.tokens;
             val.tokens = 0;
         } else {
             issuedTokens = _tokenFromShare(valAddr, shares);
@@ -480,6 +481,7 @@ contract Staking {
                 amount += entries[i].amount;
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
+                i++;
             }
         }
         require(amount > 0, "no unbonding amount to withdraw");
