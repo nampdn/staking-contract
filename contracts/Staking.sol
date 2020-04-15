@@ -32,10 +32,6 @@ contract Staking {
         bool jailed;
         ValidatorCommission commission;
         uint256 minSelfDelegation;
-        string name;
-        string website;
-        string contact;
-        string identity;
         uint256 updateTime;
     }
 
@@ -219,11 +215,7 @@ contract Staking {
         uint256 commssionRate,
         uint256 maxRate,
         uint256 maxChangeRate,
-        uint256 minSeftDelegation,
-        string memory name,
-        string memory website,
-        string memory contact,
-        string memory identity
+        uint256 minSeftDelegation
     ) public payable {
         _createValidator(
             msg.sender,
@@ -231,11 +223,7 @@ contract Staking {
             commssionRate,
             maxRate,
             maxChangeRate,
-            minSeftDelegation,
-            name,
-            website,
-            contact,
-            identity
+            minSeftDelegation
         );
     }
 
@@ -245,11 +233,7 @@ contract Staking {
         uint256 rate,
         uint256 maxRate,
         uint256 maxChangeRate,
-        uint256 minSelfDelegation,
-        string memory name,
-        string memory website,
-        string memory contact,
-        string memory identity
+        uint256 minSelfDelegation
     ) private {
         require(validatorsIndex[valAddr] == 0, "validator owner exists");
         require(amount > 0, "invalid delegation amount");
@@ -280,10 +264,6 @@ contract Staking {
                 jailed: false,
                 commission: commission,
                 minSelfDelegation: minSelfDelegation,
-                name: name,
-                website: website,
-                contact: contact,
-                identity: identity,
                 updateTime: block.timestamp
             })
         );
@@ -294,11 +274,7 @@ contract Staking {
 
     function updateValidator(
         uint256 commissionRate,
-        uint256 minSelfDelegation,
-        string memory name,
-        string memory website,
-        string memory contact,
-        string memory identity
+        uint256 minSelfDelegation 
     ) public {
         require(validatorsIndex[msg.sender] > 0, "validator not found");
         Validator storage val = validators[validatorsIndex[msg.sender]-1];
@@ -332,19 +308,6 @@ contract Staking {
         if (commissionRate > 0) {
             val.commission.rate = commissionRate;
             val.updateTime = block.timestamp;
-        }
-
-        if (bytes(name).length > 0) {
-            val.name = name;
-        }
-        if (bytes(website).length > 0) {
-            val.website = website;
-        }
-        if (bytes(identity).length > 0) {
-            val.identity = identity;
-        }
-        if (bytes(contact).length > 0) {
-            val.contact = contact;
         }
     }
 
