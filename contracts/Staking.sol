@@ -32,6 +32,11 @@ contract Staking {
         bool jailed;
         ValidatorCommission commission;
         uint256 minSelfDelegation;
+        string name;
+        string website;
+        string contact;
+        string identity;
+        uint256 updateTime;
     }
 
     struct DelegatorStartingInfo {
@@ -210,27 +215,60 @@ contract Staking {
         }
     }
 
-    function createValidator(uint256 commssionRate, uint256 maxRate, uint256 maxChangeRate, uint256 minSeftDelegation) public payable {
-        _createValidator(msg.sender, msg.value, commssionRate, maxRate, maxChangeRate, minSeftDelegation);
+    function createValidator(
+        uint256 commssionRate,
+        uint256 maxRate,
+        uint256 maxChangeRate,
+        uint256 minSeftDelegation,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    ) public payable {
+        _createValidator(
+            msg.sender,
+            msg.value,
+            commssionRate,
+            maxRate,
+            maxChangeRate,
+            minSeftDelegation,
+            name,
+            website,
+            contact,
+            identity
+        );
     }
 
     function _createValidator(
         address payable valAddr,
         uint256 amount,
-        uint256 commssionRate,
+        uint256 rate,
         uint256 maxRate,
         uint256 maxChangeRate,
-        uint256 minSeftDelegation,
+        uint256 minSelfDelegation,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
     ) private {
         require(validatorsIndex[valAddr] == 0, "validator owner exists");
         require(amount > 0, "invalid delegation amount");
-        require(amount >= minSeftDelegation, "validator's selft delegation must be greater than their minimum self delegation");
+        require(
+            amount >= minSelfDelegation,
+            "selft delegation must be greater than their minimum self delegation"
+        );
         require(maxRate <= oneDec, "commission rate cannot be more than 100%");
-        require(maxChangeRate <= maxRate, "commission max change rate cannot be more than max rate");
-        require(commissionRate <= maxRate, "commission rate cannot be more than max rate");
+        require(
+            maxChangeRate <= maxRate,
+            "commission max change rate cannot be more than max rate"
+        );
+        require(
+            rate <= maxRate,
+            "commission rate cannot be more than max rate"
+        );
 
         ValidatorCommission memory commission = ValidatorCommission({
-            rate: commssionRate,
+            rate: rate,
             maxRate: maxRate,
             maxChangeRate: maxChangeRate
         });
@@ -241,13 +279,75 @@ contract Staking {
                 delegationShares: 0,
                 jailed: false,
                 commission: commission,
-                minSeftDelegation: minSeftDelegation
+                minSelfDelegation: minSelfDelegation,
+                name: name,
+                website: website,
+                contact: contact,
+                identity: identity,
+                updateTime: block.timestamp
             })
         );
         validatorsIndex[valAddr] = validators.length;
         _afterValidatorCreated(valAddr);
         _delegate(valAddr, valAddr, amount);
     }
+
+    function updateValidator(
+        uint256 commissionRate,
+        uint256 minSelfDelegation,
+        string memory name,
+        string memory website,
+        string memory contact,
+        string memory identity
+    ) public {
+        require(validatorsIndex[msg.sender] > 0, "validator not found");
+        Validator storage val = validators[validatorsIndex[msg.sender]-1];
+        if (commissionRate > 0) {
+            require(
+                (block.timestamp - val.updateTime) > 86400,
+                "commission rate can not be changed more than one in 24h"
+            );
+            require(
+                commissionRate < val.commission.maxRate,
+                "commission rate can not be more than the max rate"
+            );
+            require(
+                commissionRate.sub(val.commission.rate) <
+                    val.commission.maxChangeRate,
+                "commision rate can not be more than the max change rate"
+            );
+        }
+        if (minSelfDelegation > 0) {
+            require(
+                minSelfDelegation > val.minSelfDelegation,
+                "min self delegation recreased"
+            );
+            require(
+                minSelfDelegation < val.tokens, 
+                "min self delegation below minumum"
+            );
+            val.minSelfDelegation = minSelfDelegation;
+        }
+
+        if (commissionRate > 0) {
+            val.commission.rate = commissionRate;
+            val.updateTime = block.timestamp;
+        }
+
+        if (bytes(name).length > 0) {
+            val.name = name;
+        }
+        if (bytes(website).length > 0) {
+            val.website = website;
+        }
+        if (bytes(identity).length > 0) {
+            val.identity = identity;
+        }
+        if (bytes(contact).length > 0) {
+            val.contact = contact;
+        }
+    }
+
 
     function _afterValidatorCreated(address valAddr) private {
         _initializeValidator(valAddr);
@@ -394,7 +494,7 @@ contract Staking {
         if (infrationHeight < block.number) {
             for (uint256 i = 0; i < delegations[valAddr].length; i++) {
 
-                UBDEntry[] storage entries
+                    UBDEntry[] storage entries
                  = unbondingEntries[valAddr][delegations[valAddr][i].owner];
                 for (uint256 j = 0; j < entries.length; j++) {
                     UBDEntry storage entry = entries[j];
@@ -544,6 +644,7 @@ contract Staking {
             ValidatorHistoricalRewards memory starting
          = validatorHistoricalRewards[valAddr][startingPeriod];
 
+
             ValidatorHistoricalRewards memory ending
          = validatorHistoricalRewards[valAddr][endingPeriod];
         uint256 difference = ending.cumulativeRewardRatio.sub(
@@ -557,6 +658,7 @@ contract Staking {
         returns (uint256)
     {
         Validator memory val = validators[validatorsIndex[valAddr] - 1];
+
 
             ValidatorCurrentReward storage rewards
          = validatorCurrentRewards[valAddr];
