@@ -140,7 +140,7 @@ contract Staking {
     }
 
     modifier onlyRoot() {
-        //require (msg.sender == root, "permission denied");
+        require (msg.sender == _root, "permission denied");
         _;
     }
 

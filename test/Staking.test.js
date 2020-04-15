@@ -31,16 +31,37 @@ contract("Staking", async (accounts) => {
         await instance.setRoot(accounts[0], {from: accounts[0]});
     });
 
-    it ("should set params", async() => {
+    it ("should not set root", async () => {
+        let instance = await Staking.deployed();
+        await assertRevert(instance.setRoot(accounts[0], {from: accounts[1]}));
+    });
+    
+
+    async function setParams(owner, isOk) {
         const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
         const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
         const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
         const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 1%
         const unBondingTime = 1;
         let instance = await Staking.deployed(); 
-        await instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
-            slashFractionDowntime, unBondingTime, slashFractionDoubleSign)
+        const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
+            slashFractionDowntime, unBondingTime, slashFractionDoubleSign, {from: owner})
+        if (isOk) {
+            await promise;
+        } else {
+            await assertRevert(promise);
+        }
+    }
+
+
+    it ("should set params", async() => {
+        await setParams(accounts[0], true);
     });
+
+    it ("should not set params", async() => {
+        await setParams(accounts[1]);
+    });
+
 
     it("should create validator", async () => {
         const instance = await Staking.deployed();
