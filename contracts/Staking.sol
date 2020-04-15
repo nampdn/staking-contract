@@ -762,12 +762,11 @@ contract Staking {
     function getValidator(address valAddr)
         public
         view
-        returns (address, uint256, uint256, bool)
+        returns (uint256, uint256, bool)
     {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         uint256 valIndex = validatorsIndex[valAddr] - 1;
         return (
-            validators[valIndex].owner,
             validators[valIndex].tokens,
             validators[valIndex].delegationShares,
             validators[valIndex].jailed
@@ -792,12 +791,12 @@ contract Staking {
     function getDelegation(address valAddr, address delAddr)
         public
         view
-        returns (address, uint256, uint256)
+        returns (uint256)
     {
         uint256 delIndex = delegationsIndex[valAddr][delAddr];
         require(delIndex > 0, "delegation not found");
         Delegation memory del = delegations[valAddr][delIndex - 1];
-        return (del.owner, del.shares, _tokenFromShare(valAddr, del.shares));
+        return (del.shares);
     }
 
     function getDelegatorValidators(address delAddr)
