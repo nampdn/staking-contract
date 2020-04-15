@@ -2,6 +2,14 @@ const Staking = artifacts.require("Staking");
 const utils = require("./utils");
 
 
+async function assertRevert(promise) {
+    return promise.then(() => {
+        throw null;
+    }).catch(e => {
+        assert.isNotNull(e);
+    });
+}
+
 contract("Staking", async (accounts) => {
     const powerReduction = Math.pow(10, 6);
     async function finalizeCommit(signed) {
@@ -104,13 +112,8 @@ contract("Staking", async (accounts) => {
 
 
         for(var testCase of testCases) {
-            try {
-                await instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                    testCase.minSelfDelegation, {from: testCase.from, value: bond});
-                throw null;
-            } catch(e) {
-                assert.isNotNull(e, testCase.message);
-            }
+            await assertRevert(instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
+                testCase.minSelfDelegation, {from: testCase.from, value: bond}));
         }
     })
 
@@ -141,29 +144,23 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("0.5", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[1]});
-
-        try {
-            await instance.getDelegation.call(accounts[0], accounts[1]);
-            throw null;
-        } catch(e) {
-            assert.isNotNull(e);
-        }
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]));
     })
 
     it ("should remove validator", async() => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("100", "ether")
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
-        try {
-            await instance.getValidator.call(accounts[0]);
-            throw null
-        } catch(e) {
-            assert.isNotNull(e);
-        }
+        await assertRevert(instance.getValidator.call(accounts[0]));
 
         const validatorSets = await getCurrentValidatorSet();
-        assert.equal(validatorSets.length, 0);
+        assert.equal(validatorSets[0].length, 0);
     })
+
+    it ("should not withdraw", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
+    });
 
 
     // it("should delegate to validator", async () => {

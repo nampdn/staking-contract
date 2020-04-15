@@ -237,19 +237,10 @@ contract Staking {
     ) private {
         require(validatorsIndex[valAddr] == 0, "");
         require(amount > 0, "");
-        require(
-            amount >= minSelfDelegation,
-            ""
-        );
+        require(amount >= minSelfDelegation, "");
         require(maxRate <= oneDec, "");
-        require(
-            maxChangeRate <= maxRate,
-            ""
-        );
-        require(
-            rate <= maxRate,
-            ""
-        );
+        require(maxChangeRate <= maxRate, "");
+        require(rate <= maxRate, "");
 
         ValidatorCommission memory commission = ValidatorCommission({
             rate: rate,
@@ -272,21 +263,14 @@ contract Staking {
         _delegate(valAddr, valAddr, amount);
     }
 
-    function updateValidator(
-        uint256 commissionRate,
-        uint256 minSelfDelegation 
-    ) public {
+    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
+        public
+    {
         require(validatorsIndex[msg.sender] > 0, "validator not found");
-        Validator storage val = validators[validatorsIndex[msg.sender]-1];
+        Validator storage val = validators[validatorsIndex[msg.sender] - 1];
         if (commissionRate > 0) {
-            require(
-                (block.timestamp - val.updateTime) > 86400,
-                ""
-            );
-            require(
-                commissionRate < val.commission.maxRate,
-                ""
-            );
+            require((block.timestamp - val.updateTime) > 86400, "");
+            require(commissionRate < val.commission.maxRate, "");
             require(
                 commissionRate.sub(val.commission.rate) <
                     val.commission.maxChangeRate,
@@ -294,14 +278,8 @@ contract Staking {
             );
         }
         if (minSelfDelegation > 0) {
-            require(
-                minSelfDelegation > val.minSelfDelegation,
-                ""
-            );
-            require(
-                minSelfDelegation < val.tokens, 
-                ""
-            );
+            require(minSelfDelegation > val.minSelfDelegation, "");
+            require(minSelfDelegation < val.tokens, "");
             val.minSelfDelegation = minSelfDelegation;
         }
 
@@ -310,7 +288,6 @@ contract Staking {
             val.updateTime = block.timestamp;
         }
     }
-
 
     function _afterValidatorCreated(address valAddr) private {
         _initializeValidator(valAddr);
@@ -404,6 +381,8 @@ contract Staking {
         uint256 amountRemoved = _removeDelShares(valAddr, shares);
         if (val.delegationShares == 0) {
             _removeValidator(valAddr);
+        } else {
+            addValidatorRank(valAddr);
         }
 
         unbondingEntries[valAddr][delAddr].push(
@@ -413,8 +392,6 @@ contract Staking {
                 amount: amountRemoved
             })
         );
-
-        addValidatorRank(valAddr);
     }
 
     function _removeDelShares(address valAddr, uint256 shares)
@@ -550,6 +527,7 @@ contract Staking {
         delete validatorAccumulatedCommission[valAddr];
         delete validatorHistoricalRewards[valAddr];
         delete validatorCurrentRewards[valAddr];
+        
         removeValidatorRank(valAddr);
     }
 
@@ -1138,8 +1116,7 @@ contract Staking {
         return annualProvision.div(_params.blocksPerYear);
     }
 
-    // validator rank
-
+   // validator rank
     function addValidatorRank(address valAddr) private {
         if (validatorRankIndex[valAddr] == 0) {
             if (validatorsRank.length == 500) {
@@ -1156,11 +1133,14 @@ contract Staking {
     }
 
     function removeValidatorRank(address valAddr) private {
-        if (validatorRankIndex[valAddr] > 0) {
-            address lastValAddr = validatorsRank[validatorsRank.length - 1];
-            validatorsRank[validatorRankIndex[valAddr] - 1] = lastValAddr;
-            validatorRankIndex[lastValAddr] = validatorRankIndex[valAddr];
+        uint rankIndex = validatorRankIndex[valAddr];
+        if (rankIndex > 0) {
+            uint lastIndex = validatorsRank.length - 1;
+            address last = validatorsRank[lastIndex];
+            validatorsRank[rankIndex - 1] = last;
+            validatorRankIndex[last] = rankIndex;
             delete validatorRankIndex[valAddr];
+            validatorsRank.pop();
             _needSort = true;
         }
     }
@@ -1207,7 +1187,7 @@ contract Staking {
         onlyRoot
         returns (address[] memory, uint256[] memory)
     {
-        if (_needSort) {
+        if (_needSort && validatorsRank.length > 0) {
             _sortValidatorRank(0, int256(validatorsRank.length - 1));
             _needSort = false;
         }
@@ -1223,7 +1203,6 @@ contract Staking {
         if (maxValidators > validatorsRank.length) {
             maxValidators = validatorsRank.length;
         }
-
         address[] memory vals = new address[](maxValidators);
         uint256[] memory powers = new uint256[](maxValidators);
 
