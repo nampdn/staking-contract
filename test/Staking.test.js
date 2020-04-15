@@ -56,6 +56,64 @@ contract("Staking", async (accounts) => {
         assert.equal(validator[2], false);
     })
 
+    it ("should not create validator", async() => {
+        const instance = await Staking.deployed();
+        const bond = web3.utils.toWei("1", "ether")
+        const testCases = [
+            {
+                rate: 0,
+                maxRate: 0,
+                maxChangeRate: 0,
+                minSelfDelegation: 0,
+                from: accounts[0],
+                message: "validator found"
+            }, 
+            {
+                rate: 0,
+                maxRate: web3.utils.toWei("1.1", "ether"),
+                maxChangeRate: 0,
+                minSelfDelegation: 0,
+                from: accounts[5],
+                message: "max rate cannot be more than 100%"
+            },
+            {
+                rate: web3.utils.toWei("1", "ether"),
+                maxRate: web3.utils.toWei("0.9", "ether"),
+                maxChangeRate: 0,
+                minSelfDelegation: 0,
+                from: accounts[5],
+                message: "rate cannot be more than max rate"
+            },
+            {
+                rate: 0,
+                maxRate: web3.utils.toWei("0.9", "ether"),
+                maxChangeRate: web3.utils.toWei("1", "ether"),
+                minSelfDelegation: 0,
+                from: accounts[5],
+                message: "max change rate cannot be more than max rate"
+            },
+            {
+                rate: 0,
+                maxRate: 0,
+                maxChangeRate: 0,
+                minSelfDelegation:  web3.utils.toWei("2", "ether"),
+                from: accounts[5],
+                message: "validator's self delegation must be greater than their minimum delegation"
+            }
+        ];
+
+
+        for(var testCase of testCases) {
+            try {
+                await instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
+                    testCase.minSelfDelegation, {from: testCase.from, value: bond});
+                throw null;
+            } catch(e) {
+                assert.isNotNull(e, testCase.message);
+            }
+        }
+    })
+
     it ("should delegate", async() => {
         const instance = await Staking.deployed();
         const bond1to0 = web3.utils.toWei("1", "ether");
