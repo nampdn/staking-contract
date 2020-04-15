@@ -21,6 +21,8 @@ contract Staking {
 
     struct ValidatorCommission {
         uint256 rate;
+        uint256 maxRate;
+        uint256 maxChangeRate;
     }
 
     struct Validator {
@@ -29,6 +31,7 @@ contract Staking {
         uint256 delegationShares;
         bool jailed;
         ValidatorCommission commission;
+        uint256 minSelfDelegation;
     }
 
     struct DelegatorStartingInfo {
@@ -207,19 +210,29 @@ contract Staking {
         }
     }
 
-    function createValidator(uint256 commssionRate) public payable {
-        _createValidator(msg.sender, msg.value, commssionRate);
+    function createValidator(uint256 commssionRate, uint256 maxRate, uint256 maxChangeRate, uint256 minSeftDelegation) public payable {
+        _createValidator(msg.sender, msg.value, commssionRate, maxRate, maxChangeRate, minSeftDelegation);
     }
 
     function _createValidator(
         address payable valAddr,
         uint256 amount,
-        uint256 commssionRate
+        uint256 commssionRate,
+        uint256 maxRate,
+        uint256 maxChangeRate,
+        uint256 minSeftDelegation,
     ) private {
         require(validatorsIndex[valAddr] == 0, "validator owner exists");
         require(amount > 0, "invalid delegation amount");
+        require(amount >= minSeftDelegation, "validator's selft delegation must be greater than their minimum self delegation");
+        require(maxRate <= oneDec, "commission rate cannot be more than 100%");
+        require(maxChangeRate <= maxRate, "commission max change rate cannot be more than max rate");
+        require(commissionRate <= maxRate, "commission rate cannot be more than max rate");
+
         ValidatorCommission memory commission = ValidatorCommission({
-            rate: commssionRate
+            rate: commssionRate,
+            maxRate: maxRate,
+            maxChangeRate: maxChangeRate
         });
         validators.push(
             Validator({
@@ -227,7 +240,8 @@ contract Staking {
                 tokens: 0,
                 delegationShares: 0,
                 jailed: false,
-                commission: commission
+                commission: commission,
+                minSeftDelegation: minSeftDelegation
             })
         );
         validatorsIndex[valAddr] = validators.length;
