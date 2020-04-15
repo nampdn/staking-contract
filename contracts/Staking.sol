@@ -146,7 +146,7 @@ contract Staking {
 
     function setRoot(address newRoot) public {
         if (_root != address(0x0)) {
-            require(msg.sender == _root, "permission denied");
+            require(msg.sender == _root, "");
         }
         _root = newRoot;
     }
@@ -235,20 +235,20 @@ contract Staking {
         uint256 maxChangeRate,
         uint256 minSelfDelegation
     ) private {
-        require(validatorsIndex[valAddr] == 0, "validator owner exists");
-        require(amount > 0, "invalid delegation amount");
+        require(validatorsIndex[valAddr] == 0, "");
+        require(amount > 0, "");
         require(
             amount >= minSelfDelegation,
-            "selft delegation must be greater than their minimum self delegation"
+            ""
         );
-        require(maxRate <= oneDec, "commission rate cannot be more than 100%");
+        require(maxRate <= oneDec, "");
         require(
             maxChangeRate <= maxRate,
-            "commission max change rate cannot be more than max rate"
+            ""
         );
         require(
             rate <= maxRate,
-            "commission rate cannot be more than max rate"
+            ""
         );
 
         ValidatorCommission memory commission = ValidatorCommission({
@@ -281,26 +281,26 @@ contract Staking {
         if (commissionRate > 0) {
             require(
                 (block.timestamp - val.updateTime) > 86400,
-                "commission rate can not be changed more than one in 24h"
+                ""
             );
             require(
                 commissionRate < val.commission.maxRate,
-                "commission rate can not be more than the max rate"
+                ""
             );
             require(
                 commissionRate.sub(val.commission.rate) <
                     val.commission.maxChangeRate,
-                "commision rate can not be more than the max change rate"
+                ""
             );
         }
         if (minSelfDelegation > 0) {
             require(
                 minSelfDelegation > val.minSelfDelegation,
-                "min self delegation recreased"
+                ""
             );
             require(
                 minSelfDelegation < val.tokens, 
-                "min self delegation below minumum"
+                ""
             );
             val.minSelfDelegation = minSelfDelegation;
         }
