@@ -103,7 +103,7 @@ contract Staking {
     address[] validatorsRank;
     mapping(address => uint256) validatorRankIndex;
 
-    address[] validatorUpdateRankQueue;
+    bool _needSort;
 
     // supply
     uint256 public totalSupply = 5000000000 * 10**18;
@@ -351,7 +351,7 @@ contract Staking {
         del.shares += shared;
         _afterDelegationModified(valAddr, delAddr);
 
-        validatorUpdateRankQueue.push(valAddr);
+        addValidatorRank(valAddr);
     }
 
     function _addTokenFromDel(address valAddr, uint256 amount)
@@ -414,7 +414,7 @@ contract Staking {
             })
         );
 
-        validatorUpdateRankQueue.push(valAddr);
+        addValidatorRank(valAddr);
     }
 
     function _removeDelShares(address valAddr, uint256 shares)
@@ -442,7 +442,7 @@ contract Staking {
 
     function _jail(address valAddr) private {
         validators[validatorsIndex[valAddr] - 1].jailed = true;
-        validatorUpdateRankQueue.push(valAddr);
+        removeValidatorRank(valAddr);
     }
 
     function _slash(
@@ -550,6 +550,7 @@ contract Staking {
         delete validatorAccumulatedCommission[valAddr];
         delete validatorHistoricalRewards[valAddr];
         delete validatorCurrentRewards[valAddr];
+        removeValidatorRank(valAddr);
     }
 
     function withdraw(address valAddr) public {
@@ -1151,6 +1152,7 @@ contract Staking {
                 validatorRankIndex[valAddr] = validatorsRank.length;
             }
         }
+        _needSort = true;
     }
 
     function removeValidatorRank(address valAddr) private {
@@ -1159,6 +1161,7 @@ contract Staking {
             validatorsRank[validatorRankIndex[valAddr] - 1] = lastValAddr;
             validatorRankIndex[lastValAddr] = validatorRankIndex[valAddr];
             delete validatorRankIndex[valAddr];
+            _needSort = true;
         }
     }
 
@@ -1204,25 +1207,10 @@ contract Staking {
         onlyRoot
         returns (address[] memory, uint256[] memory)
     {
-        for (uint256 i = 0; i < validatorUpdateRankQueue.length; i++) {
-            if (validatorsIndex[validatorUpdateRankQueue[i]] > 0) {
-                if (
-                    validators[validatorsIndex[validatorUpdateRankQueue[i]] - 1]
-                        .jailed == true
-                ) {
-                    removeValidatorRank(validatorUpdateRankQueue[i]);
-                } else {
-                    addValidatorRank(validatorUpdateRankQueue[i]);
-                }
-            } else {
-                removeValidatorRank(validatorUpdateRankQueue[i]);
-            }
-            validatorUpdateRankQueue[i] = validatorUpdateRankQueue[validatorUpdateRankQueue
-                .length - 1];
-            validatorUpdateRankQueue.pop();
-            i--;
+        if (_needSort) {
+            _sortValidatorRank(0, int256(validatorsRank.length - 1));
+            _needSort = false;
         }
-        _sortValidatorRank(0, int256(validatorsRank.length - 1));
         return getValidatorSets();
     }
 

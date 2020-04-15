@@ -144,9 +144,9 @@ contract("Staking", async (accounts) => {
 
         try {
             await instance.getDelegation.call(accounts[0], accounts[1]);
-            assert.fail()
+            throw null;
         } catch(e) {
-            
+            assert.isNotNull(e);
         }
     })
 
@@ -156,10 +156,13 @@ contract("Staking", async (accounts) => {
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
         try {
             await instance.getValidator.call(accounts[0]);
-            assert.fail()
+            throw null
         } catch(e) {
-            
+            assert.isNotNull(e);
         }
+
+        const validatorSets = await getCurrentValidatorSet();
+        assert.equal(validatorSets.length, 0);
     })
 
 
