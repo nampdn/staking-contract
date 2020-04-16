@@ -54,7 +54,7 @@ contract("Staking", async (accounts) => {
         const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
         const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
         const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
-        const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 1%
+        const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 50%
         const unBondingTime = 1;
         let instance = await Staking.deployed(); 
         const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
@@ -268,6 +268,27 @@ contract("Staking", async (accounts) => {
         commission = await instance.getValidatorCommission.call(accounts[3]);
         assert.equal(commission.toString(), web3.utils.toWei("0"));
 
+    });
+
+
+    it("should slash", async () => {
+        const instance = await Staking.deployed();
+        const bond4to4 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(0, 0, 0, 0, {from: accounts[4], value: bond4to4});
+        await instance.doubleSign(accounts[4], 1000000000000, 10);
+
+        const validator = await instance.getValidator.call(accounts[4]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
+    });
+
+    it("should slash unbonding delegtion entries", async () => {
+        // const instance = await Staking.deployed();
+        // const bond4to4 = web3.utils.toWei("1", "ether");
+        // await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond4to4});
+        // await instance.doubleSign(accounts[5], 1000000000000, 10);
+
+        // const validator = await instance.getValidator.call(accounts[4]);
+        // assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
     });
 
 
