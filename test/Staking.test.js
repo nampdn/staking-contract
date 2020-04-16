@@ -12,13 +12,15 @@ async function assertRevert(promise) {
 
 contract("Staking", async (accounts) => {
     const powerReduction = Math.pow(10, 6);
-    async function finalizeCommit(signed) {
+    async function finalizeCommit(isSigned) {
         let instance = await Staking.deployed();
         const validatorSet = await getCurrentValidatorSet();
         await instance.mint();
         //await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
         await instance.setPreviousProposer(accounts[0]);
-        await instance.finalizeCommit(validatorSet[0], validatorSet[1], [signed, true, true])
+        let signed = validatorSet[0].map(_ => true);
+        signed[0] = isSigned;
+        await instance.finalizeCommit(validatorSet[0], validatorSet[1], signed)
     }
 
     async function getCurrentValidatorSet() {
@@ -242,6 +244,29 @@ contract("Staking", async (accounts) => {
 
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
         assert.equal(reward.toString(), web3.utils.toWei("17.745329274261433244", "ether"));
+
+    });
+
+    it ("should withdraw commission rewards", async() => {
+        const instance = await Staking.deployed();
+        const commissionRate = web3.utils.toWei("0.5", "ether")
+        const maxRate = web3.utils.toWei("1", "ether");
+        await utils.advanceTime(86401);
+        const bond3to3 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
+
+        await finalizeCommit(true);
+        
+        let commission = await instance.getValidatorCommission.call(accounts[3]);
+        assert.equal(commission.toString(), web3.utils.toWei("3.696943660307728894"));
+
+        const reward = await instance.getDelegationRewards.call(accounts[3], accounts[3]);
+        assert.equal(reward.toString(), web3.utils.toWei("3.696943660307728895", "ether"));
+
+        await instance.withdrawValidatorCommission({from: accounts[3]});
+
+        commission = await instance.getValidatorCommission.call(accounts[3]);
+        assert.equal(commission.toString(), web3.utils.toWei("0"));
 
     });
 

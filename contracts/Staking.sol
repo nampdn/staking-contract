@@ -270,7 +270,7 @@ contract Staking {
         Validator storage val = validators[validatorsIndex[msg.sender] - 1];
         if (commissionRate > 0) {
             require((block.timestamp - val.updateTime) > 86400, "");
-            require(commissionRate < val.commission.maxRate, "");
+            require(commissionRate <= val.commission.maxRate, "");
             require(
                 commissionRate.sub(val.commission.rate) <
                     val.commission.maxChangeRate,
