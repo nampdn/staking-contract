@@ -16,8 +16,9 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         const validatorSet = await getCurrentValidatorSet();
         await instance.mint();
-        await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
-        await instance.finalizeCommit(accounts[0], validatorSet[0], [signed, true, true], validatorSet[1], {from: accounts[0]})
+        //await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
+        await instance.setPreviousProposer(accounts[0]);
+        await instance.finalizeCommit(validatorSet[0], validatorSet[1], [signed, true, true])
     }
 
     async function getCurrentValidatorSet() {
@@ -199,6 +200,49 @@ contract("Staking", async (accounts) => {
         await instance.withdraw(accounts[0], {from: accounts[0]}); 
 
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
+    });
+
+
+    it ("should withdraw delegation rewards", async () => {
+        const instance = await Staking.deployed();
+        const bond0to0 = web3.utils.toWei("1", "ether");
+        const bond1to0 = web3.utils.toWei("1", "ether");
+        const bond2to0 = web3.utils.toWei("1", "ether");
+
+        const bond1to1 = web3.utils.toWei("1", "ether");
+        const bond2to2 = web3.utils.toWei("1", "ether");
+
+        await instance.createValidator(0, 0,0, 0, {from: accounts[0], value: bond0to0});
+        await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
+        await instance.delegate(accounts[0], {from: accounts[2], value: bond2to0});
+        await instance.createValidator(0, 0,0, 0, {from: accounts[1], value: bond1to1});
+        await instance.createValidator(0, 0,0, 0, {from: accounts[2], value: bond2to2});
+
+        await finalizeCommit(true);
+
+        let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
+        assert.equal(reward.toString(), web3.utils.toWei("12.569608166231483593", "ether"));
+        reward = await instance.getDelegationRewards.call(accounts[0], accounts[1]);
+        assert.equal(reward.toString(), web3.utils.toWei("12.569608166231483593", "ether"));
+        reward = await instance.getDelegationRewards.call(accounts[0], accounts[2]);
+        assert.equal(reward.toString(), web3.utils.toWei("12.569608166231483593", "ether"));
+
+        reward = await instance.getDelegationRewards.call(accounts[1], accounts[1]);
+        assert.equal(reward.toString(), web3.utils.toWei("8.872664587928106066", "ether"));
+
+        reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
+        assert.equal(reward.toString(), web3.utils.toWei("8.872664587928106066", "ether"));
+
+
+        await instance.withdrawReward(accounts[0], {from: accounts[0]});
+        reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
+        assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
+
+        await finalizeCommit(true);
+
+        reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
+        assert.equal(reward.toString(), web3.utils.toWei("17.745329274261433244", "ether"));
+
     });
 
 

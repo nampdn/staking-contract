@@ -140,7 +140,7 @@ contract Staking {
     }
 
     modifier onlyRoot() {
-        require (msg.sender == _root, "permission denied");
+        require(msg.sender == _root, "permission denied");
         _;
     }
 
@@ -529,7 +529,7 @@ contract Staking {
         delete validatorAccumulatedCommission[valAddr];
         delete validatorHistoricalRewards[valAddr];
         delete validatorCurrentRewards[valAddr];
-        
+
         removeValidatorRank(valAddr);
     }
 
@@ -704,22 +704,23 @@ contract Staking {
         view
         returns (uint256)
     {
-        require(validatorsIndex[valAddr] > 0, "validator not found");
-        require(delegationsIndex[valAddr][delAddr] > 0, "delegation not found");
-        Validator memory val = validators[validatorsIndex[valAddr] - 1];
-
-
-            Delegation memory del
-         = delegations[valAddr][delegationsIndex[valAddr][delAddr] - 1];
+        uint256 valIndex = validatorsIndex[valAddr];
+        uint256 delIndex = delegationsIndex[valAddr][delAddr];
+        require(valIndex > 0, "validator not found");
+        require(delIndex > 0, "delegation not found");
+        Validator memory val = validators[valIndex - 1];
+        Delegation memory del = delegations[valAddr][delIndex - 1];
         uint256 rewards = _calculateDelegationRewards(
             valAddr,
             delAddr,
-            validatorCurrentRewards[valAddr].period
+            validatorCurrentRewards[valAddr].period - 1
         );
-        // current reward
-        rewards += _tokenFromShare(valAddr, del.shares).mulTrun(
-            validatorCurrentRewards[valAddr].reward.divTrun(val.tokens)
-        );
+
+        uint256 currentReward = validatorCurrentRewards[valAddr].reward;
+        if (currentReward > 0) {
+            uint256 stake = _tokenFromShare(valAddr, del.shares);
+            rewards += stake.mulTrun(currentReward.divTrun(val.tokens));
+        }
         return rewards;
     }
 
@@ -979,16 +980,15 @@ contract Staking {
         );
         uint256 proposerReward = _feesCollected.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(previousProposer, proposerReward);
-        _feesCollected -= proposerReward;
 
-        uint256 voteMultiplier = oneDec.sub(proposerMultiplier);
+        uint256 voteMultiplier = oneDec;
+        voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < vals.length; i++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
             uint256 rewards = _feesCollected.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
-            _allocateTokensToValidator(vals[0], rewards);
-            _feesCollected -= rewards;
+            _allocateTokensToValidator(vals[i], rewards);
         }
     }
 
@@ -1122,7 +1122,7 @@ contract Staking {
         return annualProvision.div(_params.blocksPerYear);
     }
 
-   // validator rank
+    // validator rank
     function addValidatorRank(address valAddr) private {
         if (validatorRankIndex[valAddr] == 0) {
             if (validatorsRank.length == 500) {
@@ -1139,9 +1139,9 @@ contract Staking {
     }
 
     function removeValidatorRank(address valAddr) private {
-        uint rankIndex = validatorRankIndex[valAddr];
+        uint256 rankIndex = validatorRankIndex[valAddr];
         if (rankIndex > 0) {
-            uint lastIndex = validatorsRank.length - 1;
+            uint256 lastIndex = validatorsRank.length - 1;
             address last = validatorsRank[lastIndex];
             validatorsRank[rankIndex - 1] = last;
             validatorRankIndex[last] = rankIndex;
