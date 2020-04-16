@@ -1240,13 +1240,13 @@ contract Staking {
     }
 
     // slashing
-    function _unjail(address valAddr) private {
+    function _unjail(address valAddr) private  {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         uint256 valIndex = validatorsIndex[valAddr] - 1;
         Validator storage val = validators[valIndex];
         require(val.jailed, "validator not jailed");
         require(validatorSigningInfos[valAddr].jailedUntil < block.timestamp, "validator jailed");
-        uint256 delIndex = delegationsIndex[valAddr][valAddr];
+        uint256 delIndex = delegationsIndex[valAddr][valAddr] - 1;
         Delegation storage del = delegations[valAddr][delIndex];
         require(
             _tokenFromShare(valAddr, del.shares) > val.minSelfDelegation,

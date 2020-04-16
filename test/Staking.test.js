@@ -300,6 +300,23 @@ contract("Staking", async (accounts) => {
 
     });
 
+    it ("should slash delegation rewards", async () => {
+        const instance = await Staking.deployed();
+        const bond6to6 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
+        
+        await instance.doubleSign(accounts[6], 1000000000000, 10);
+        await utils.advanceTime(600);
+        await instance.unjail({from: accounts[6]});
+
+
+        await finalizeCommit(true);
+
+        let rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
+        assert.equal(rewards.toString(), web3.utils.toWei("3.412563415604115360"));
+
+    });
+
 
     // it("should delegate to validator", async () => {
     //     let instance = await Staking.deployed();
