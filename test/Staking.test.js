@@ -283,14 +283,21 @@ contract("Staking", async (accounts) => {
         assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
     });
 
-    it("should slash unbonding delegtion entries", async () => {
-        // const instance = await Staking.deployed();
-        // const bond4to4 = web3.utils.toWei("1", "ether");
-        // await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond4to4});
-        // await instance.doubleSign(accounts[5], 1000000000000, 10);
+    it("should slash unbonding delegation entries", async () => {
+        const instance = await Staking.deployed();
+        const bond5to5 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond5to5});
 
-        // const validator = await instance.getValidator.call(accounts[4]);
-        // assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
+        const amount = web3.utils.toWei("0.1", "ether")
+        await instance.undelegate(accounts[5], amount, {from: accounts[5]});
+        await instance.doubleSign(accounts[5], 1000000000000, 10);
+
+        const udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
+        assert.equal(udbEntries[0][0].toString(), amount/2);
+
+        const validator = await instance.getValidator.call(accounts[5]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0.45", "ether"));
+
     });
 
 
