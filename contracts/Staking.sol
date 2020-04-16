@@ -505,25 +505,27 @@ contract Staking {
 
     function _removeDelegation(address valAddr, address delAddr) private {
         // delete delegation and delegation index
-        uint256 delegationIndex = delegationsIndex[valAddr][delAddr];
-        uint256 lastDelegationIndex = delegations[valAddr].length;
+        uint256 index = delegationsIndex[valAddr][delAddr];
+        uint256 lastIndex = delegations[valAddr].length;
+        Delegation memory last = delegations[valAddr][lastIndex - 1];
 
-
-            Delegation memory lastDelegation
-         = delegations[valAddr][lastDelegationIndex - 1];
-        delegations[valAddr][delegationIndex - 1] = lastDelegation;
+        delegations[valAddr][index - 1] = last;
         delegations[valAddr].pop();
-        delegationsIndex[valAddr][lastDelegation.owner] = delegationIndex;
+        delegationsIndex[valAddr][last.owner] = index;
 
         // delete other info
         delete delegationsIndex[valAddr][delAddr];
         delete delegatorStartingInfo[valAddr][delAddr];
 
-        // delete delegator validator index
-        uint256 delValIndex = delegatorValidatorsIndex[delAddr][valAddr];
-        delegatorValidators[delAddr][delValIndex -
-            1] = delegatorValidators[delAddr][delegatorValidators[delAddr]
-            .length - 1];
+        _removeDelegatorValidatorIndex(valAddr, delAddr);
+    }
+
+    function _removeDelegatorValidatorIndex(address valAddr, address delAddr) private {
+        uint256 index = delegatorValidatorsIndex[delAddr][valAddr];
+        uint256 lastIndex = delegatorValidators[delAddr].length;
+        address last = delegatorValidators[delAddr][lastIndex - 1];
+        delegatorValidators[delAddr][lastIndex - 1] = last;
+        delegatorValidatorsIndex[delAddr][last] = index;
         delegatorValidators[delAddr].pop();
         delete delegatorValidatorsIndex[delAddr][valAddr];
     }
