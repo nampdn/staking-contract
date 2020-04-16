@@ -33,6 +33,7 @@ contract Staking {
         ValidatorCommission commission;
         uint256 minSelfDelegation;
         uint256 updateTime;
+        uint256 ubdEntryCount;
     }
 
     struct DelegatorStartingInfo {
@@ -255,7 +256,8 @@ contract Staking {
                 jailed: false,
                 commission: commission,
                 minSelfDelegation: minSelfDelegation,
-                updateTime: block.timestamp
+                updateTime: block.timestamp,
+                ubdEntryCount: 0
             })
         );
         validatorsIndex[valAddr] = validators.length;
@@ -379,10 +381,11 @@ contract Staking {
         }
 
         uint256 amountRemoved = _removeDelShares(valAddr, shares);
-        if (val.delegationShares == 0) {
+        if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
             _removeValidator(valAddr);
         } else {
             addValidatorRank(valAddr);
+            val.ubdEntryCount++;
         }
 
         unbondingEntries[valAddr][delAddr].push(
@@ -476,17 +479,28 @@ contract Staking {
     function _withdraw(address valAddr, address payable delAddr) private {
         UBDEntry[] storage entries = unbondingEntries[valAddr][delAddr];
         uint256 amount = 0;
+        uint256 entryCount = 0;
         for (uint256 i = 0; i < entries.length; i++) {
             if (entries[i].completionTime < block.timestamp) {
                 amount += entries[i].amount;
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
-                i++;
+                i--;
+                entryCount++;
             }
         }
         require(amount > 0, "no unbonding amount to withdraw");
         delAddr.transfer(amount);
         totalBonded -= amount;
+
+        uint256 valIndex = validatorsIndex[valAddr];
+        if (valIndex > 0) {
+            Validator storage val = validators[valIndex - 1];
+            val.ubdEntryCount -= entryCount;
+            if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
+                _removeValidator(valAddr);
+            }
+        }
     }
 
     function _removeDelegation(address valAddr, address delAddr) private {

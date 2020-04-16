@@ -179,14 +179,16 @@ contract("Staking", async (accounts) => {
         const amount = web3.utils.toWei("0.5", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[1]});
         await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]));
+
+        await utils.advanceTime(2000);
+        await instance.withdraw(accounts[0], {from: accounts[1]});
     })
 
     it ("should remove validator", async() => {
         const instance = await Staking.deployed();
-        const amount = web3.utils.toWei("100", "ether")
+        const amount = web3.utils.toWei("100", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
         await assertRevert(instance.getValidator.call(accounts[0]));
-
         const validatorSets = await getCurrentValidatorSet();
         assert.equal(validatorSets[0].length, 0);
     })
