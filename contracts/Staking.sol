@@ -520,7 +520,9 @@ contract Staking {
         _removeDelegatorValidatorIndex(valAddr, delAddr);
     }
 
-    function _removeDelegatorValidatorIndex(address valAddr, address delAddr) private {
+    function _removeDelegatorValidatorIndex(address valAddr, address delAddr)
+        private
+    {
         uint256 index = delegatorValidatorsIndex[delAddr][valAddr];
         uint256 lastIndex = delegatorValidators[delAddr].length;
         address last = delegatorValidators[delAddr][lastIndex - 1];
@@ -1235,5 +1237,28 @@ contract Staking {
             );
         }
         return (vals, powers);
+    }
+
+    // slashing
+    function _unjail(address valAddr) private {
+        require(validatorsIndex[valAddr] > 0, "validator not found");
+        uint256 valIndex = validatorsIndex[valAddr] - 1;
+        Validator storage val = validators[valIndex];
+        require(val.jailed, "validator not jailed");
+        require(validatorSigningInfos[valAddr].jailedUntil < block.timestamp, "validator jailed");
+        uint256 delIndex = delegationsIndex[valAddr][valAddr];
+        Delegation storage del = delegations[valAddr][delIndex];
+        require(
+            _tokenFromShare(valAddr, del.shares) > val.minSelfDelegation,
+            "selt delegation too low to unjail"
+        );
+
+        validatorSigningInfos[valAddr].jailedUntil = 0;
+        val.jailed = false;
+        addValidatorRank(valAddr);
+    }
+
+    function unjail() public {
+        _unjail(msg.sender);
     }
 }
