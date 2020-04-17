@@ -92,7 +92,7 @@ contract Staking {
     mapping(address => ValidatorSlashEvent[]) validatorSlashEvents;
     mapping(address => ValidatorCurrentReward) validatorCurrentRewards;
     mapping(address => ValidatorHistoricalRewards[]) validatorHistoricalRewards;
-    mapping(address => bool[1000]) validatorMissedBlockBitArray;
+    mapping(address => bool[]) validatorMissedBlock;
     mapping(address => ValidatorSigningInfo) validatorSigningInfos;
     mapping(address => uint256) validatorAccumulatedCommission;
     mapping(address => Delegation[]) delegations;
@@ -930,6 +930,8 @@ contract Staking {
             _params.slashFractionDoubleSign
         );
         _jail(valAddr);
+        // // (Dec 31, 9999 - 23:59:59 GMT).
+        validatorSigningInfos[valAddr].jailedUntil = 253402300799;
     }
 
     function doubleSign(
@@ -949,14 +951,17 @@ contract Staking {
         ValidatorSigningInfo storage signInfo = validatorSigningInfos[valAddr];
         uint256 index = signInfo.indexOffset % _params.signedBlockWindown;
         signInfo.indexOffset++;
-        bool previous = validatorMissedBlockBitArray[valAddr][index];
+        if (validatorMissedBlock[valAddr].length == index) {
+            validatorMissedBlock[valAddr].push(false);
+        }
+        bool previous = validatorMissedBlock[valAddr][index];
         bool missed = !signed;
         if (!previous && missed) {
             signInfo.missedBlockCounter++;
-            validatorMissedBlockBitArray[valAddr][index] = true;
+            validatorMissedBlock[valAddr][index] = true;
         } else if (previous && !missed) {
             signInfo.missedBlockCounter--;
-            validatorMissedBlockBitArray[valAddr][index] = false;
+            validatorMissedBlock[valAddr][index] = false;
         }
 
         uint256 minHeight = signInfo.startHeight + _params.signedBlockWindown;
@@ -978,7 +983,7 @@ contract Staking {
                 );
                 signInfo.missedBlockCounter = 0;
                 signInfo.indexOffset = 0;
-                delete validatorMissedBlockBitArray[valAddr];
+                delete validatorMissedBlock[valAddr];
             }
         }
     }
@@ -1077,9 +1082,9 @@ contract Staking {
     function getMissedBlock(address valAddr)
         public
         view
-        returns (bool[1000] memory)
+        returns (bool[] memory)
     {
-        return validatorMissedBlockBitArray[valAddr];
+        return validatorMissedBlock[valAddr];
     }
 
     // Mint

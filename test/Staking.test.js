@@ -12,14 +12,14 @@ async function assertRevert(promise) {
 
 contract("Staking", async (accounts) => {
     const powerReduction = Math.pow(10, 6);
-    async function finalizeCommit(isSigned) {
+    async function finalizeCommit(notSigned) {
+        notSigned = notSigned  || [];
         let instance = await Staking.deployed();
         const validatorSet = await getCurrentValidatorSet();
         await instance.mint();
         //await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
         await instance.setPreviousProposer(accounts[0]);
-        let signed = validatorSet[0].map(_ => true);
-        signed[0] = isSigned;
+        let signed = validatorSet[0].map(addr => notSigned.indexOf(addr) === -1);
         await instance.finalizeCommit(validatorSet[0], validatorSet[1], signed)
     }
 
@@ -222,7 +222,7 @@ contract("Staking", async (accounts) => {
         await instance.createValidator(0, 0,0, 0, {from: accounts[1], value: bond1to1});
         await instance.createValidator(0, 0,0, 0, {from: accounts[2], value: bond2to2});
 
-        await finalizeCommit(true);
+        await finalizeCommit([]);
 
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("12.569608166231483593", "ether"));
@@ -242,7 +242,7 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
 
-        await finalizeCommit(true);
+        await finalizeCommit([]);
 
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
         assert.equal(reward.toString(), web3.utils.toWei("17.745329274261433244", "ether"));
@@ -257,7 +257,7 @@ contract("Staking", async (accounts) => {
         const bond3to3 = web3.utils.toWei("1", "ether");
         await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
 
-        await finalizeCommit(true);
+        await finalizeCommit([]);
         
         let commission = await instance.getValidatorCommission.call(accounts[3]);
         assert.equal(commission.toString(), web3.utils.toWei("3.696943660307728894"));
@@ -304,17 +304,31 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const bond6to6 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
+
+        await finalizeCommit([]);
         
         await instance.doubleSign(accounts[6], 1000000000000, 10);
         await utils.advanceTime(600);
         await instance.unjail({from: accounts[6]});
 
 
-        await finalizeCommit(true);
+        await finalizeCommit([]);
 
         let rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
         assert.equal(rewards.toString(), web3.utils.toWei("3.412563415604115360"));
 
+    });
+
+
+    it ("should not unjail", async() => {
+        const instance = await Staking.deployed();
+        const bond6to6 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(0, 0, 0, 0, {from: accounts[7], value: bond6to6});
+        
+        await assertRevert(instance.unjail({from: accounts[7]}));
+
+        await instance.doubleSign(accounts[7], 1000000000000, 10);
+        //await assertRevert(instance.unjail({from: accounts[7]}));
     });
 
 
