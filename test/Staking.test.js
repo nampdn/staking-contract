@@ -320,13 +320,31 @@ contract("Staking", async (accounts) => {
 
     it ("should not unjail", async() => {
         const instance = await Staking.deployed();
-        const bond6to6 = web3.utils.toWei("1", "ether");
-        await instance.createValidator(0, 0, 0, 0, {from: accounts[7], value: bond6to6});
         
+        // validator not found
         await assertRevert(instance.unjail({from: accounts[7]}));
 
-        await instance.doubleSign(accounts[7], 1000000000000, 10);
-        //await assertRevert(instance.unjail({from: accounts[7]}));
+        const bond6to6 = web3.utils.toWei("1", "ether");
+        const minSelfDelegation = web3.utils.toWei("0.9", "ether");
+        await instance.createValidator(0, 0, 0, minSelfDelegation, {from: accounts[7], value: bond6to6});
+
+        // validator not jailed
+        await assertRevert(instance.unjail({from: accounts[7]}));
+
+        // slash and jail
+        await finalizeCommit([accounts[7]]);
+        await finalizeCommit([accounts[7]]);
+        await finalizeCommit([accounts[7]]);
+
+        const validator = await instance.getValidator.call(accounts[7]);
+        assert.equal(validator[2], true);
+
+        // validator jailed
+        await assertRevert(instance.unjail({from: accounts[7]}));
+
+        // self delegation too low to unjail
+        await instance.undelegate(accounts[7], web3.utils.toWei("0.5", "ether"), {from: accounts[7]});
+        await assertRevert(instance.unjail({from: accounts[7]}));
     });
 
 
