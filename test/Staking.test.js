@@ -2,12 +2,33 @@ const Staking = artifacts.require("Staking");
 const utils = require("./utils");
 
 
-async function assertRevert(promise) {
+async function assertRevert(promise, includeStr = "") {
     return promise.then(() => {
         throw null;
     }).catch(e => {
         assert.isNotNull(e);
+        if (includeStr != "" && e != null) {
+            assert.include(e.message, includeStr);
+        }
     });
+}
+
+async function setParams(owner, isOk) {
+    const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
+    const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
+    const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
+    const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 50%
+    const unBondingTime = 1;
+    const signedBlockWindow= 2;
+    const minSignedBlockPerWindow = web3.utils.toWei("0.5", "ether")
+    let instance = await Staking.deployed(); 
+    const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
+        slashFractionDowntime, unBondingTime, slashFractionDoubleSign, signedBlockWindow, minSignedBlockPerWindow, {from: owner})
+    if (isOk) {
+        await promise;
+    } else {
+        await assertRevert(promise, "permission denied");
+    }
 }
 
 contract("Staking", async (accounts) => {
@@ -48,25 +69,6 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}));
     });
-    
-
-    async function setParams(owner, isOk) {
-        const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
-        const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
-        const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
-        const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 50%
-        const unBondingTime = 1;
-        const signedBlockWindow= 2;
-        const minSignedBlockPerWindow = web3.utils.toWei("0.5", "ether")
-        let instance = await Staking.deployed(); 
-        const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
-            slashFractionDowntime, unBondingTime, slashFractionDoubleSign, signedBlockWindow, minSignedBlockPerWindow, {from: owner})
-        if (isOk) {
-            await promise;
-        } else {
-            await assertRevert(promise);
-        }
-    }
 
 
     it ("should set params", async() => {
@@ -75,6 +77,11 @@ contract("Staking", async (accounts) => {
 
     it ("should not set params", async() => {
         await setParams(accounts[1]);
+    });
+
+    it ("should not finalize", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.finalizeCommit([], [], [], {from: accounts[1]}), "permission denied");
     });
 
 
