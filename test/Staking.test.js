@@ -56,9 +56,11 @@ contract("Staking", async (accounts) => {
         const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
         const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 50%
         const unBondingTime = 1;
+        const signedBlockWindow= 2;
+        const minSignedBlockPerWindow = web3.utils.toWei("0.5", "ether")
         let instance = await Staking.deployed(); 
         const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
-            slashFractionDowntime, unBondingTime, slashFractionDoubleSign, {from: owner})
+            slashFractionDowntime, unBondingTime, slashFractionDoubleSign, signedBlockWindow, minSignedBlockPerWindow, {from: owner})
         if (isOk) {
             await promise;
         } else {
@@ -304,18 +306,14 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const bond6to6 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
-
-        await finalizeCommit([]);
-        
-        await instance.doubleSign(accounts[6], 1000000000000, 10);
-        await utils.advanceTime(600);
+        await finalizeCommit([accounts[6]]);
+        await finalizeCommit([accounts[6]]);
+        await finalizeCommit([accounts[6]]);
+        await utils.advanceTime(601);
         await instance.unjail({from: accounts[6]});
-
-
         await finalizeCommit([]);
-
         let rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
-        assert.equal(rewards.toString(), web3.utils.toWei("3.412563415604115360"));
+        assert.equal(rewards.toString(), web3.utils.toWei("12.237310357231678083"));
 
     });
 

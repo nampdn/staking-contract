@@ -75,8 +75,8 @@ contract Staking {
         uint256 slashFractionDowntime;
         uint256 unbondingTime;
         uint256 slashFractionDoubleSign;
-        uint256 signedBlockWindown;
-        uint256 minSignedPerWindown;
+        uint256 signedBlockWindow;
+        uint256 minSignedPerWindow;
         // mint params
         uint256 inflationRateChange;
         uint256 goalBonded;
@@ -115,6 +115,8 @@ contract Staking {
 
     address _root;
 
+
+
     // mint
 
     Params _params;
@@ -130,8 +132,8 @@ contract Staking {
             slashFractionDowntime: 1 * 10**14,
             unbondingTime: 1814400,
             slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindown: 1000,
-            minSignedPerWindown: 10,
+            signedBlockWindow: 100,
+            minSignedPerWindow: 5 * 10 ** 16,
             inflationRateChange: 13 * 10**16,
             goalBonded: 67 * 10**16,
             blocksPerYear: 6311520,
@@ -160,7 +162,9 @@ contract Staking {
         uint256 bonusProposerReward,
         uint256 slashFractionDowntime,
         uint256 unbondingTime,
-        uint256 slashFractionDoubleSign
+        uint256 slashFractionDoubleSign,
+        uint256 signedBlockWindow,
+        uint256 minSignedPerWindow
     ) public onlyRoot {
         if (maxValidators > 0) {
             _params.maxValidators = maxValidators;
@@ -185,6 +189,14 @@ contract Staking {
         }
         if (slashFractionDoubleSign > 0) {
             _params.slashFractionDoubleSign = slashFractionDoubleSign;
+        }
+
+        if (signedBlockWindow > 0) {
+            _params.signedBlockWindow = signedBlockWindow;
+        }
+
+        if (minSignedPerWindow > 0) {
+            _params.minSignedPerWindow = minSignedPerWindow;
         }
     }
 
@@ -263,6 +275,8 @@ contract Staking {
         validatorsIndex[valAddr] = validators.length;
         _afterValidatorCreated(valAddr);
         _delegate(valAddr, valAddr, amount);
+
+        validatorSigningInfos[valAddr].startHeight = block.number;
     }
 
     function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
@@ -294,6 +308,7 @@ contract Staking {
     function _afterValidatorCreated(address valAddr) private {
         _initializeValidator(valAddr);
     }
+
 
     function _afterDelegationModified(address valAddr, address delAddr)
         private
@@ -949,7 +964,7 @@ contract Staking {
     ) private {
         Validator storage val = validators[validatorsIndex[valAddr] - 1];
         ValidatorSigningInfo storage signInfo = validatorSigningInfos[valAddr];
-        uint256 index = signInfo.indexOffset % _params.signedBlockWindown;
+        uint256 index = signInfo.indexOffset % _params.signedBlockWindow;
         signInfo.indexOffset++;
         if (validatorMissedBlock[valAddr].length == index) {
             validatorMissedBlock[valAddr].push(false);
@@ -964,9 +979,10 @@ contract Staking {
             validatorMissedBlock[valAddr][index] = false;
         }
 
-        uint256 minHeight = signInfo.startHeight + _params.signedBlockWindown;
-        uint256 maxMissed = _params.signedBlockWindown -
-            _params.minSignedPerWindown;
+        uint256 minHeight = signInfo.startHeight + _params.signedBlockWindow;
+
+        uint256 minSignedPerWindow = _params.signedBlockWindow.mulTrun(_params.minSignedPerWindow);
+        uint256 maxMissed = _params.signedBlockWindow - minSignedPerWindow;
         if (
             block.number > minHeight && signInfo.missedBlockCounter > maxMissed
         ) {
