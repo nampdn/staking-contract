@@ -163,6 +163,17 @@ contract("Staking", async (accounts) => {
         assert.equal(delegation.toString(), web3.utils.toWei("0.01", "ether"))
     });
 
+    it ("should not undelegate", async () => {
+        const instance = await Staking.deployed();
+        const amount = web3.utils.toWei("1.5", "ether");
+        
+        // delegation not found
+        await assertRevert(instance.undelegate(accounts[0], {from: accounts[5]} ))
+
+        // invalid undelegate amount
+        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[1]}));
+    });
+
     it ("should undelegate", async() => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("0.5", "ether");
