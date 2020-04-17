@@ -153,6 +153,18 @@ contract("Staking", async (accounts) => {
         }
     })
 
+    it ("should not delegate", async () => {
+        const instance = await Staking.deployed();
+        const bond1to0 = web3.utils.toWei("1", "ether");
+        
+        // validator not found
+        await assertRevert(instance.delegate(accounts[5], {from: accounts[1], value: bond1to0}));
+
+        // invalid delegation amount
+        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}));
+
+    });
+
     it ("should delegate", async() => {
         const instance = await Staking.deployed();
         const bond1to0 = web3.utils.toWei("1", "ether");
@@ -166,7 +178,7 @@ contract("Staking", async (accounts) => {
     it ("should not undelegate", async () => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("1.5", "ether");
-        
+
         // delegation not found
         await assertRevert(instance.undelegate(accounts[0], {from: accounts[5]} ))
 
