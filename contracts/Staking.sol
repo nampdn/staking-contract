@@ -36,29 +36,29 @@ contract Staking {
         uint256 ubdEntryCount;
     }
 
-    struct DelegatorStartingInfo {
+    struct DelStartingInfo {
         uint256 stake;
         uint256 previousPeriod;
         uint256 height;
     }
 
-    struct ValidatorSlashEvent {
+    struct ValSlashEvent {
         uint256 validatorPeriod;
         uint256 fraction;
         uint256 height;
     }
 
-    struct ValidatorCurrentReward {
+    struct ValCurrentReward {
         uint256 period;
         uint256 reward;
     }
 
-    struct ValidatorHistoricalRewards {
+    struct ValHistoricalRewards {
         uint256 cumulativeRewardRatio;
         uint256 reference_count;
     }
 
-    struct ValidatorSigningInfo {
+    struct ValSigningInfo {
         uint256 startHeight;
         uint256 indexOffset;
         bool tombstoned;
@@ -88,12 +88,12 @@ contract Staking {
     Validator[] validators;
     mapping(address => mapping(address => uint256)) delegationsIndex;
     mapping(address => mapping(address => UBDEntry[])) unbondingEntries;
-    mapping(address => mapping(address => DelegatorStartingInfo)) delegatorStartingInfo;
-    mapping(address => ValidatorSlashEvent[]) validatorSlashEvents;
-    mapping(address => ValidatorCurrentReward) validatorCurrentRewards;
-    mapping(address => ValidatorHistoricalRewards[]) validatorHistoricalRewards;
+    mapping(address => mapping(address => DelStartingInfo)) delStartingInfo;
+    mapping(address => ValSlashEvent[]) valSlashEvents;
+    mapping(address => ValCurrentReward) valCurrentRewards;
+    mapping(address => ValHistoricalRewards[]) valHistoricalRewards;
     mapping(address => bool[]) validatorMissedBlock;
-    mapping(address => ValidatorSigningInfo) validatorSigningInfos;
+    mapping(address => ValSigningInfo) validatorSigningInfos;
     mapping(address => uint256) validatorAccumulatedCommission;
     mapping(address => Delegation[]) delegations;
     mapping(address => uint256) validatorsIndex;
@@ -283,7 +283,7 @@ contract Staking {
         require(validatorsIndex[msg.sender] > 0, "validator not found");
         Validator storage val = validators[validatorsIndex[msg.sender] - 1];
         if (commissionRate > 0) {
-            require((block.timestamp - val.updateTime) > 86400, "");
+            require((block.timestamp.sub(val.updateTime)) > 86400, "");
             require(commissionRate <= val.commission.maxRate, "");
             require(
                 commissionRate.sub(val.commission.rate) <
@@ -488,8 +488,8 @@ contract Staking {
     {
         uint256 newPeriod = _incrementValidatorPeriod(valAddr);
         _incrementReferenceCount(valAddr, newPeriod);
-        validatorSlashEvents[valAddr].push(
-            ValidatorSlashEvent({
+        valSlashEvents[valAddr].push(
+            ValSlashEvent({
                 validatorPeriod: newPeriod,
                 fraction: fraction,
                 height: block.number
@@ -536,7 +536,7 @@ contract Staking {
 
         // delete other info
         delete delegationsIndex[valAddr][delAddr];
-        delete delegatorStartingInfo[valAddr][delAddr];
+        delete delStartingInfo[valAddr][delAddr];
 
         _removeDelegatorValidatorIndex(valAddr, delAddr);
     }
@@ -564,10 +564,10 @@ contract Staking {
         delete validatorsIndex[valAddr];
 
         // remove other index
-        delete validatorSlashEvents[valAddr];
+        delete valSlashEvents[valAddr];
         delete validatorAccumulatedCommission[valAddr];
-        delete validatorHistoricalRewards[valAddr];
-        delete validatorCurrentRewards[valAddr];
+        delete valHistoricalRewards[valAddr];
+        delete valCurrentRewards[valAddr];
 
         removeValidatorRank(valAddr);
     }
@@ -581,14 +581,10 @@ contract Staking {
         address delAddr,
         uint256 endingPeriod
     ) private view returns (uint256) {
-
-            DelegatorStartingInfo memory startingInfo
-         = delegatorStartingInfo[valAddr][delAddr];
+        DelStartingInfo memory startingInfo = delStartingInfo[valAddr][delAddr];
         uint256 rewards = 0;
-        for (uint256 i = 0; i < validatorSlashEvents[valAddr].length; i++) {
-
-                ValidatorSlashEvent memory slashEvent
-             = validatorSlashEvents[valAddr][i];
+        for (uint256 i = 0; i < valSlashEvents[valAddr].length; i++) {
+            ValSlashEvent memory slashEvent = valSlashEvents[valAddr][i];
             if (
                 slashEvent.height > startingInfo.height &&
                 slashEvent.height < block.number
@@ -624,12 +620,11 @@ contract Staking {
         uint256 stake
     ) private view returns (uint256) {
 
-            ValidatorHistoricalRewards memory starting
-         = validatorHistoricalRewards[valAddr][startingPeriod];
+            ValHistoricalRewards memory starting
+         = valHistoricalRewards[valAddr][startingPeriod];
 
-
-            ValidatorHistoricalRewards memory ending
-         = validatorHistoricalRewards[valAddr][endingPeriod];
+            ValHistoricalRewards memory ending
+         = valHistoricalRewards[valAddr][endingPeriod];
         uint256 difference = ending.cumulativeRewardRatio.sub(
             starting.cumulativeRewardRatio
         );
@@ -642,19 +637,17 @@ contract Staking {
     {
         Validator memory val = validators[validatorsIndex[valAddr] - 1];
 
-
-            ValidatorCurrentReward storage rewards
-         = validatorCurrentRewards[valAddr];
+        ValCurrentReward storage rewards = valCurrentRewards[valAddr];
         uint256 previousPeriod = rewards.period - 1;
         uint256 current = 0;
         if (rewards.reward > 0) {
             current = rewards.reward.divTrun(val.tokens);
         }
-        uint256 historical = validatorHistoricalRewards[valAddr][previousPeriod]
+        uint256 historical = valHistoricalRewards[valAddr][previousPeriod]
             .cumulativeRewardRatio;
         _decrementReferenceCount(valAddr, rewards.period - 1);
-        validatorHistoricalRewards[valAddr].push(
-            ValidatorHistoricalRewards({
+        valHistoricalRewards[valAddr].push(
+            ValHistoricalRewards({
                 cumulativeRewardRatio: historical.add(current),
                 reference_count: 1
             })
@@ -665,38 +658,35 @@ contract Staking {
     }
 
     function _decrementReferenceCount(address valAddr, uint256 period) private {
-        validatorHistoricalRewards[valAddr][period].reference_count--;
-        if (validatorHistoricalRewards[valAddr][period].reference_count == 0) {
-            delete validatorHistoricalRewards[valAddr][period];
+        valHistoricalRewards[valAddr][period].reference_count--;
+        if (valHistoricalRewards[valAddr][period].reference_count == 0) {
+            delete valHistoricalRewards[valAddr][period];
         }
     }
 
     function _incrementReferenceCount(address valAddr, uint256 period) private {
-        validatorHistoricalRewards[valAddr][period].reference_count++;
+        valHistoricalRewards[valAddr][period].reference_count++;
     }
 
     function _initializeDelegation(address valAddr, address delAddr) private {
         uint256 delegationIndex = delegationsIndex[valAddr][delAddr] - 1;
-        uint256 previousPeriod = validatorCurrentRewards[valAddr].period - 1;
+        uint256 previousPeriod = valCurrentRewards[valAddr].period - 1;
         _incrementReferenceCount(valAddr, previousPeriod);
-        delegatorStartingInfo[valAddr][delAddr].height = block.number;
-        delegatorStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
+        delStartingInfo[valAddr][delAddr].height = block.number;
+        delStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
         uint256 stake = _tokenFromShare(
             valAddr,
             delegations[valAddr][delegationIndex].shares
         );
-        delegatorStartingInfo[valAddr][delAddr].stake = stake;
+        delStartingInfo[valAddr][delAddr].stake = stake;
     }
 
     function _initializeValidator(address valAddr) private {
-        validatorHistoricalRewards[valAddr].push(
-            ValidatorHistoricalRewards({
-                reference_count: 1,
-                cumulativeRewardRatio: 0
-            })
+        valHistoricalRewards[valAddr].push(
+            ValHistoricalRewards({reference_count: 1, cumulativeRewardRatio: 0})
         );
-        validatorCurrentRewards[valAddr].period = 1;
-        validatorCurrentRewards[valAddr].reward = 0;
+        valCurrentRewards[valAddr].period = 1;
+        valCurrentRewards[valAddr].reward = 0;
         validatorAccumulatedCommission[valAddr] = 0;
     }
 
@@ -722,9 +712,9 @@ contract Staking {
         );
         _decrementReferenceCount(
             valAddr,
-            delegatorStartingInfo[valAddr][delAddr].previousPeriod
+            delStartingInfo[valAddr][delAddr].previousPeriod
         );
-        delete delegatorStartingInfo[valAddr][delAddr];
+        delete delStartingInfo[valAddr][delAddr];
         delAddr.transfer(rewards);
     }
 
@@ -752,10 +742,10 @@ contract Staking {
         uint256 rewards = _calculateDelegationRewards(
             valAddr,
             delAddr,
-            validatorCurrentRewards[valAddr].period - 1
+            valCurrentRewards[valAddr].period - 1
         );
 
-        uint256 currentReward = validatorCurrentRewards[valAddr].reward;
+        uint256 currentReward = valCurrentRewards[valAddr].reward;
         if (currentReward > 0) {
             uint256 stake = _tokenFromShare(valAddr, del.shares);
             rewards += stake.mulTrun(currentReward.divTrun(val.tokens));
@@ -926,14 +916,12 @@ contract Staking {
         returns (uint256[] memory, uint256[] memory)
     {
         uint256[] memory fraction = new uint256[](
-            validatorSlashEvents[valAddr].length
+            valSlashEvents[valAddr].length
         );
-        uint256[] memory height = new uint256[](
-            validatorSlashEvents[valAddr].length
-        );
-        for (uint256 i = 0; i < validatorSlashEvents[valAddr].length; i++) {
-            fraction[i] = validatorSlashEvents[valAddr][i].fraction;
-            height[i] = validatorSlashEvents[valAddr][i].height;
+        uint256[] memory height = new uint256[](valSlashEvents[valAddr].length);
+        for (uint256 i = 0; i < valSlashEvents[valAddr].length; i++) {
+            fraction[i] = valSlashEvents[valAddr][i].fraction;
+            height[i] = valSlashEvents[valAddr][i].height;
         }
         return (height, fraction);
     }
@@ -969,7 +957,7 @@ contract Staking {
         bool signed
     ) private {
         Validator storage val = validators[validatorsIndex[valAddr] - 1];
-        ValidatorSigningInfo storage signInfo = validatorSigningInfos[valAddr];
+        ValSigningInfo storage signInfo = validatorSigningInfos[valAddr];
         uint256 index = signInfo.indexOffset % _params.signedBlockWindow;
         signInfo.indexOffset++;
         if (validatorMissedBlock[valAddr].length == index) {
@@ -1047,7 +1035,7 @@ contract Staking {
         );
         uint256 shared = rewards.sub(commission);
         validatorAccumulatedCommission[valAddr] += commission;
-        validatorCurrentRewards[valAddr].reward += shared;
+        valCurrentRewards[valAddr].reward += shared;
     }
 
     function _finalizeCommit(
