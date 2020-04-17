@@ -115,8 +115,6 @@ contract Staking {
 
     address _root;
 
-
-
     // mint
 
     Params _params;
@@ -133,7 +131,7 @@ contract Staking {
             unbondingTime: 1814400,
             slashFractionDoubleSign: 5 * 10**16,
             signedBlockWindow: 100,
-            minSignedPerWindow: 5 * 10 ** 16,
+            minSignedPerWindow: 5 * 10**16,
             inflationRateChange: 13 * 10**16,
             goalBonded: 67 * 10**16,
             blocksPerYear: 6311520,
@@ -309,7 +307,6 @@ contract Staking {
         _initializeValidator(valAddr);
     }
 
-
     function _afterDelegationModified(address valAddr, address delAddr)
         private
     {
@@ -393,6 +390,15 @@ contract Staking {
             _removeDelegation(valAddr, delAddr);
         } else {
             _afterDelegationModified(valAddr, delAddr);
+        }
+
+        bool isValidatorOperator = valAddr == delAddr;
+        if (
+            isValidatorOperator &&
+            !val.jailed &&
+            _tokenFromShare(valAddr, del.shares) < val.minSelfDelegation
+        ) {
+            _jail(valAddr);
         }
 
         uint256 amountRemoved = _removeDelShares(valAddr, shares);
@@ -981,7 +987,9 @@ contract Staking {
 
         uint256 minHeight = signInfo.startHeight + _params.signedBlockWindow;
 
-        uint256 minSignedPerWindow = _params.signedBlockWindow.mulTrun(_params.minSignedPerWindow);
+        uint256 minSignedPerWindow = _params.signedBlockWindow.mulTrun(
+            _params.minSignedPerWindow
+        );
         uint256 maxMissed = _params.signedBlockWindow - minSignedPerWindow;
         if (
             block.number > minHeight && signInfo.missedBlockCounter > maxMissed
@@ -1261,12 +1269,15 @@ contract Staking {
     }
 
     // slashing
-    function _unjail(address valAddr) private  {
+    function _unjail(address valAddr) private {
         require(validatorsIndex[valAddr] > 0, "validator not found");
         uint256 valIndex = validatorsIndex[valAddr] - 1;
         Validator storage val = validators[valIndex];
         require(val.jailed, "validator not jailed");
-        require(validatorSigningInfos[valAddr].jailedUntil < block.timestamp, "validator jailed");
+        require(
+            validatorSigningInfos[valAddr].jailedUntil < block.timestamp,
+            "validator jailed"
+        );
         uint256 delIndex = delegationsIndex[valAddr][valAddr] - 1;
         Delegation storage del = delegations[valAddr][delIndex];
         require(
