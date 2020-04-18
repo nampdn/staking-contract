@@ -1138,7 +1138,7 @@ contract Staking {
             if (inflation > inflationRateChange) {
                 inflation = inflation.sub(inflationRateChange);
             } else {
-                inflation = inflationRateChangePerYear;
+                inflation = 0;
             }
         }
         if (inflation > _params.inflationMax) {
