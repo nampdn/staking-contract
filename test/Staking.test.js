@@ -50,6 +50,13 @@ contract("Staking", async (accounts) => {
         return instance.getValidatorSets.call();
     }
 
+    async function mint(num) {
+        const instance = await Staking.deployed();
+        for (var i =0; i < num; i ++) {
+            await instance.mint();
+        }
+    }
+
     it ("should set root", async() => {
         let instance = await Staking.deployed();
         await instance.setRoot(accounts[0], {from: accounts[0]});
@@ -84,6 +91,11 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.finalizeCommit([], [], [], {from: accounts[1]}), "permission denied");
     });
 
+
+    it ("should set total bonded", async () => {
+        const instance = await Staking.deployed();
+        await instance.setTotalBonded(web3.utils.toWei("5000000000", "ether"));
+    });
 
     it("should create validator", async () => {
         const instance = await Staking.deployed();
@@ -376,4 +388,63 @@ contract("Staking", async (accounts) => {
         await instance.undelegate(accounts[7], web3.utils.toWei("0.5", "ether"), {from: accounts[7]});
         await assertRevert(instance.unjail({from: accounts[7]}));
     });
+
+
+    it ("should mint", async () => {
+        const instance = await Staking.deployed();
+        await instance.setMintParams(0,0,5,0,0);
+        const totalSupply = web3.utils.toWei("1000", "ether");
+        const totalBonded = web3.utils.toWei("1", "ether");
+        await instance.setTotalSupply(totalSupply);
+        await instance.setTotalBonded(totalBonded);
+        await instance.setInflation(0);
+        await instance.setAnnualProvision(0);
+
+        await instance.mint();
+
+        // inflation min
+        let inflation = await instance.getInflation.call();
+        assert.equal(inflation.toString(), web3.utils.toWei("0.07", "ether")) // 7%
+
+        const blockProvision = await instance.getBlockProvision.call();
+        // 1000 * 7% / 5 = 14
+        assert.equal(blockProvision.toString(),  web3.utils.toWei("14.000000000000000000", "ether"));
+
+        await instance.mint();
+        
+        inflation = await instance.getInflation.call();
+        assert.equal(inflation.toString(), web3.utils.toWei("0.095961729812476081", "ether"))
+
+        await mint(5);
+
+        // inflation max: 20%
+        inflation = await instance.getInflation.call();
+        assert.equal(inflation.toString(), web3.utils.toWei("0.2", "ether"));
+
+        await instance.setTotalSupply(totalSupply);
+        await instance.setTotalBonded(totalSupply);
+        await instance.mint();
+
+        inflation = await instance.getInflation.call();
+        assert.equal(inflation.toString(), web3.utils.toWei("0.187194029850746269", "ether"));
+
+        
+
+        await mint(5); // 1 year
+        let newTotalSupply = await instance.getTotalSupply.call();
+        await instance.setTotalBonded(newTotalSupply.toString());
+
+        await mint(5); // 1 year
+        newTotalSupply = await instance.getTotalSupply.call();
+        await instance.setTotalBonded(newTotalSupply.toString());
+
+        await mint(5); // 1 year
+
+
+        // inflation min : 7%
+        inflation = await instance.getInflation.call();
+        assert.equal(inflation.toString(), web3.utils.toWei("0.07", "ether")) // 7%
+
+
+    })
 })

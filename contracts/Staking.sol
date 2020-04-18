@@ -198,6 +198,10 @@ contract Staking {
         }
     }
 
+    function setTotalBonded(uint256 amount) public onlyRoot {
+        totalBonded = amount;
+    }
+
     function setMintParams(
         uint256 inflationRateChange,
         uint256 goalBonded,
@@ -495,6 +499,10 @@ contract Staking {
                 height: block.number
             })
         );
+    }
+
+    function getTotalSupply() public view returns (uint256) {
+        return totalSupply;
     }
 
     function _withdraw(address valAddr, address payable delAddr) private {
@@ -1114,33 +1122,25 @@ contract Staking {
         return _feesCollected;
     }
 
+    function setInflation(uint256 _inflation) public onlyRoot {
+        inflation = _inflation;
+    }
+
     function nextInflationRate() private {
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
-        uint256 inflationChangeRatePerYear = 0;
-        uint256 inflationRateChange = 0;
-        if (bondedRatio.divTrun(_params.goalBonded) > oneDec) {
-            inflationChangeRatePerYear = bondedRatio
-                .divTrun(_params.goalBonded)
-                .sub(oneDec)
-                .mul(_params.inflationRateChange);
-            inflationRateChange = inflationRateChange.div(
-                _params.blocksPerYear
-            );
-            if (inflationRateChange < inflation) {
+        if (bondedRatio < _params.goalBonded) {
+            uint256 inflationRateChangePerYear = oneDec.sub(bondedRatio.divTrun(_params.goalBonded)).mulTrun(_params.inflationRateChange);
+            uint256 inflationRateChange = inflationRateChangePerYear.div(_params.blocksPerYear);
+            inflation = inflation.add(inflationRateChange);
+        } else {
+            uint256 inflationRateChangePerYear = bondedRatio.divTrun(_params.goalBonded).sub(oneDec).mulTrun(_params.inflationRateChange);
+            uint256 inflationRateChange = inflationRateChangePerYear.div(_params.blocksPerYear);
+            if (inflation > inflationRateChange) {
                 inflation = inflation.sub(inflationRateChange);
             } else {
-                inflation = 0;
+                inflation = inflationRateChangePerYear;
             }
-        } else {
-            inflationChangeRatePerYear = oneDec
-                .sub(bondedRatio.divTrun(_params.goalBonded))
-                .mul(_params.inflationRateChange);
-            inflationRateChange = inflationRateChange.div(
-                _params.blocksPerYear
-            );
-            inflation = inflation.add(inflationRateChange);
         }
-
         if (inflation > _params.inflationMax) {
             inflation = _params.inflationMax;
         }
@@ -1153,8 +1153,21 @@ contract Staking {
         annualProvision = inflation.mulTrun(totalSupply);
     }
 
+    function setAnnualProvision(uint256 _annualProvision) public onlyRoot {
+        annualProvision = _annualProvision;
+    }
+
     function getBlockProvision() public view returns (uint256) {
         return annualProvision.div(_params.blocksPerYear);
+    }
+
+
+    function setTotalSupply(uint256 amount) public onlyRoot {
+        totalSupply = amount;
+    }
+
+    function getInflation() public view returns (uint256) {
+        return inflation;
     }
 
     // validator rank
