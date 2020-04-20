@@ -120,6 +120,7 @@ contract("Staking", async (accounts) => {
         assert.equal(validator[2], false);
     })
 
+
     it ("should not create validator", async() => {
         const instance = await Staking.deployed();
         const bond = web3.utils.toWei("1", "ether")
@@ -190,6 +191,18 @@ contract("Staking", async (accounts) => {
         commissionRate = web3.utils.toWei("0.3", "ether");
         await assertRevert(instance.updateValidator(commissionRate, 0, {from: accounts[0]}), "commission cannot be changed more than max change rate");
     });
+
+    it ("should update validator", async () => {
+        const instance = await Staking.deployed();
+
+        let minSelfDelegation = web3.utils.toWei("0.51", "ether");
+        await instance.updateValidator(0, minSelfDelegation, {from: accounts[0]});
+
+        let commissionRate = web3.utils.toWei("0.09", "ether");
+        await instance.updateValidator(commissionRate, 0, {from: accounts[0]});
+
+
+    })
 
     it ("should not delegate", async () => {
         const instance = await Staking.deployed();

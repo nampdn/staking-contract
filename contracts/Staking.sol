@@ -295,7 +295,7 @@ contract Staking {
         if (commissionRate > 0) {
             require(
                 // solhint-disable-next-line not-rely-on-time
-                block.timestamp.sub(val.updateTime) > 86400,
+                block.timestamp.sub(val.updateTime) >= 86400,
                 "commission cannot be changed more than one in 24h"
             );
             require(
@@ -303,7 +303,7 @@ contract Staking {
                 "commission cannot be more than the max rate"
             );
             require(
-                commissionRate.sub(val.commission.rate) <
+                commissionRate.sub(val.commission.rate) <=
                     val.commission.maxChangeRate,
                 "commission cannot be changed more than max change rate"
             );
@@ -314,7 +314,7 @@ contract Staking {
                 "minimum self delegation cannot be decrease"
             );
             require(
-                minSelfDelegation < val.tokens,
+                minSelfDelegation <= val.tokens,
                 "self delegation below minimum"
             );
             val.minSelfDelegation = minSelfDelegation;
