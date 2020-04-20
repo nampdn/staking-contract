@@ -22,7 +22,7 @@ async function setParams(owner, isOk) {
     const signedBlockWindow= 2;
     const minSignedBlockPerWindow = web3.utils.toWei("0.5", "ether")
     let instance = await Staking.deployed(); 
-    const promise =  instance.setParams(0, 0, 0, baseProposerReward, bonusProposerReward, 
+    const promise =  instance.setParams(0, 0, baseProposerReward, bonusProposerReward, 
         slashFractionDowntime, unBondingTime, slashFractionDoubleSign, signedBlockWindow, minSignedBlockPerWindow, {from: owner})
     if (isOk) {
         await promise;

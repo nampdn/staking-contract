@@ -70,7 +70,6 @@ contract Staking {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
         uint256 maxValidators;
-        uint256 maxMissed;
         uint256 downtimeJailDuration;
         uint256 slashFractionDowntime;
         uint256 unbondingTime;
@@ -123,7 +122,6 @@ contract Staking {
     constructor() public {
         _params = Params({
             maxValidators: 100,
-            maxMissed: 10000,
             downtimeJailDuration: 600,
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
@@ -154,7 +152,6 @@ contract Staking {
 
     function setParams(
         uint256 maxValidators,
-        uint256 maxMissed,
         uint256 downtimeJailDuration,
         uint256 baseProposerReward,
         uint256 bonusProposerReward,
@@ -166,9 +163,6 @@ contract Staking {
     ) public onlyRoot {
         if (maxValidators > 0) {
             _params.maxValidators = maxValidators;
-        }
-        if (maxMissed > 0) {
-            _params.maxMissed = maxMissed;
         }
         if (downtimeJailDuration > 0) {
             _params.downtimeJailDuration = downtimeJailDuration;
