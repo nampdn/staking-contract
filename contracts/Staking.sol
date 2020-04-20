@@ -551,7 +551,7 @@ contract Staking {
         uint256 index = delValsIndex[delAddr][valAddr];
         uint256 lastIndex = delVals[delAddr].length;
         address last = delVals[delAddr][lastIndex - 1];
-        delVals[delAddr][lastIndex - 1] = last;
+        delVals[delAddr]index] = last;
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
         delete delValsIndex[delAddr][valAddr];
