@@ -99,11 +99,12 @@ contract("Staking", async (accounts) => {
 
     it("should create validator", async () => {
         const instance = await Staking.deployed();
-        const maxRate = web3.utils.toWei("0.1", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
 
         const bond = web3.utils.toWei("100", "ether")
-        await instance.createValidator(0, maxRate, maxChangeRate ,0, {from: accounts[0], value: bond});
+        await instance.createValidator(0, maxRate, maxChangeRate ,minSelfDelegation, {from: accounts[0], value: bond});
         let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0].toString(), bond/powerReduction);
@@ -171,6 +172,24 @@ contract("Staking", async (accounts) => {
                 testCase.minSelfDelegation, {from: testCase.from, value: bond}), testCase.message);
         }
     })
+
+    it ("should not update validator", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.updateValidator(1, 0, {from: accounts[5]}), "validator not found");
+
+        let minSelfDelegation = web3.utils.toWei("0.4", "ether");
+        await assertRevert(instance.updateValidator(0, minSelfDelegation, {from: accounts[0]}), "minimum self delegation cannot be decrease");
+
+        minSelfDelegation = web3.utils.toWei("101", "ether");
+        await assertRevert(instance.updateValidator(0, minSelfDelegation, {from: accounts[0]}), "self delegation below minimum");
+
+        let commissionRate = web3.utils.toWei("0.11", "ether");
+        await assertRevert(instance.updateValidator(commissionRate, 0, {from: accounts[0]}), "commission cannot be changed more than one in 24h");
+        await utils.advanceTime(86401);
+
+        commissionRate = web3.utils.toWei("0.3", "ether");
+        await assertRevert(instance.updateValidator(commissionRate, 0, {from: accounts[0]}), "commission cannot be changed more than max change rate");
+    });
 
     it ("should not delegate", async () => {
         const instance = await Staking.deployed();
