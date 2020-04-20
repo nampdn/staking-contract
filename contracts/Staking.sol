@@ -100,8 +100,8 @@ contract Staking {
     mapping(address => uint256) valAccumulatedCommission;
     mapping(address => Delegation[]) delegations;
     mapping(address => uint256) valsIdx;
-    mapping(address => address[]) delegatorValidators;
-    mapping(address => mapping(address => uint256)) delegatorValidatorsIndex;
+    mapping(address => address[]) delVals;
+    mapping(address => mapping(address => uint256)) delValsIndex;
 
     // sort
     address[] valsRank;
@@ -326,9 +326,8 @@ contract Staking {
             delsIdx[valAddr][delAddr] = delIndex;
 
             // delegator validators index
-            delegatorValidators[delAddr].push(valAddr);
-            delegatorValidatorsIndex[delAddr][valAddr] = delegatorValidators[delAddr]
-                .length;
+            delVals[delAddr].push(valAddr);
+            delValsIndex[delAddr][valAddr] = delVals[delAddr].length;
 
             _beforeDelegationCreated(valAddr);
         } else {
@@ -549,13 +548,13 @@ contract Staking {
     function _removeDelegatorValidatorIndex(address valAddr, address delAddr)
         private
     {
-        uint256 index = delegatorValidatorsIndex[delAddr][valAddr];
-        uint256 lastIndex = delegatorValidators[delAddr].length;
-        address last = delegatorValidators[delAddr][lastIndex - 1];
-        delegatorValidators[delAddr][lastIndex - 1] = last;
-        delegatorValidatorsIndex[delAddr][last] = index;
-        delegatorValidators[delAddr].pop();
-        delete delegatorValidatorsIndex[delAddr][valAddr];
+        uint256 index = delValsIndex[delAddr][valAddr];
+        uint256 lastIndex = delVals[delAddr].length;
+        address last = delVals[delAddr][lastIndex - 1];
+        delVals[delAddr][lastIndex - 1] = last;
+        delValsIndex[delAddr][last] = index;
+        delVals[delAddr].pop();
+        delete delValsIndex[delAddr][valAddr];
     }
 
     function _removeValidator(address valAddr) private {
@@ -808,7 +807,7 @@ contract Staking {
         view
         returns (address[] memory)
     {
-        return delegatorValidators[delAddr];
+        return delVals[delAddr];
     }
 
     function getValidatorCommission(address valAddr)
@@ -824,12 +823,10 @@ contract Staking {
         view
         returns (uint256)
     {
+        uint256 total = delVals[delAddr].length;
         uint256 rewards = 0;
-        for (uint256 i = 0; i < delegatorValidators[delAddr].length; i++) {
-            rewards += getDelegationRewards(
-                delegatorValidators[delAddr][i],
-                delAddr
-            );
+        for (uint256 i = 0; i < total; i++) {
+            rewards += getDelegationRewards(delVals[delAddr][i], delAddr);
         }
         return rewards;
     }
@@ -851,12 +848,9 @@ contract Staking {
         returns (uint256)
     {
         uint256 stake = 0;
-        uint256 total = delegatorValidators[delAddr].length;
+        uint256 total = delVals[delAddr].length;
         for (uint256 i = 0; i < total; i++) {
-            stake += getDelegatorStake(
-                delegatorValidators[delAddr][i],
-                delAddr
-            );
+            stake += getDelegatorStake(delVals[delAddr][i], delAddr);
         }
         return stake;
     }
@@ -1247,11 +1241,17 @@ contract Staking {
 
         for (uint256 i = 0; i < maxVal; i++) {
             valAddrs[i] = valsRank[i];
-            powers[i] = vals[valsIdx[valAddrs[i]] - 1].tokens.div(
-                powerReduction
-            );
+            powers[i] = getValidatorPower(valsRank[i]);
         }
         return (valAddrs, powers);
+    }
+
+    function getValidatorPower(address valAddr)
+        public
+        view
+        returns (uint256)
+    {
+        return vals[valsIdx[valAddr] - 1].tokens.div(powerReduction);
     }
 
     // slashing
