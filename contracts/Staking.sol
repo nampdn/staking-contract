@@ -403,12 +403,8 @@ contract Staking {
         }
 
         uint256 amountRemoved = _removeDelShares(valAddr, shares);
-        if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
-            _removeValidator(valAddr);
-        } else {
-            addValidatorRank(valAddr);
-            val.ubdEntryCount++;
-        }
+        addValidatorRank(valAddr);
+        val.ubdEntryCount++;
 
         ubdEntries[valAddr][delAddr].push(
             UBDEntry({
@@ -551,7 +547,7 @@ contract Staking {
         uint256 index = delValsIndex[delAddr][valAddr];
         uint256 lastIndex = delVals[delAddr].length;
         address last = delVals[delAddr][lastIndex - 1];
-        delVals[delAddr]index] = last;
+        delVals[delAddr][index] = last;
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
         delete delValsIndex[delAddr][valAddr];
@@ -646,7 +642,7 @@ contract Staking {
         }
         uint256 historical = valHRewards[valAddr][previousPeriod]
             .cumulativeRewardRatio;
-        _decrementReferenceCount(valAddr, rewards.period - 1);
+        _decrementReferenceCount(valAddr, previousPeriod);
         valHRewards[valAddr].push(
             ValHRewards({
                 cumulativeRewardRatio: historical.add(current),
@@ -670,15 +666,13 @@ contract Staking {
     }
 
     function _initializeDelegation(address valAddr, address delAddr) private {
-        uint256 delegationIndex = delsIdx[valAddr][delAddr] - 1;
+        uint256 delIndex = delsIdx[valAddr][delAddr] - 1;
         uint256 previousPeriod = valCurrentRewards[valAddr].period - 1;
         _incrementReferenceCount(valAddr, previousPeriod);
         delStartingInfo[valAddr][delAddr].height = block.number;
         delStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
-        uint256 stake = _tokenFromShare(
-            valAddr,
-            delegations[valAddr][delegationIndex].shares
-        );
+        uint256 shares = delegations[valAddr][delIndex].shares;
+        uint256 stake = _tokenFromShare(valAddr, shares);
         delStartingInfo[valAddr][delAddr].stake = stake;
     }
 
