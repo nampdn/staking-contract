@@ -1286,7 +1286,7 @@ contract Staking {
         uint256 delIndex = delsIdx[valAddr][valAddr] - 1;
         Delegation storage del = delegations[valAddr][delIndex];
         uint256 tokens = _tokenFromShare(valAddr, del.shares);
-        require(tokens > val.minSelfDelegation, "invalid self delegation");
+        require(tokens > val.minSelfDelegation, "self delegation too low to unjail");
 
         valSigningInfos[valAddr].jailedUntil = 0;
         val.jailed = false;

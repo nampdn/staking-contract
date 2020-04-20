@@ -388,6 +388,8 @@ contract("Staking", async (accounts) => {
 
         // self delegation too low to unjail
         await instance.undelegate(accounts[7], web3.utils.toWei("0.5", "ether"), {from: accounts[7]});
+        await assertRevert(instance.unjail({from: accounts[7]}), "validator jailed");
+        await utils.advanceTime(601);
         await assertRevert(instance.unjail({from: accounts[7]}), "self delegation too low to unjail");
     });
 
