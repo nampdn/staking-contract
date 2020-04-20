@@ -1151,6 +1151,12 @@ contract Staking {
         if (idx == 0) {
             if (valsRank.length == 500) {
                 address last = valsRank[valsRank.length - 1];
+                if (
+                    vals[valsIdx[valAddr] - 1].tokens <
+                    vals[valsIdx[last] - 1].tokens
+                ) {
+                    return;
+                }
                 delete validatorRankIndex[last];
                 valsRank[valsRank.length - 1] = valAddr;
                 validatorRankIndex[valAddr] = valsRank.length;
@@ -1240,11 +1246,7 @@ contract Staking {
         return (valAddrs, powers);
     }
 
-    function getValidatorPower(address valAddr)
-        public
-        view
-        returns (uint256)
-    {
+    function getValidatorPower(address valAddr) public view returns (uint256) {
         return vals[valsIdx[valAddr] - 1].tokens.div(powerReduction);
     }
 
