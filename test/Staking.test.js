@@ -228,17 +228,12 @@ contract("Staking", async (accounts) => {
         await instance.withdraw(accounts[0], {from: accounts[1]});
     })
 
-    it ("should remove validator", async() => {
-        const instance = await Staking.deployed();
-        const amount = web3.utils.toWei("100", "ether");
-        await instance.undelegate(accounts[0], amount, {from: accounts[0]});
-        await assertRevert(instance.getValidator.call(accounts[0]));
-        const validatorSets = await getCurrentValidatorSet();
-        assert.equal(validatorSets[0].length, 0);
-    })
-
     it ("should not withdraw", async () => {
         const instance = await Staking.deployed();
+
+        const amount = web3.utils.toWei("100", "ether");
+        await instance.undelegate(accounts[0], amount, {from: accounts[0]});
+
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
     });
 
@@ -246,9 +241,16 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         await utils.advanceTime(2000);
         await instance.withdraw(accounts[0], {from: accounts[0]}); 
-
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
     });
+
+
+    it ("should remove validator", async() => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.getValidator.call(accounts[0]));
+        const validatorSets = await getCurrentValidatorSet();
+        assert.equal(validatorSets[0].length, 0);
+    })
 
 
     it ("should withdraw delegation rewards", async () => {

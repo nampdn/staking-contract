@@ -544,9 +544,9 @@ contract Staking {
     function _removeDelegatorValidatorIndex(address valAddr, address delAddr)
         private
     {
-        uint256 index = delValsIndex[delAddr][valAddr];
-        uint256 lastIndex = delVals[delAddr].length;
-        address last = delVals[delAddr][lastIndex - 1];
+        uint256 index = delValsIndex[delAddr][valAddr] - 1;
+        uint256 lastIndex = delVals[delAddr].length - 1;
+        address last = delVals[delAddr][lastIndex];
         delVals[delAddr][index] = last;
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
@@ -555,12 +555,12 @@ contract Staking {
 
     function _removeValidator(address valAddr) private {
         // remove validator
-        uint256 validatorIndex = valsIdx[valAddr];
-        uint256 lastIndex = vals.length;
-        Validator memory last = vals[lastIndex - 1];
-        vals[validatorIndex - 1] = last;
+        uint256 valIdx = valsIdx[valAddr] - 1;
+        uint256 lastIndex = vals.length - 1;
+        Validator memory last = vals[lastIndex];
+        vals[valIdx] = last;
         vals.pop();
-        valsIdx[last.owner] = validatorIndex;
+        valsIdx[last.owner] = valIdx;
         delete valsIdx[valAddr];
 
         // remove other index
