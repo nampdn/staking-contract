@@ -64,7 +64,7 @@ contract("Staking", async (accounts) => {
 
     it ("should not set root", async () => {
         let instance = await Staking.deployed();
-        await assertRevert(instance.setRoot(accounts[0], {from: accounts[1]}));
+        await assertRevert(instance.setRoot(accounts[0], {from: accounts[1]}), "permission denied");
     });
 
     it ("should set previous proposer", async () => {
@@ -74,7 +74,7 @@ contract("Staking", async (accounts) => {
 
     it ("should not set previous proposer", async () => {
         let instance = await Staking.deployed();
-        await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}));
+        await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}), "permission denied");
     });
 
 
@@ -129,7 +129,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[0],
-                message: "validator found"
+                message: "validator already exist"
             }, 
             {
                 rate: 0,
@@ -137,7 +137,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[5],
-                message: "max rate cannot be more than 100%"
+                message: "commission max rate cannot be more than 100%"
             },
             {
                 rate: web3.utils.toWei("1", "ether"),
@@ -145,7 +145,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[5],
-                message: "rate cannot be more than max rate"
+                message: "commission rate cannot be more than the max rate"
             },
             {
                 rate: 0,
@@ -153,7 +153,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: web3.utils.toWei("1", "ether"),
                 minSelfDelegation: 0,
                 from: accounts[5],
-                message: "max change rate cannot be more than max rate"
+                message: "commission max change rate can not be more than the max rate"
             },
             {
                 rate: 0,
@@ -161,14 +161,14 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation:  web3.utils.toWei("2", "ether"),
                 from: accounts[5],
-                message: "validator's self delegation must be greater than their minimum delegation"
+                message: "self delegation below minumum"
             }
         ];
 
 
         for(var testCase of testCases) {
             await assertRevert(instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                testCase.minSelfDelegation, {from: testCase.from, value: bond}));
+                testCase.minSelfDelegation, {from: testCase.from, value: bond}), testCase.message);
         }
     })
 
@@ -177,10 +177,10 @@ contract("Staking", async (accounts) => {
         const bond1to0 = web3.utils.toWei("1", "ether");
         
         // validator not found
-        await assertRevert(instance.delegate(accounts[5], {from: accounts[1], value: bond1to0}));
+        await assertRevert(instance.delegate(accounts[5], {from: accounts[1], value: bond1to0}), "validator not found");
 
         // invalid delegation amount
-        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}));
+        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}), "invalid delegation amount");
 
     });
 
@@ -199,10 +199,10 @@ contract("Staking", async (accounts) => {
         const amount = web3.utils.toWei("1.5", "ether");
 
         // delegation not found
-        await assertRevert(instance.undelegate(accounts[0], {from: accounts[5]} ))
+        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[5]} ), "delegation not found")
 
         // invalid undelegate amount
-        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[1]}));
+        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[1]}), "invalid undelegate amount");
     });
 
     it ("should undelegate", async() => {
@@ -222,7 +222,7 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("0.5", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[1]});
-        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]));
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
 
         await utils.advanceTime(2000);
         await instance.withdraw(accounts[0], {from: accounts[1]});
@@ -234,20 +234,20 @@ contract("Staking", async (accounts) => {
         const amount = web3.utils.toWei("100", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
 
-        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
+        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "no unbonding amount to withdraw");
     });
 
     it ("should withdraw", async () => {
         const instance = await Staking.deployed();
         await utils.advanceTime(2000);
         await instance.withdraw(accounts[0], {from: accounts[0]}); 
-        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}));
+        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "no unbonding amount to withdraw");
     });
 
 
     it ("should remove validator", async() => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.getValidator.call(accounts[0]));
+        await assertRevert(instance.getValidator.call(accounts[0]), "validator not found");
         const validatorSets = await getCurrentValidatorSet();
         assert.equal(validatorSets[0].length, 0);
     })
@@ -366,14 +366,14 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
 
         // validator not found
-        await assertRevert(instance.unjail({from: accounts[7]}));
+        await assertRevert(instance.unjail({from: accounts[7]}), "validator not found");
 
         const bond6to6 = web3.utils.toWei("1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.9", "ether");
         await instance.createValidator(0, 0, 0, minSelfDelegation, {from: accounts[7], value: bond6to6});
 
         // validator not jailed
-        await assertRevert(instance.unjail({from: accounts[7]}));
+        await assertRevert(instance.unjail({from: accounts[7]}), "validator not jailed");
 
         // slash and jail
         await finalizeCommit([accounts[7]]);
@@ -384,11 +384,11 @@ contract("Staking", async (accounts) => {
         assert.equal(validator[2], true);
 
         // validator jailed
-        await assertRevert(instance.unjail({from: accounts[7]}));
+        await assertRevert(instance.unjail({from: accounts[7]}), "validator jailed");
 
         // self delegation too low to unjail
         await instance.undelegate(accounts[7], web3.utils.toWei("0.5", "ether"), {from: accounts[7]});
-        await assertRevert(instance.unjail({from: accounts[7]}));
+        await assertRevert(instance.unjail({from: accounts[7]}), "self delegation too low to unjail");
     });
 
 

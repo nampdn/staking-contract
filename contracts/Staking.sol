@@ -1,9 +1,6 @@
-pragma solidity >=0.4.21 <0.7.0;
+pragma solidity  ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 
-
-// error message
-// 1: validator not found
 
 contract Staking {
     using SafeMath for uint256;
@@ -149,7 +146,7 @@ contract Staking {
 
     function setRoot(address newRoot) public {
         if (_root != address(0x0)) {
-            require(msg.sender == _root, "");
+            require(msg.sender == _root, "permission denied");
         }
         _root = newRoot;
     }
@@ -248,18 +245,28 @@ contract Staking {
         uint256 maxChangeRate,
         uint256 minSelfDelegation
     ) private {
-        require(valsIdx[valAddr] == 0, "");
-        require(amount > 0, "");
-        require(amount > minSelfDelegation, "");
-        require(maxRate <= oneDec, "");
-        require(maxChangeRate <= maxRate, "");
-        require(rate <= maxRate, "");
+        require(valsIdx[valAddr] == 0, "validator already exist");
+        require(amount > 0, "invalid delegation amount");
+        require(amount > minSelfDelegation, "self delegation below minumum");
+        require(
+            maxRate <= oneDec,
+            "commission max rate cannot be more than 100%"
+        );
+        require(
+            maxChangeRate <= maxRate,
+            "commission max change rate can not be more than the max rate"
+        );
+        require(
+            rate <= maxRate,
+            "commission rate cannot be more than the max rate"
+        );
 
         Commission memory commission = Commission({
             rate: rate,
             maxRate: maxRate,
             maxChangeRate: maxChangeRate
         });
+
         vals.push(
             Validator({
                 owner: valAddr,
@@ -268,6 +275,7 @@ contract Staking {
                 jailed: false,
                 commission: commission,
                 minSelfDelegation: minSelfDelegation,
+                // solhint-disable-next-line not-rely-on-time
                 updateTime: block.timestamp,
                 ubdEntryCount: 0
             })
@@ -282,25 +290,39 @@ contract Staking {
     function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
         public
     {
-        require(valsIdx[msg.sender] > 0, "1");
+        require(valsIdx[msg.sender] > 0, "validator not found");
         Validator storage val = vals[valsIdx[msg.sender] - 1];
         if (commissionRate > 0) {
-            require((block.timestamp.sub(val.updateTime)) > 86400, "");
-            require(commissionRate <= val.commission.maxRate, "");
+            require(
+                // solhint-disable-next-line not-rely-on-time
+                block.timestamp.sub(val.updateTime) > 86400,
+                "commission cannot be changed more than one in 24h"
+            );
+            require(
+                commissionRate <= val.commission.maxRate,
+                "commission cannot be more than the max rate"
+            );
             require(
                 commissionRate.sub(val.commission.rate) <
                     val.commission.maxChangeRate,
-                ""
+                "commission cannot be changed more than max change rate"
             );
         }
         if (minSelfDelegation > 0) {
-            require(minSelfDelegation > val.minSelfDelegation, "");
-            require(minSelfDelegation < val.tokens, "");
+            require(
+                minSelfDelegation > val.minSelfDelegation,
+                "minimum self delegation cannot be decrease"
+            );
+            require(
+                minSelfDelegation < val.tokens,
+                "self delegation below minimum"
+            );
             val.minSelfDelegation = minSelfDelegation;
         }
 
         if (commissionRate > 0) {
             val.commission.rate = commissionRate;
+            // solhint-disable-next-line not-rely-on-time
             val.updateTime = block.timestamp;
         }
     }
@@ -363,7 +385,7 @@ contract Staking {
     }
 
     function delegate(address valAddr) public payable {
-        require(valsIdx[valAddr] > 0, "1");
+        require(valsIdx[valAddr] > 0, "validator not found");
         require(msg.value > 0, "invalid delegation amount");
         _delegate(msg.sender, valAddr, msg.value);
     }
@@ -408,6 +430,7 @@ contract Staking {
 
         ubdEntries[valAddr][delAddr].push(
             UBDEntry({
+                // solhint-disable-next-line not-rely-on-time
                 completionTime: block.timestamp.add(_params.unbondingTime),
                 blockHeight: block.number,
                 amount: amountRemoved
@@ -502,6 +525,7 @@ contract Staking {
         uint256 amount = 0;
         uint256 entryCount = 0;
         for (uint256 i = 0; i < entries.length; i++) {
+            // solhint-disable-next-line not-rely-on-time
             if (entries[i].completionTime < block.timestamp) {
                 amount += entries[i].amount;
                 entries[i] = entries[entries.length - 1];
@@ -515,12 +539,10 @@ contract Staking {
         totalBonded -= amount;
 
         uint256 valIndex = valsIdx[valAddr];
-        if (valIndex > 0) {
-            Validator storage val = vals[valIndex - 1];
-            val.ubdEntryCount -= entryCount;
-            if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
-                _removeValidator(valAddr);
-            }
+        Validator storage val = vals[valIndex - 1];
+        val.ubdEntryCount -= entryCount;
+        if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
+            _removeValidator(valAddr);
         }
     }
 
@@ -544,10 +566,10 @@ contract Staking {
     function _removeDelegatorValidatorIndex(address valAddr, address delAddr)
         private
     {
-        uint256 index = delValsIndex[delAddr][valAddr] - 1;
-        uint256 lastIndex = delVals[delAddr].length - 1;
-        address last = delVals[delAddr][lastIndex];
-        delVals[delAddr][index] = last;
+        uint256 index = delValsIndex[delAddr][valAddr];
+        uint256 lastIndex = delVals[delAddr].length;
+        address last = delVals[delAddr][lastIndex - 1];
+        delVals[delAddr][index - 1] = last;
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
         delete delValsIndex[delAddr][valAddr];
@@ -555,10 +577,10 @@ contract Staking {
 
     function _removeValidator(address valAddr) private {
         // remove validator
-        uint256 valIdx = valsIdx[valAddr] - 1;
-        uint256 lastIndex = vals.length - 1;
-        Validator memory last = vals[lastIndex];
-        vals[valIdx] = last;
+        uint256 valIdx = valsIdx[valAddr];
+        uint256 lastIndex = vals.length;
+        Validator memory last = vals[lastIndex - 1];
+        vals[valIdx - 1] = last;
         vals.pop();
         valsIdx[last.owner] = valIdx;
         delete valsIdx[valAddr];
@@ -714,7 +736,7 @@ contract Staking {
     }
 
     function withdrawReward(address valAddr) public {
-        require(valsIdx[valAddr] > 0, "1");
+        require(valsIdx[valAddr] > 0, "validator not found");
         require(delsIdx[valAddr][msg.sender] > 0, "delegator not found");
         _withdrawRewards(valAddr, msg.sender);
         _initializeDelegation(valAddr, msg.sender);
@@ -727,7 +749,7 @@ contract Staking {
     {
         uint256 valIndex = valsIdx[valAddr];
         uint256 delIndex = delsIdx[valAddr][delAddr];
-        require(valIndex > 0, "1");
+        require(valIndex > 0, "validator not found");
         require(delIndex > 0, "delegation not found");
         Validator memory val = vals[valIndex - 1];
         Delegation memory del = delegations[valAddr][delIndex - 1];
@@ -747,7 +769,7 @@ contract Staking {
 
     function _withdrawValidatorCommission(address payable valAddr) private {
         uint256 valIndex = valsIdx[valAddr];
-        require(valIndex > 0, "1");
+        require(valIndex > 0, "validator not found");
         uint256 commission = valAccumulatedCommission[valAddr];
         require(commission > 0, "no validator commission to reward");
         valAddr.transfer(commission);
@@ -764,7 +786,7 @@ contract Staking {
         returns (uint256, uint256, bool)
     {
         uint256 valIndex = valsIdx[valAddr];
-        require(valIndex > 0, "1");
+        require(valIndex > 0, "validator not found");
         Validator memory val = vals[valIndex - 1];
         return (val.tokens, val.delegationShares, val.jailed);
     }
@@ -774,7 +796,7 @@ contract Staking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        require(valsIdx[valAddr] > 0, "1");
+        require(valsIdx[valAddr] > 0, "validator not found");
         uint256 total = delegations[valAddr].length;
         address[] memory dels = new address[](total);
         uint256[] memory shares = new uint256[](total);
@@ -964,6 +986,8 @@ contract Staking {
                     _params.slashFractionDowntime
                 );
                 _jail(valAddr);
+
+                // solhint-disable-next-line not-rely-on-time
                 signInfo.jailedUntil = block.timestamp.add(
                     _params.downtimeJailDuration
                 );
@@ -1252,11 +1276,12 @@ contract Staking {
 
     // slashing
     function _unjail(address valAddr) private {
-        require(valsIdx[valAddr] > 0, "1");
+        require(valsIdx[valAddr] > 0, "validator not found");
         uint256 valIndex = valsIdx[valAddr] - 1;
         Validator storage val = vals[valIndex];
         require(val.jailed, "validator not jailed");
         uint256 jailedUntil = valSigningInfos[valAddr].jailedUntil;
+        // solhint-disable-next-line not-rely-on-time
         require(jailedUntil < block.timestamp, "validator jailed");
         uint256 delIndex = delsIdx[valAddr][valAddr] - 1;
         Delegation storage del = delegations[valAddr][delIndex];
