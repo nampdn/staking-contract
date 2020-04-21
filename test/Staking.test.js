@@ -16,7 +16,7 @@ async function assertRevert(promise, includeStr = "") {
 async function setParams(owner, isOk) {
     const baseProposerReward = web3.utils.toWei("0.1", "ether") // 10%
     const bonusProposerReward = web3.utils.toWei("0.01", "ether") // 1%
-    const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 1%
+    const slashFractionDowntime = web3.utils.toWei("0.1", "ether") // 10%
     const slashFractionDoubleSign = web3.utils.toWei("0.5", "ether") // 50%
     const unBondingTime = 1;
     const signedBlockWindow= 2;
@@ -38,7 +38,8 @@ contract("Staking", async (accounts) => {
         let instance = await Staking.deployed();
         const validatorSet = await getCurrentValidatorSet();
         await instance.mint();
-        //await web3.eth.sendTransaction({from: accounts[8], to: instance.address, value: web3.utils.toWei("1000", "ether")})
+        const blockProvision = await  instance.getBlockProvision.call();
+        await instance.deposit({from: accounts[0], value: blockProvision.toString()})
         await instance.setPreviousProposer(accounts[0]);
         let signed = validatorSet[0].map(addr => notSigned.indexOf(addr) === -1);
         await instance.finalizeCommit(validatorSet[0], validatorSet[1], signed)
@@ -96,7 +97,7 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         await instance.setTotalBonded(web3.utils.toWei("5000000000", "ether"));
     });
-
+    
     it("should create validator", async () => {
         const instance = await Staking.deployed();
         const maxRate = web3.utils.toWei("0.5", "ether");
@@ -370,49 +371,60 @@ contract("Staking", async (accounts) => {
 
     });
 
-
-    it("should slash", async () => {
-        const instance = await Staking.deployed();
-        const bond4to4 = web3.utils.toWei("1", "ether");
-        await instance.createValidator(0, 0, 0, 0, {from: accounts[4], value: bond4to4});
-        await instance.doubleSign(accounts[4], 1000000000000, 10);
-
-        const validator = await instance.getValidator.call(accounts[4]);
-        assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
-    });
-
-    it("should slash unbonding delegation entries", async () => {
-        const instance = await Staking.deployed();
-        const bond5to5 = web3.utils.toWei("1", "ether");
-        await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond5to5});
-
-        const amount = web3.utils.toWei("0.1", "ether")
-        await instance.undelegate(accounts[5], amount, {from: accounts[5]});
-        await instance.doubleSign(accounts[5], 1000000000000, 10);
-
-        const udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
-        assert.equal(udbEntries[0][0].toString(), amount/2);
-
-        const validator = await instance.getValidator.call(accounts[5]);
-        assert.equal(validator[0].toString(), web3.utils.toWei("0.45", "ether"));
-
-    });
-
-    it ("should slash delegation rewards", async () => {
+    it ("calculate delegation reward after slash", async () => {
         const instance = await Staking.deployed();
         const bond6to6 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
+        // new block provision: 55,45415552
+        // delegation reward: 55,454154905* 89,142857143% * (1/7) = 7,06191687
         await finalizeCommit([accounts[6]]);
+        // new block provision: 55,454156135
+        // delegation reward: 55,454156135* 89,142857143% * (1/7) = 7,061917026
         await finalizeCommit([accounts[6]]);
-        await finalizeCommit([accounts[6]]);
+        // new block provision: 55,45415675
+        // delegation reward: 0
+        await finalizeCommit([]);
+
         await utils.advanceTime(601);
         await instance.unjail({from: accounts[6]});
+
+        // delegation reward: 55,45415675* 89% * (0.9/6.9) = 6,437504284
         await finalizeCommit([]);
-        let rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
-        assert.equal(rewards.toString(), web3.utils.toWei("13.499421378388207677"));
+        // total reward: 7,06191687 + 7,061917026 + 0 + 6,437504284 = 20,56133818;
+        rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
+        assert.equal(rewards.toString(), web3.utils.toWei("20.561338328761406515"));
 
     });
 
+    context("slashing", () => {
+    
+        it("should slash", async () => {
+            const instance = await Staking.deployed();
+            const bond4to4 = web3.utils.toWei("1", "ether");
+            await instance.createValidator(0, 0, 0, 0, {from: accounts[4], value: bond4to4});
+            await instance.doubleSign(accounts[4], 1000000000000, 10);
+    
+            const validator = await instance.getValidator.call(accounts[4]);
+            assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
+        });
+    
+        it("should slash unbonding delegation entries", async () => {
+            const instance = await Staking.deployed();
+            const bond5to5 = web3.utils.toWei("1", "ether");
+            await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond5to5});
+    
+            const amount = web3.utils.toWei("0.1", "ether")
+            await instance.undelegate(accounts[5], amount, {from: accounts[5]});
+            await instance.doubleSign(accounts[5], 1000000000000, 10);
+    
+            const udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
+            assert.equal(udbEntries[0][0].toString(), amount/2);
+    
+            const validator = await instance.getValidator.call(accounts[5]);
+            assert.equal(validator[0].toString(), web3.utils.toWei("0.45", "ether"));
+    
+        });
+    })
 
     it ("should not unjail", async() => {
         const instance = await Staking.deployed();
@@ -453,5 +465,66 @@ contract("Staking", async (accounts) => {
         await instance.undelegate(accounts[8], web3.utils.toWei("1.5", "ether"), {from: accounts[8]});
         const validator = await instance.getValidator.call(accounts[8]);
         assert.equal(validator[2], true);
+    })
+
+
+    context("mint", () => {
+        it ("should mint", async () => {
+            const instance = await Staking.deployed();
+            await instance.setMintParams(0,0,5,0,0);
+            const totalSupply = web3.utils.toWei("1000", "ether");
+            const totalBonded = web3.utils.toWei("1", "ether");
+            await instance.setTotalSupply(totalSupply);
+            await instance.setTotalBonded(totalBonded);
+            await instance.setInflation(0);
+            await instance.setAnnualProvision(0);
+    
+            await instance.mint();
+    
+            // inflation min
+            let inflation = await instance.getInflation.call();
+            assert.equal(inflation.toString(), web3.utils.toWei("0.07", "ether")) // 7%
+    
+            const blockProvision = await instance.getBlockProvision.call();
+            // 1000 * 7% / 5 = 14
+            assert.equal(blockProvision.toString(),  web3.utils.toWei("14.000000000000000000", "ether"));
+    
+            await instance.mint();
+            
+            inflation = await instance.getInflation.call();
+            assert.equal(inflation.toString(), web3.utils.toWei("0.095961729812476081", "ether"))
+    
+            await mint(5);
+    
+            // inflation max: 20%
+            inflation = await instance.getInflation.call();
+            assert.equal(inflation.toString(), web3.utils.toWei("0.2", "ether"));
+    
+            await instance.setTotalSupply(totalSupply);
+            await instance.setTotalBonded(totalSupply);
+            await instance.mint();
+    
+            inflation = await instance.getInflation.call();
+            assert.equal(inflation.toString(), web3.utils.toWei("0.187194029850746269", "ether"));
+    
+            
+    
+            await mint(5); // 1 year
+            let newTotalSupply = await instance.getTotalSupply.call();
+            await instance.setTotalBonded(newTotalSupply.toString());
+    
+            await mint(5); // 1 year
+            newTotalSupply = await instance.getTotalSupply.call();
+            await instance.setTotalBonded(newTotalSupply.toString());
+    
+            await mint(5); // 1 year
+    
+    
+            // inflation min : 7%
+            inflation = await instance.getInflation.call();
+            assert.equal(inflation.toString(), web3.utils.toWei("0.07", "ether")) // 7%
+    
+    
+        })
     })
 })

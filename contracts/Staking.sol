@@ -120,6 +120,18 @@ contract Staking {
     Params _params;
     address _previousProposer;
 
+    modifier onlyRoot() {
+        require(msg.sender == _root, "permission denied");
+        _;
+    }
+
+    function setRoot(address newRoot) public {
+        if (_root != address(0x0)) {
+            require(msg.sender == _root, "permission denied");
+        }
+        _root = newRoot;
+    }
+
     constructor() public {
         _params = Params({
             maxValidators: 100,
@@ -139,16 +151,8 @@ contract Staking {
         });
     }
 
-    modifier onlyRoot() {
-        require(msg.sender == _root, "permission denied");
-        _;
-    }
-
-    function setRoot(address newRoot) public {
-        if (_root != address(0x0)) {
-            require(msg.sender == _root, "permission denied");
-        }
-        _root = newRoot;
+    // @notice Will receive any eth sent to the contract
+    function deposit() external payable {
     }
 
     function setParams(
@@ -492,8 +496,8 @@ contract Staking {
                 }
             }
         }
+        _beforeValidatorSlashed(valAddr, slashFactor);
         val.tokens -= slashAmount;
-        _updateValidatorSlashFraction(valAddr, slashFactor);
         _burn(slashAmount);
     }
 
@@ -514,6 +518,10 @@ contract Staking {
                 height: block.number
             })
         );
+    }
+
+    function _beforeValidatorSlashed(address valAddr, uint256 fraction) private {
+        _updateValidatorSlashFraction(valAddr, fraction);
     }
 
     function getTotalSupply() public view returns (uint256) {
@@ -605,14 +613,13 @@ contract Staking {
     ) private view returns (uint256) {
         DelStartingInfo memory startingInfo = delStartingInfo[valAddr][delAddr];
         uint256 rewards = 0;
-        uint256 _endingPeriod = endingPeriod;
         for (uint256 i = 0; i < valSlashEvents[valAddr].length; i++) {
             ValSlashEvent memory slashEvent = valSlashEvents[valAddr][i];
             if (
                 slashEvent.height > startingInfo.height &&
                 slashEvent.height < block.number
             ) {
-                _endingPeriod = slashEvent.validatorPeriod;
+                uint256 _endingPeriod = slashEvent.validatorPeriod;
                 if (_endingPeriod > startingInfo.previousPeriod) {
                     rewards += _calculateDelegationRewardsBetween(
                         valAddr,
@@ -621,7 +628,7 @@ contract Staking {
                         startingInfo.stake
                     );
                     startingInfo.stake = startingInfo.stake.mulTrun(
-                        slashEvent.fraction
+                        oneDec.sub(slashEvent.fraction)
                     );
                     startingInfo.previousPeriod = _endingPeriod;
                 }
@@ -630,7 +637,7 @@ contract Staking {
         rewards += _calculateDelegationRewardsBetween(
             valAddr,
             startingInfo.previousPeriod,
-            _endingPeriod,
+            endingPeriod,
             startingInfo.stake
         );
         return rewards;
@@ -673,7 +680,7 @@ contract Staking {
         );
         rewards.period++;
         rewards.reward = 0;
-        return previousPeriod;
+        return previousPeriod.add(1);
     }
 
     function _decrementReferenceCount(address valAddr, uint256 period) private {
@@ -1044,7 +1051,6 @@ contract Staking {
         uint256 previousTotalPower = 0;
         uint256 sumPreviousPrecommitPower = 0;
         for (uint256 i = 0; i < powers.length; i++) {
-            _validateSignature(addrs[i], powers[i], signed[i]);
             previousTotalPower += powers[i];
             if (signed[i]) {
                 sumPreviousPrecommitPower += powers[i];
@@ -1060,6 +1066,10 @@ contract Staking {
             );
         }
         _previousProposer = block.coinbase;
+
+        for (uint256 i = 0; i < powers.length; i++) {
+            _validateSignature(addrs[i], powers[i], signed[i]);
+        }
     }
 
     function finalizeCommit(
