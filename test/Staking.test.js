@@ -425,6 +425,16 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.unjail({from: accounts[7]}), "self delegation too low to unjail");
     });
 
+    it ("should jail when self delegation too low", async () => {
+        const instance = await Staking.deployed();
+        const bond6to6 = web3.utils.toWei("2", "ether");
+        const minSelfDelegation = web3.utils.toWei("1", "ether");
+        await instance.createValidator(0, 0, 0, minSelfDelegation, {from: accounts[8], value: bond6to6});
+        await instance.undelegate(accounts[8], web3.utils.toWei("1.5", "ether"), {from: accounts[8]});
+        const validator = await instance.getValidator.call(accounts[8]);
+        assert.equal(validator[2], true);
+    })
+
 
     it ("should mint", async () => {
         const instance = await Staking.deployed();
