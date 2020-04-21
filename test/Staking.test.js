@@ -97,6 +97,31 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         await instance.setTotalBonded(web3.utils.toWei("5000000000", "ether"));
     });
+
+    it ("should not set total bonded", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.setTotalBonded(1, {from: accounts[2]}), "permission denied");
+    })
+
+    it ("should not set total supply", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.setTotalSupply(1, {from: accounts[2]}), "permission denied");
+    });
+
+    it ("should not set inflation", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.setInflation(1, {from: accounts[2]}), "permission denied");
+    });
+
+    it ("should not set mint params", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert(instance.setMintParams(0,0,5,0,0, {from: accounts[2]}), "permission denied");
+    });
+
+    it ("should not set annual provision", async () => {
+        const instance = await Staking.deployed();
+        await assertRevert( instance.setAnnualProvision(0, {from: accounts[2]}), "permission denied");
+    })
     
     it("should create validator", async () => {
         const instance = await Staking.deployed();
@@ -325,7 +350,6 @@ contract("Staking", async (accounts) => {
 
     });
 
-
     it ("should withdraw delegation rewards", async () => {
         const instance = await Staking.deployed();
 
@@ -343,6 +367,16 @@ contract("Staking", async (accounts) => {
         assert.equal(reward.toString(), web3.utils.toWei("19.741678817615844484", "ether"));
         
     });
+
+    it ("calculate delegation rewards after withdraw reward", async () => {
+        const instance = await Staking.deployed();
+
+        // proposer base reward: 55,45415429 *  (10+ 1)% = 6,099956972
+        // validator 1 reward: 55,45415429 * 89% * (3/5) + 6,099956972 = 35,712475363
+        // delegation reward: 35,712475295/3 = 11,904158454;
+        reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
+        assert.equal(reward.toString(), web3.utils.toWei("11.904158454163880631", "ether"));
+    })
 
     it ("should withdraw commission rewards", async() => {
         const instance = await Staking.deployed();
