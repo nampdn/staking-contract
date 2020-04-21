@@ -247,7 +247,7 @@ contract Staking {
     ) private {
         require(valsIdx[valAddr] == 0, "validator already exist");
         require(amount > 0, "invalid delegation amount");
-        require(amount > minSelfDelegation, "self delegation below minumum");
+        require(amount > minSelfDelegation, "self delegation below minimum");
         require(
             maxRate <= oneDec,
             "commission max rate cannot be more than 100%"
@@ -1009,7 +1009,7 @@ contract Staking {
             totalPreviousVotingPower
         );
         uint256 proposerMultiplier = _params.baseProposerReward.add(
-            _params.baseProposerReward.mulTrun(previousFractionVotes)
+            _params.bonusProposerReward.mulTrun(previousFractionVotes)
         );
         uint256 proposerReward = _feesCollected.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(previousProposer, proposerReward);
