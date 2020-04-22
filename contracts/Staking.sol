@@ -1,8 +1,8 @@
 pragma solidity  ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
+import {IStaking} from "./IStaking.sol";
 
-
-contract Staking {
+contract Staking is IStaking {
     using SafeMath for uint256;
 
     uint256 oneDec = 1 * 10**18;
@@ -239,6 +239,15 @@ contract Staking {
             maxChangeRate,
             minSeftDelegation
         );
+
+        emit CreateValidator(
+            msg.sender,
+            msg.value,
+            commssionRate,
+            maxRate,
+            maxChangeRate,
+            minSeftDelegation
+        );
     }
 
     function _createValidator(
@@ -329,6 +338,12 @@ contract Staking {
             // solhint-disable-next-line not-rely-on-time
             val.updateTime = block.timestamp;
         }
+
+        emit UpdateValidator(
+            msg.sender,
+            commissionRate,
+            minSelfDelegation
+        );
     }
 
     function _afterValidatorCreated(address valAddr) private {
@@ -392,6 +407,7 @@ contract Staking {
         require(valsIdx[valAddr] > 0, "validator not found");
         require(msg.value > 0, "invalid delegation amount");
         _delegate(msg.sender, valAddr, msg.value);
+        emit Delegate(valAddr, msg.sender, msg.value);
     }
 
     function _undelegate(
@@ -464,11 +480,13 @@ contract Staking {
     function undelegate(address valAddr, uint256 amount) public {
         require(amount > 0, "invalid undelegate amount");
         _undelegate(valAddr, msg.sender, amount);
+        emit Undelegate(valAddr, msg.sender, amount);
     }
 
     function _jail(address valAddr) private {
         vals[valsIdx[valAddr] - 1].jailed = true;
         removeValidatorRank(valAddr);
+        emit Jailed(valAddr);
     }
 
     function _slash(
@@ -498,12 +516,14 @@ contract Staking {
         }
         _beforeValidatorSlashed(valAddr, slashFactor);
         val.tokens -= slashAmount;
+        emit Slashed(valAddr, slashAmount);
         _burn(slashAmount);
     }
 
     function _burn(uint256 amount) private {
         totalBonded -= amount;
         totalSupply -= amount;
+        emit Burn(amount);
     }
 
     function _updateValidatorSlashFraction(address valAddr, uint256 fraction)
@@ -552,6 +572,8 @@ contract Staking {
         if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
             _removeValidator(valAddr);
         }
+
+        emit Withdraw(valAddr, delAddr, amount);
     }
 
     function _removeDelegation(address valAddr, address delAddr) private {
@@ -581,6 +603,7 @@ contract Staking {
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
         delete delValsIndex[delAddr][valAddr];
+        emit RemoveDelegation(valAddr, delAddr);
     }
 
     function _removeValidator(address valAddr) private {
@@ -600,6 +623,7 @@ contract Staking {
         delete valCurrentRewards[valAddr];
 
         removeValidatorRank(valAddr);
+        emit RemoveValidator(valAddr);
     }
 
     function withdraw(address valAddr) public {
@@ -740,6 +764,8 @@ contract Staking {
         );
         delete delStartingInfo[valAddr][delAddr];
         delAddr.transfer(rewards);
+
+        emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
     }
 
     function withdrawReward(address valAddr) public {
@@ -781,6 +807,7 @@ contract Staking {
         require(commission > 0, "no validator commission to reward");
         valAddr.transfer(commission);
         valAccumulatedCommission[valAddr] = 0;
+        emit WithdrawCommissionReward(valAddr, commission);
     }
 
     function withdrawValidatorCommission() public {
@@ -1120,6 +1147,7 @@ contract Staking {
         // update fee collected
         _feesCollected = getBlockProvision();
         totalSupply += _feesCollected;
+        emit Minted(_feesCollected);
         return _feesCollected;
     }
 
