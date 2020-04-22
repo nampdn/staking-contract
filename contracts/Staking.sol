@@ -620,6 +620,8 @@ contract Staking is IStaking {
         delete valAccumulatedCommission[valAddr];
         delete valHRewards[valAddr];
         delete valCurrentRewards[valAddr];
+        delete valHRewards[valAddr];
+        delete missedBlock[valAddr];
 
         removeValidatorRank(valAddr);
     }
@@ -1343,5 +1345,6 @@ contract Staking is IStaking {
 
     function unjail() public {
         _unjail(msg.sender);
+        emit UnJail(msg.sender);
     }
 }
