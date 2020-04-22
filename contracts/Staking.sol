@@ -448,14 +448,17 @@ contract Staking is IStaking {
         addValidatorRank(valAddr);
         val.ubdEntryCount++;
 
+        // solhint-disable-next-line not-rely-on-time
+        uint256 completionTime = block.timestamp.add(_params.unbondingTime);
         ubdEntries[valAddr][delAddr].push(
             UBDEntry({
-                // solhint-disable-next-line not-rely-on-time
-                completionTime: block.timestamp.add(_params.unbondingTime),
+                completionTime: completionTime,
                 blockHeight: block.number,
                 amount: amountRemoved
             })
         );
+
+         emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
 
     function _removeDelShares(address valAddr, uint256 shares)
@@ -480,13 +483,11 @@ contract Staking is IStaking {
     function undelegate(address valAddr, uint256 amount) public {
         require(amount > 0, "invalid undelegate amount");
         _undelegate(valAddr, msg.sender, amount);
-        emit Undelegate(valAddr, msg.sender, amount);
     }
 
     function _jail(address valAddr) private {
         vals[valsIdx[valAddr] - 1].jailed = true;
         removeValidatorRank(valAddr);
-        emit Jailed(valAddr);
     }
 
     function _slash(
@@ -516,7 +517,6 @@ contract Staking is IStaking {
         }
         _beforeValidatorSlashed(valAddr, slashFactor);
         val.tokens -= slashAmount;
-        emit Slashed(valAddr, slashAmount);
         _burn(slashAmount);
     }
 
@@ -603,7 +603,6 @@ contract Staking is IStaking {
         delValsIndex[delAddr][last] = index;
         delVals[delAddr].pop();
         delete delValsIndex[delAddr][valAddr];
-        emit RemoveDelegation(valAddr, delAddr);
     }
 
     function _removeValidator(address valAddr) private {
@@ -623,7 +622,6 @@ contract Staking is IStaking {
         delete valCurrentRewards[valAddr];
 
         removeValidatorRank(valAddr);
-        emit RemoveValidator(valAddr);
     }
 
     function withdraw(address valAddr) public {
@@ -763,9 +761,10 @@ contract Staking is IStaking {
             delStartingInfo[valAddr][delAddr].previousPeriod
         );
         delete delStartingInfo[valAddr][delAddr];
-        delAddr.transfer(rewards);
-
-        emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
+        if (rewards > 0) {
+            delAddr.transfer(rewards);
+            emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
+        }
     }
 
     function withdrawReward(address valAddr) public {
@@ -962,6 +961,10 @@ contract Staking is IStaking {
         uint256 distributionHeight
     ) private {
         if (valsIdx[valAddr] == 0) return;
+
+        // reason: doubleSign
+        emit Slashed(valAddr, votingPower, 2);
+
         _slash(
             valAddr,
             distributionHeight - 1,
@@ -1003,6 +1006,10 @@ contract Staking is IStaking {
             missedBlock[valAddr][index] = false;
         }
 
+        if (missed) {
+            emit Liveness(valAddr, signInfo.missedBlockCounter, block.number);
+        }
+
         uint256 minHeight = signInfo.startHeight + _params.signedBlockWindow;
 
         uint256 minSignedPerWindow = _params.signedBlockWindow.mulTrun(
@@ -1013,6 +1020,9 @@ contract Staking is IStaking {
             block.number > minHeight && signInfo.missedBlockCounter > maxMissed
         ) {
             if (!val.jailed) {
+                // reason: missing signature
+                emit Slashed(valAddr, votingPower, 1);
+
                 _slash(
                     valAddr,
                     block.number - 2,

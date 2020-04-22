@@ -40,7 +40,8 @@ interface IStaking {
     event Undelegate(
         address valAddr,
         address delAddr,
-        uint256 amount
+        uint256 amount,
+        uint256 completionTime
     );
 
     event Withdraw(
@@ -51,16 +52,8 @@ interface IStaking {
 
 
     event Minted(uint256 amount);
-
     event Burn(uint256 amount);
-
-    event Slashed(address valAddr, uint256 slashFactor);
-
+    event Slashed(address valAddr, uint256 power, uint256 reason);
     event UnJail(address valAddr);
-
-    event Jailed(address valAddr);
-
-
-    event RemoveValidator(address valAddr);
-    event RemoveDelegation(address valAddr, address delAddr);
+    event Liveness(address valAddr, uint256 missedBlocks, uint256 blockHeight);
 }
