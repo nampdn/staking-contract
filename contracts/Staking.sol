@@ -280,6 +280,8 @@ contract Staking is IStaking {
             maxChangeRate: maxChangeRate
         });
 
+        // solhint-disable-next-line not-rely-on-time
+        uint256 updateTime = block.timestamp;
         vals.push(
             Validator({
                 owner: valAddr,
@@ -288,8 +290,7 @@ contract Staking is IStaking {
                 jailed: false,
                 commission: commission,
                 minSelfDelegation: minSelfDelegation,
-                updateTime: // solhint-disable-next-line not-rely-on-time
-                block.timestamp,
+                updateTime: updateTime,
                 ubdEntryCount: 0
             })
         );
@@ -1266,24 +1267,18 @@ contract Staking is IStaking {
         }
     }
 
-    function getValidatorTokenByRank(uint256 rank)
-        private
-        view
-        returns (uint256)
-    {
-        return vals[valsIdx[valsRank[rank]] - 1].tokens.div(powerReduction);
+    function getValPowerByRank(uint256 rank) private view returns (uint256) {
+        return getValidatorPower(valsRank[rank]);
     }
 
     function _sortValidatorRank(int256 left, int256 right) internal {
         int256 i = left;
         int256 j = right;
         if (i == j) return;
-        uint256 pivot = getValidatorTokenByRank(
-            uint256(left + (right - left) / 2)
-        );
+        uint256 pivot = getValPowerByRank(uint256(left + (right - left) / 2));
         while (i <= j) {
-            while (getValidatorTokenByRank(uint256(i)) > pivot) i++;
-            while (pivot > getValidatorTokenByRank(uint256(j))) j--;
+            while (getValPowerByRank(uint256(i)) > pivot) i++;
+            while (pivot > getValPowerByRank(uint256(j))) j--;
             if (i <= j) {
                 address tmp = valsRank[uint256(i)];
                 valsRank[uint256(i)] = valsRank[uint256(j)];
