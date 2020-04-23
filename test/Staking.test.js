@@ -238,7 +238,7 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.delegate(accounts[5], {from: accounts[1], value: bond1to0}), "validator not found");
 
         // invalid delegation amount
-        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}), "not enough delegation shares");
+        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}), "invalid delegation amount");
 
     });
 
@@ -260,7 +260,7 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[5]} ), "delegation not found")
 
         // invalid undelegate amount
-        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[1]}), "invalid undelegate amount");
+        await assertRevert(instance.undelegate(accounts[0], amount, {from: accounts[1]}), "not enough delegation shares");
     });
 
     it ("should undelegate", async() => {
@@ -280,18 +280,16 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const amount = web3.utils.toWei("0.5", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[1]});
-        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
 
-        await utils.advanceTime(2000);
+        await utils.advanceTime(2001);
         await instance.withdraw(accounts[0], {from: accounts[1]});
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
     })
 
     it ("should not withdraw", async () => {
         const instance = await Staking.deployed();
-
         const amount = web3.utils.toWei("100", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
-
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "no unbonding amount to withdraw");
     });
 
@@ -299,7 +297,7 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         await utils.advanceTime(2000);
         await instance.withdraw(accounts[0], {from: accounts[0]}); 
-        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "no unbonding amount to withdraw");
+        await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "delegation not found");
     });
 
 

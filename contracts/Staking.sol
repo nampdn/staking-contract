@@ -425,13 +425,7 @@ contract Staking is IStaking {
         uint256 shares = _shareFromToken(valAddr, amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
-
-        if (del.shares == 0) {
-            _removeDelegation(valAddr, delAddr);
-        } else {
-            _afterDelegationModified(valAddr, delAddr);
-        }
-
+        _afterDelegationModified(valAddr, delAddr);
         bool isValidatorOperator = valAddr == delAddr;
         if (
             isValidatorOperator &&
@@ -561,9 +555,15 @@ contract Staking is IStaking {
     }
 
     function _withdraw(address valAddr, address payable delAddr) private {
+        uint256 delIndex = delsIdx[valAddr][delAddr];
+        require(delIndex > 0, "delegation not found");
+        Delegation memory del = delegations[valAddr][delIndex - 1];
+        uint256 valIndex = valsIdx[valAddr];
+        Validator storage val = vals[valIndex - 1];
         UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
         uint256 amount = 0;
         uint256 entryCount = 0;
+
         for (uint256 i = 0; i < entries.length; i++) {
             // solhint-disable-next-line not-rely-on-time
             if (entries[i].completionTime < block.timestamp) {
@@ -578,8 +578,10 @@ contract Staking is IStaking {
         delAddr.transfer(amount);
         totalBonded -= amount;
 
-        uint256 valIndex = valsIdx[valAddr];
-        Validator storage val = vals[valIndex - 1];
+        if (del.shares == 0 && entries.length == 0) {
+            _removeDelegation(valAddr, delAddr);
+        }
+
         val.ubdEntryCount -= entryCount;
         if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
             _removeValidator(valAddr);
