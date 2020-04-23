@@ -627,6 +627,12 @@ contract Staking is IStaking {
         valsIdx[last.owner] = valIdx;
         delete valsIdx[valAddr];
 
+        uint256 commission = valAccumulatedCommission[valAddr];
+        if (commission > 0) {
+            // substract total supply
+            totalSupply = totalSupply.sub(commission);
+        }
+
         // remove other index
         delete valSlashEvents[valAddr];
         delete valAccumulatedCommission[valAddr];
