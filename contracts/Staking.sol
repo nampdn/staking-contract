@@ -1,6 +1,7 @@
-pragma solidity  ^0.6.0;
+pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
+
 
 contract Staking is IStaking {
     using SafeMath for uint256;
@@ -152,8 +153,7 @@ contract Staking is IStaking {
     }
 
     // @notice Will receive any eth sent to the contract
-    function deposit() external payable {
-    }
+    function deposit() external payable {}
 
     function setParams(
         uint256 maxValidators,
@@ -288,8 +288,8 @@ contract Staking is IStaking {
                 jailed: false,
                 commission: commission,
                 minSelfDelegation: minSelfDelegation,
-                // solhint-disable-next-line not-rely-on-time
-                updateTime: block.timestamp,
+                updateTime: // solhint-disable-next-line not-rely-on-time
+                block.timestamp,
                 ubdEntryCount: 0
             })
         );
@@ -339,11 +339,7 @@ contract Staking is IStaking {
             val.updateTime = block.timestamp;
         }
 
-        emit UpdateValidator(
-            msg.sender,
-            commissionRate,
-            minSelfDelegation
-        );
+        emit UpdateValidator(msg.sender, commissionRate, minSelfDelegation);
     }
 
     function _afterValidatorCreated(address valAddr) private {
@@ -458,7 +454,7 @@ contract Staking is IStaking {
             })
         );
 
-         emit Undelegate(valAddr, msg.sender, amount, completionTime);
+        emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
 
     function _removeDelShares(address valAddr, uint256 shares)
@@ -515,9 +511,22 @@ contract Staking is IStaking {
                 }
             }
         }
-        _beforeValidatorSlashed(valAddr, slashFactor);
-        val.tokens -= slashAmount;
-        _burn(slashAmount);
+
+        uint256 tokensToBurn = slashAmount;
+        if (tokensToBurn > val.tokens) {
+            tokensToBurn = val.tokens;
+        }
+
+        if (val.tokens > 0) {
+            uint256 effectiveFraction = tokensToBurn.divTrun(val.tokens);
+            if (effectiveFraction > oneDec) {
+                effectiveFraction = oneDec;
+            }
+            _beforeValidatorSlashed(valAddr, effectiveFraction);
+        }
+
+        val.tokens -= tokensToBurn;
+        _burn(tokensToBurn);
     }
 
     function _burn(uint256 amount) private {
@@ -540,7 +549,9 @@ contract Staking is IStaking {
         );
     }
 
-    function _beforeValidatorSlashed(address valAddr, uint256 fraction) private {
+    function _beforeValidatorSlashed(address valAddr, uint256 fraction)
+        private
+    {
         _updateValidatorSlashFraction(valAddr, fraction);
     }
 
@@ -1336,7 +1347,10 @@ contract Staking is IStaking {
         uint256 delIndex = delsIdx[valAddr][valAddr] - 1;
         Delegation storage del = delegations[valAddr][delIndex];
         uint256 tokens = _tokenFromShare(valAddr, del.shares);
-        require(tokens > val.minSelfDelegation, "self delegation too low to unjail");
+        require(
+            tokens > val.minSelfDelegation,
+            "self delegation too low to unjail"
+        );
 
         valSigningInfos[valAddr].jailedUntil = 0;
         val.jailed = false;

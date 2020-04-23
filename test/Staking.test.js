@@ -430,7 +430,7 @@ contract("Staking", async (accounts) => {
 
     });
 
-    it("should slash", async () => {
+    it("should slash 50%", async () => {
         const instance = await Staking.deployed();
         const bond4to4 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[4], value: bond4to4});
@@ -438,6 +438,13 @@ contract("Staking", async (accounts) => {
 
         const validator = await instance.getValidator.call(accounts[4]);
         assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
+    });
+
+    it("should slash 100%", async () => {
+        const instance = await Staking.deployed();
+        await instance.doubleSign(accounts[4], 5000000000000, 10);
+        const validator = await instance.getValidator.call(accounts[4]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0", "ether"));
     });
 
     it("should slash unbonding delegation entries", async () => {
