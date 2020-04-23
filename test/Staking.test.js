@@ -238,7 +238,7 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.delegate(accounts[5], {from: accounts[1], value: bond1to0}), "validator not found");
 
         // invalid delegation amount
-        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}), "invalid delegation amount");
+        await assertRevert(instance.delegate(accounts[0], {from: accounts[1], value: 0}), "not enough delegation shares");
 
     });
 
