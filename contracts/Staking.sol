@@ -423,7 +423,7 @@ contract Staking is IStaking {
         Validator storage val = vals[valsIdx[valAddr] - 1];
         Delegation storage del = delegations[valAddr][delegationIndex - 1];
         uint256 shares = _shareFromToken(valAddr, amount);
-        require(del.shares >= shares, "invalid undelegate amount");
+        require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
 
         if (del.shares == 0) {
