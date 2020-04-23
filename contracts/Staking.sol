@@ -380,8 +380,8 @@ contract Staking is IStaking {
         Delegation storage del = delegations[valAddr][delIndex - 1];
         del.shares += shared;
         _afterDelegationModified(valAddr, delAddr);
-
         addValidatorRank(valAddr);
+        emit Delegate(valAddr, delAddr, amount);
     }
 
     function _addTokenFromDel(address valAddr, uint256 amount)
@@ -404,7 +404,6 @@ contract Staking is IStaking {
         require(valsIdx[valAddr] > 0, "validator not found");
         require(msg.value > 0, "invalid delegation amount");
         _delegate(msg.sender, valAddr, msg.value);
-        emit Delegate(valAddr, msg.sender, msg.value);
     }
 
     function _undelegate(
