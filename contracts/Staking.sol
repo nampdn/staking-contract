@@ -495,6 +495,7 @@ contract Staking is IStaking {
                 UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
                 for (uint256 j = 0; j < entries.length; j++) {
                     UBDEntry storage entry = entries[j];
+                    if (entry.amount == 0) continue;
                     // if unbonding started before this height, stake did not contribute to infraction;
                     if (entry.blockHeight < infrationHeight) continue;
                     // solhint-disable-next-line not-rely-on-time
@@ -503,8 +504,8 @@ contract Staking is IStaking {
                         continue;
                     }
                     uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
-                    entry.amount -= amountSlashed;
-                    slashAmount -= amountSlashed;
+                    entry.amount = entry.amount.sub(amountSlashed);
+                    slashAmount = slashAmount.sub(amountSlashed);
                 }
             }
         }
@@ -522,7 +523,7 @@ contract Staking is IStaking {
             _beforeValidatorSlashed(valAddr, effectiveFraction);
         }
 
-        val.tokens -= tokensToBurn;
+        val.tokens = val.tokens.sub(tokensToBurn);
         _burn(tokensToBurn);
     }
 
@@ -710,7 +711,7 @@ contract Staking is IStaking {
         Validator memory val = vals[valsIdx[valAddr] - 1];
 
         ValCurrentReward storage rewards = valCurrentRewards[valAddr];
-        uint256 previousPeriod = rewards.period - 1;
+        uint256 previousPeriod = rewards.period.sub(1);
         uint256 current = 0;
         if (rewards.reward > 0) {
             current = rewards.reward.divTrun(val.tokens);
