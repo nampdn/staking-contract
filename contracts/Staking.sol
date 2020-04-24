@@ -374,11 +374,11 @@ contract Staking is IStaking {
 
         uint256 shared = _addTokenFromDel(valAddr, amount);
 
-        totalBonded += amount;
+        totalBonded = totalBonded.add(amount);
 
         // increment stake amount
         Delegation storage del = delegations[valAddr][delIndex - 1];
-        del.shares += shared;
+        del.shares = del.shares.add(shared);
         _afterDelegationModified(valAddr, delAddr);
         addValidatorRank(valAddr);
         emit Delegate(valAddr, delAddr, amount);
