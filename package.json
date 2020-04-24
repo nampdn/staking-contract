@@ -9,7 +9,9 @@
   "dependencies": {
     "@openzeppelin/contracts": "^2.5.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "solidity-coverage": "^0.7.4"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
