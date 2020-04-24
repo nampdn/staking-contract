@@ -999,6 +999,7 @@ contract Staking is IStaking {
         _jail(valAddr);
         // // (Dec 31, 9999 - 23:59:59 GMT).
         valSigningInfos[valAddr].jailedUntil = 253402300799;
+        valSigningInfos[valAddr].tombstoned = true;
     }
 
     function doubleSign(
@@ -1347,6 +1348,8 @@ contract Staking is IStaking {
         uint256 valIndex = valsIdx[valAddr] - 1;
         Validator storage val = vals[valIndex];
         require(val.jailed, "validator not jailed");
+        // cannot be unjailed if tombstoned
+        require(valSigningInfos[valAddr].tombstoned == false, "validator jailed");
         uint256 jailedUntil = valSigningInfos[valAddr].jailedUntil;
         // solhint-disable-next-line not-rely-on-time
         require(jailedUntil < block.timestamp, "validator jailed");
