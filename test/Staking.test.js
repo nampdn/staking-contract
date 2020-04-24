@@ -451,29 +451,39 @@ contract("Staking", async (accounts) => {
         await instance.createValidator(0, 0, 0, 0, {from: accounts[5], value: bond5to5});
 
         const amount = web3.utils.toWei("0.1", "ether")
-        await instance.undelegate(accounts[5], amount, {from: accounts[5]});
+        const tx = await instance.undelegate(accounts[5], amount, {from: accounts[5]});
         await assertRevert(instance.doubleSign(accounts[5], 1000000000000, 0), "subtraction overflow");
         await assertRevert(instance.doubleSign(accounts[5], 1000000000000, 5000000000000), "cannot slash infrations in the future");
 
-        await utils.advanceTime(86401);
-        await instance.doubleSign(accounts[5], 1000000000000, 2);
-        // unbonding delegation no longer eligible for slashing, skip it
+        // unbonding started before this height, stake did not contribute to infraction, skip it.
+        await utils.advanceTime(1);
+        await instance.doubleSign(accounts[5], 1000000000000, tx.receipt.blockNumber + 2);
         let udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
         assert.equal(udbEntries[0][0].toString(), amount);
         // amount slashed: 9 - 10 * 50% = 4
         let validator = await instance.getValidator.call(accounts[5]);
         assert.equal(validator[0].toString(), web3.utils.toWei("0.40", "ether"));
 
+        await utils.advanceTime(86401);
+        await instance.doubleSign(accounts[5], 400000000000, 2);
+        // unbonding delegation no longer eligible for slashing, skip it
+        udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
+        assert.equal(udbEntries[0][0].toString(), amount);
+        
+
         await instance.undelegate(accounts[5], amount, {from: accounts[5]});
-        await instance.doubleSign(accounts[5], 1000000000000, 2);
+        await instance.doubleSign(accounts[5], 200000000000, 2);
         udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
         assert.equal(udbEntries[0][1].toString(), amount/2);
 
-        // amount slashed: 4 - 10 * 50% - 0.5 = −6
+        // amount slashed: 2 - 2 * 50% - 0,5 = 0,5
+        validator = await instance.getValidator.call(accounts[5]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0.050000000000000000", "ether"));
+
+        await instance.doubleSign(accounts[5], 200000000000, 2);
+        // amount slashed: 0,5 - 2 * 50% - 0,25 = −0,75
         validator = await instance.getValidator.call(accounts[5]);
         assert.equal(validator[0].toString(), web3.utils.toWei("0", "ether"));
-
-
     });
 
     it ("should not unjail", async() => {
