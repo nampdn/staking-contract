@@ -495,13 +495,16 @@ contract Staking is IStaking {
                 UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
                 for (uint256 j = 0; j < entries.length; j++) {
                     UBDEntry storage entry = entries[j];
-                    if (entry.blockHeight > infrationHeight) {
-                        uint256 amountSlashed = entry.amount.mulTrun(
-                            slashFactor
-                        );
-                        entry.amount -= amountSlashed;
-                        slashAmount -= amountSlashed;
+                    // if unbonding started before this height, stake did not contribute to infraction;
+                    if (entry.blockHeight < infrationHeight) continue;
+                    // solhint-disable-next-line not-rely-on-time
+                    if (entry.completionTime < block.timestamp) {
+                        // unbonding delegation no longer aligible for slashing, skip it
+                        continue;
                     }
+                    uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
+                    entry.amount -= amountSlashed;
+                    slashAmount -= amountSlashed;
                 }
             }
         }
