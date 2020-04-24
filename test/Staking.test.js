@@ -452,13 +452,27 @@ contract("Staking", async (accounts) => {
 
         const amount = web3.utils.toWei("0.1", "ether")
         await instance.undelegate(accounts[5], amount, {from: accounts[5]});
-        await instance.doubleSign(accounts[5], 1000000000000, 10);
+        await assertRevert(instance.doubleSign(accounts[5], 1000000000000, 0), "subtraction overflow");
+        await assertRevert(instance.doubleSign(accounts[5], 1000000000000, 5000000000000), "cannot slash infrations in the future");
 
-        const udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
-        assert.equal(udbEntries[0][0].toString(), amount/2);
+        await utils.advanceTime(86401);
+        await instance.doubleSign(accounts[5], 1000000000000, 2);
+        // unbonding delegation no longer eligible for slashing, skip it
+        let udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
+        assert.equal(udbEntries[0][0].toString(), amount);
+        // amount slashed: 9 - 10 * 50% = 4
+        let validator = await instance.getValidator.call(accounts[5]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0.40", "ether"));
 
-        const validator = await instance.getValidator.call(accounts[5]);
-        assert.equal(validator[0].toString(), web3.utils.toWei("0.45", "ether"));
+        await instance.undelegate(accounts[5], amount, {from: accounts[5]});
+        await instance.doubleSign(accounts[5], 1000000000000, 2);
+        udbEntries = await instance.getUBDEntries.call(accounts[5], accounts[5]);
+        assert.equal(udbEntries[0][1].toString(), amount/2);
+
+        // amount slashed: 4 - 10 * 50% - 0.5 = −6
+        validator = await instance.getValidator.call(accounts[5]);
+        assert.equal(validator[0].toString(), web3.utils.toWei("0", "ether"));
+
 
     });
 

@@ -486,7 +486,7 @@ contract Staking is IStaking {
         uint256 power,
         uint256 slashFactor
     ) private {
-        require(infrationHeight <= block.number, "");
+        require(infrationHeight <= block.number, "cannot slash infrations in the future");
         Validator storage val = vals[valsIdx[valAddr] - 1];
         uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
         if (infrationHeight < block.number) {
@@ -499,7 +499,7 @@ contract Staking is IStaking {
                     if (entry.blockHeight < infrationHeight) continue;
                     // solhint-disable-next-line not-rely-on-time
                     if (entry.completionTime < block.timestamp) {
-                        // unbonding delegation no longer aligible for slashing, skip it
+                        // unbonding delegation no longer eligible for slashing, skip it
                         continue;
                     }
                     uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
@@ -991,7 +991,7 @@ contract Staking is IStaking {
 
         _slash(
             valAddr,
-            distributionHeight - 1,
+            distributionHeight.sub(1),
             votingPower,
             _params.slashFractionDoubleSign
         );
