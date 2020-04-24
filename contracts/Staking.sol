@@ -395,8 +395,8 @@ contract Staking is IStaking {
         } else {
             issuedShares = _shareFromToken(valAddr, amount);
         }
-        val.tokens += amount;
-        val.delegationShares += issuedShares;
+        val.tokens = val.tokens.add(amount);
+        val.delegationShares = val.delegationShares.add(issuedShares);
         return issuedShares;
     }
 
@@ -570,7 +570,7 @@ contract Staking is IStaking {
         for (uint256 i = 0; i < entries.length; i++) {
             // solhint-disable-next-line not-rely-on-time
             if (entries[i].completionTime < block.timestamp) {
-                amount += entries[i].amount;
+                amount = amount.add(entries[i].amount);
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
                 i--;
@@ -579,13 +579,13 @@ contract Staking is IStaking {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         delAddr.transfer(amount);
-        totalBonded -= amount;
+        totalBonded = totalBonded.sub(amount);
 
         if (del.shares == 0 && entries.length == 0) {
             _removeDelegation(valAddr, delAddr);
         }
 
-        val.ubdEntryCount -= entryCount;
+        val.ubdEntryCount = val.ubdEntryCount.sub(entryCount);
         if (val.delegationShares == 0 && val.ubdEntryCount == 0) {
             _removeValidator(valAddr);
         }
