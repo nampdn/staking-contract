@@ -517,9 +517,6 @@ contract Staking is IStaking {
 
         if (val.tokens > 0) {
             uint256 effectiveFraction = tokensToBurn.divTrun(val.tokens);
-            if (effectiveFraction > oneDec) {
-                effectiveFraction = oneDec;
-            }
             _beforeValidatorSlashed(valAddr, effectiveFraction);
         }
 
@@ -849,7 +846,7 @@ contract Staking is IStaking {
         return (val.tokens, val.delegationShares, val.jailed);
     }
 
-    function getValidatorDelegations(address valAddr)
+    function getDelegationsByValidator(address valAddr)
         public
         view
         returns (address[] memory, uint256[] memory)
@@ -876,7 +873,7 @@ contract Staking is IStaking {
         return (del.shares);
     }
 
-    function getDelegatorValidators(address delAddr)
+    function getValidatorsByDelegator(address delAddr)
         public
         view
         returns (address[] memory)
@@ -1150,17 +1147,18 @@ contract Staking is IStaking {
     function getValidators()
         public
         view
-        returns (address[] memory, uint256[] memory)
+        returns (address[] memory, uint256[] memory, uint256[] memory)
     {
         uint256 total = vals.length;
         address[] memory valAddrs = new address[](total);
-        uint256[] memory powers = new uint256[](total);
-
+        uint256[] memory tokens = new uint256[](total);
+        uint256[] memory delegationsShares = new uint256[](total);
         for (uint256 i = 0; i < vals.length; i++) {
             valAddrs[i] = vals[i].owner;
-            powers[i] = vals[i].tokens.div(powerReduction);
+            tokens[i] = vals[i].tokens;
+            delegationsShares[i] = vals[i].delegationShares;
         }
-        return (valAddrs, powers);
+        return (valAddrs, tokens, delegationsShares);
     }
 
     function getMissedBlock(address valAddr)

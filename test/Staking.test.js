@@ -118,6 +118,16 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.setMintParams(0,0,5,0,0, {from: accounts[2]}), "permission denied");
     });
 
+    it ("should set mint params", async () => {
+        const inflationRateChange = web3.utils.toWei("0.13", "ether");
+        const goalBonded = web3.utils.toWei("0.67", "ether");
+        const blocksPerYear = 6311520;
+        const inflationMax = web3.utils.toWei("0.2", "ether");
+        const inflationMin = web3.utils.toWei("0.07", "ether");
+        const instance = await Staking.deployed();
+        await instance.setMintParams(inflationRateChange,goalBonded,blocksPerYear,inflationMax,inflationMin);
+    })
+
     it ("should not set annual provision", async () => {
         const instance = await Staking.deployed();
         await assertRevert( instance.setAnnualProvision(0, {from: accounts[2]}), "permission denied");
@@ -144,6 +154,13 @@ contract("Staking", async (accounts) => {
         assert.equal(validator[0].toString(), bond);
         assert.equal(validator[1].toString(), web3.utils.toWei("1", "ether"));
         assert.equal(validator[2], false);
+
+        const validators = await instance.getValidators.call();
+        assert.equal(validators[0][0], accounts[0]);
+        assert.equal(validators[1][0].toString(), bond);
+
+        const stake = await instance.getAllDelegatorStake.call(accounts[0]);
+        assert.equal(stake.toString(), bond);
     })
 
 
@@ -244,8 +261,15 @@ contract("Staking", async (accounts) => {
 
     it ("should delegate", async() => {
         const instance = await Staking.deployed();
-        const bond1to0 = web3.utils.toWei("1", "ether");
+        const bond1to0 = web3.utils.toWei("0.5", "ether");
         await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
+        await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
+
+        const delegations = await instance.getDelegationsByValidator.call(accounts[0]);
+        assert.equal(delegations[0][1], accounts[1]);
+
+        const validators = await instance.getValidatorsByDelegator.call(accounts[1]);
+        assert.equal(validators[0], accounts[0]);
 
         // check delegation
         const delegation = await instance.getDelegation.call(accounts[0], accounts[1]);
@@ -346,6 +370,10 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
         assert.equal(reward.toString(), web3.utils.toWei("9.870839354070017998", "ether"));
 
+        // rewards: 11,904158322 + 9,870839354 = 21,774997676
+        const rewards = await instance.getAllDelegatorRewards.call(accounts[2]);
+        assert.equal(rewards.toString(), web3.utils.toWei("21.774997676206893636", "ether"));
+
     });
 
     it ("should withdraw delegation rewards", async () => {
@@ -410,6 +438,10 @@ contract("Staking", async (accounts) => {
         // new block provision: 55,45415552
         // delegation reward: 55,454154905* 89,142857143% * (1/7) = 7,06191687
         await finalizeCommit([accounts[6]]);
+        
+        const missedBlocks = await instance.getMissedBlock.call(accounts[6]);
+        assert.equal(missedBlocks[0], true);
+
         // new block provision: 55,454156135
         // delegation reward: 55,454156135* 89,142857143% * (1/7) = 7,061917026
         await finalizeCommit([accounts[6]]);
@@ -432,10 +464,14 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const bond4to4 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[4], value: bond4to4});
-        await instance.doubleSign(accounts[4], 1000000000000, 10);
+        const tx = await instance.doubleSign(accounts[4], 1000000000000, 10);
 
         const validator = await instance.getValidator.call(accounts[4]);
         assert.equal(validator[0].toString(), web3.utils.toWei("0.5", "ether"));
+
+        const slashEvents = await instance.getValidatorSlashEvents.call(accounts[4]);
+        assert.equal(slashEvents[1][0].toString(), web3.utils.toWei("0.5", "ether"));
+        assert.equal(slashEvents[0][0], tx.receipt.blockNumber);
     });
 
     it("should slash 100%", async () => {
