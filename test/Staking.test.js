@@ -474,6 +474,12 @@ contract("Staking", async (accounts) => {
 
     });
 
+    it ("should not slash", async () => {
+        const instance = await Staking.deployed();
+        // validator not found
+        await instance.doubleSign(accounts[4], 1000000000000, 10);
+    });
+
     it("should slash 50%", async () => {
         const instance = await Staking.deployed();
         const bond4to4 = web3.utils.toWei("1", "ether");
@@ -544,6 +550,23 @@ contract("Staking", async (accounts) => {
         const totalSupply = await instance.getTotalSupply.call();
         // totalSupply: 5000000386,27 - 14,75 = 5000000371,52
         assert.equal(totalSupply.toString(), web3.utils.toWei("5000000371.527930381262965107"));
+    });
+
+    it ("test validate signature", async () => {
+        const instance = await Staking.deployed();
+        const commissionRate = web3.utils.toWei("0.5", "ether")
+        const maxRate = web3.utils.toWei("1", "ether");
+        await utils.advanceTime(86401);
+        const bond3to3 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
+
+        await finalizeCommit([accounts[3]]);
+        let missedBlocks = await instance.getMissedBlock.call(accounts[3]);
+        assert.equal(missedBlocks[0], true);
+        await finalizeCommit([]);
+        await finalizeCommit([]);
+        missedBlocks = await instance.getMissedBlock.call(accounts[3]);
+        assert.equal(missedBlocks[0], false);
     });
 
     it ("should not unjail", async() => {

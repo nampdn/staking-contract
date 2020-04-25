@@ -435,8 +435,12 @@ contract Staking is IStaking {
         }
 
         uint256 amountRemoved = _removeDelShares(valAddr, shares);
-        addValidatorRank(valAddr);
         val.ubdEntryCount++;
+        if (val.tokens.div(powerReduction) == 0) {
+            removeValidatorRank(valAddr);
+        } else {
+            addValidatorRank(valAddr);
+        }
 
         // solhint-disable-next-line not-rely-on-time
         uint256 completionTime = block.timestamp.add(_params.unbondingTime);
@@ -486,7 +490,10 @@ contract Staking is IStaking {
         uint256 power,
         uint256 slashFactor
     ) private {
-        require(infrationHeight <= block.number, "cannot slash infrations in the future");
+        require(
+            infrationHeight <= block.number,
+            "cannot slash infrations in the future"
+        );
         Validator storage val = vals[valsIdx[valAddr] - 1];
         uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
         if (infrationHeight < block.number) {
@@ -522,6 +529,7 @@ contract Staking is IStaking {
 
         val.tokens = val.tokens.sub(tokensToBurn);
         _burn(tokensToBurn);
+        removeValidatorRank(valAddr);
     }
 
     function _burn(uint256 amount) private {
@@ -642,6 +650,7 @@ contract Staking is IStaking {
         delete valCurrentRewards[valAddr];
         delete valHRewards[valAddr];
         delete missedBlock[valAddr];
+        delete valSigningInfos[valAddr];
 
         removeValidatorRank(valAddr);
     }
@@ -1245,36 +1254,22 @@ contract Staking is IStaking {
     function addValidatorRank(address valAddr) private {
         uint256 idx = validatorRankIndex[valAddr];
         if (idx == 0) {
-            if (valsRank.length == 500) {
-                address last = valsRank[valsRank.length - 1];
-                if (
-                    vals[valsIdx[valAddr] - 1].tokens <
-                    vals[valsIdx[last] - 1].tokens
-                ) {
-                    return;
-                }
-                delete validatorRankIndex[last];
-                valsRank[valsRank.length - 1] = valAddr;
-                validatorRankIndex[valAddr] = valsRank.length;
-            } else {
-                valsRank.push(valAddr);
-                validatorRankIndex[valAddr] = valsRank.length;
-            }
+            valsRank.push(valAddr);
+            validatorRankIndex[valAddr] = valsRank.length;
         }
         _needSort = true;
     }
 
     function removeValidatorRank(address valAddr) private {
-        uint256 rankIndex = validatorRankIndex[valAddr];
-        if (rankIndex > 0) {
-            uint256 lastIndex = valsRank.length - 1;
-            address last = valsRank[lastIndex];
-            valsRank[rankIndex - 1] = last;
-            validatorRankIndex[last] = rankIndex;
-            delete validatorRankIndex[valAddr];
-            valsRank.pop();
-            _needSort = true;
-        }
+        uint256 index = validatorRankIndex[valAddr];
+        if (index == 0) return;
+        uint256 lastIndex = valsRank.length;
+        address last = valsRank[lastIndex - 1];
+        valsRank[index - 1] = last;
+        validatorRankIndex[last] = index;
+        valsRank.pop();
+        delete validatorRankIndex[valAddr];
+        _needSort = true;
     }
 
     function getValPowerByRank(uint256 rank) private view returns (uint256) {
@@ -1347,7 +1342,10 @@ contract Staking is IStaking {
         Validator storage val = vals[valIndex];
         require(val.jailed, "validator not jailed");
         // cannot be unjailed if tombstoned
-        require(valSigningInfos[valAddr].tombstoned == false, "validator jailed");
+        require(
+            valSigningInfos[valAddr].tombstoned == false,
+            "validator jailed"
+        );
         uint256 jailedUntil = valSigningInfos[valAddr].jailedUntil;
         // solhint-disable-next-line not-rely-on-time
         require(jailedUntil < block.timestamp, "validator jailed");
