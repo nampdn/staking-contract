@@ -22,7 +22,7 @@ async function setParams(owner, isOk) {
     const signedBlockWindow= 2;
     const minSignedBlockPerWindow = web3.utils.toWei("0.5", "ether")
     let instance = await Staking.deployed(); 
-    const promise =  instance.setParams(0, 0, baseProposerReward, bonusProposerReward, 
+    const promise =  instance.setParams(100, 600, baseProposerReward, bonusProposerReward, 
         slashFractionDowntime, unBondingTime, slashFractionDoubleSign, signedBlockWindow, minSignedBlockPerWindow, {from: owner})
     if (isOk) {
         await promise;
@@ -174,6 +174,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[0],
+                value: bond,
                 message: "validator already exist"
             }, 
             {
@@ -182,6 +183,16 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[5],
+                value: 0,
+                message: "invalid delegation amount"
+            },
+            {
+                rate: 0,
+                maxRate: web3.utils.toWei("1.1", "ether"),
+                maxChangeRate: 0,
+                minSelfDelegation: 0,
+                from: accounts[5],
+                value: bond,
                 message: "commission max rate cannot be more than 100%"
             },
             {
@@ -190,6 +201,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation: 0,
                 from: accounts[5],
+                value: bond,
                 message: "commission rate cannot be more than the max rate"
             },
             {
@@ -198,6 +210,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: web3.utils.toWei("1", "ether"),
                 minSelfDelegation: 0,
                 from: accounts[5],
+                value: bond,
                 message: "commission max change rate can not be more than the max rate"
             },
             {
@@ -206,6 +219,7 @@ contract("Staking", async (accounts) => {
                 maxChangeRate: 0,
                 minSelfDelegation:  web3.utils.toWei("2", "ether"),
                 from: accounts[5],
+                value: bond,
                 message: "self delegation below minimum"
             }
         ];
@@ -213,7 +227,7 @@ contract("Staking", async (accounts) => {
 
         for(var testCase of testCases) {
             await assertRevert(instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                testCase.minSelfDelegation, {from: testCase.from, value: bond}), testCase.message);
+                testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), testCase.message);
         }
     })
 
@@ -438,7 +452,7 @@ contract("Staking", async (accounts) => {
         // new block provision: 55,45415552
         // delegation reward: 55,454154905* 89,142857143% * (1/7) = 7,06191687
         await finalizeCommit([accounts[6]]);
-        
+
         const missedBlocks = await instance.getMissedBlock.call(accounts[6]);
         assert.equal(missedBlocks[0], true);
 
@@ -520,6 +534,16 @@ contract("Staking", async (accounts) => {
         // amount slashed: 0,5 - 2 * 50% - 0,25 = −0,75
         validator = await instance.getValidator.call(accounts[5]);
         assert.equal(validator[0].toString(), web3.utils.toWei("0", "ether"));
+    });
+
+    it ("should burn commission when delete validator", async () => {
+        const instance = await Staking.deployed();
+        await instance.undelegate(accounts[3], web3.utils.toWei("1", "ether"), { from: accounts[3]});
+        await utils.advanceTime(86401);
+        await instance.withdraw(accounts[3], {from: accounts[3]});
+        const totalSupply = await instance.getTotalSupply.call();
+        // totalSupply: 5000000386,27 - 14,75 = 5000000371,52
+        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000371.527930381262965107"));
     });
 
     it ("should not unjail", async() => {
