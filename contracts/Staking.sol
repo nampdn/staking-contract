@@ -1170,9 +1170,9 @@ contract Staking is IStaking {
     // @dev mints new tokens for the previous block. Returns fee collected
     function mint() public onlyRoot returns (uint256) {
         // recalculate inflation rate
-        nextInflationRate();
+        inflation =  nextInflationRate();
         // recalculate annual provisions
-        nextAnnualProvisions();
+        annualProvision = nextAnnualProvisions();
         // update fee collected
         _feesCollected = getBlockProvision();
         totalSupply += _feesCollected;
@@ -1184,40 +1184,44 @@ contract Staking is IStaking {
         inflation = _inflation;
     }
 
-    function nextInflationRate() private {
+    function nextInflationRate() public view returns (uint256) {
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
+        uint256 inflationRateChangePerYear;
+        uint256 inflationRateChange;
+        uint256 inflationRate;
         if (bondedRatio < _params.goalBonded) {
-            uint256 inflationRateChangePerYear = oneDec
+            inflationRateChangePerYear = oneDec
                 .sub(bondedRatio.divTrun(_params.goalBonded))
                 .mulTrun(_params.inflationRateChange);
-            uint256 inflationRateChange = inflationRateChangePerYear.div(
+            inflationRateChange = inflationRateChangePerYear.div(
                 _params.blocksPerYear
             );
-            inflation = inflation.add(inflationRateChange);
+            inflationRate = inflation.add(inflationRateChange);
         } else {
-            uint256 inflationRateChangePerYear = bondedRatio
+            inflationRateChangePerYear = bondedRatio
                 .divTrun(_params.goalBonded)
                 .sub(oneDec)
                 .mulTrun(_params.inflationRateChange);
-            uint256 inflationRateChange = inflationRateChangePerYear.div(
+            inflationRateChange = inflationRateChangePerYear.div(
                 _params.blocksPerYear
             );
             if (inflation > inflationRateChange) {
-                inflation = inflation.sub(inflationRateChange);
+                inflationRate = inflation.sub(inflationRateChange);
             } else {
-                inflation = 0;
+                inflationRate = 0;
             }
         }
-        if (inflation > _params.inflationMax) {
-            inflation = _params.inflationMax;
+        if (inflationRate > _params.inflationMax) {
+            inflationRate = _params.inflationMax;
         }
-        if (inflation < _params.inflationMin) {
-            inflation = _params.inflationMin;
+        if (inflationRate < _params.inflationMin) {
+            inflationRate = _params.inflationMin;
         }
+        return inflationRate;
     }
 
-    function nextAnnualProvisions() private {
-        annualProvision = inflation.mulTrun(totalSupply);
+    function nextAnnualProvisions() public view returns(uint256) {
+        return inflation.mulTrun(totalSupply);
     }
 
     function setAnnualProvision(uint256 _annualProvision) public onlyRoot {
