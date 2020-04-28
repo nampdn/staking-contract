@@ -1243,6 +1243,8 @@ contract Staking is IStaking {
     // validator rank
     function addValidatorRank(address valAddr) private {
         uint256 idx = validatorRankIndex[valAddr];
+        uint256 valPower = getValidatorPower(valAddr);
+        if (valPower == 0) return;
         if (idx == 0) {
             valsRank.push(valAddr);
             validatorRankIndex[valAddr] = valsRank.length;
