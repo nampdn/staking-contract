@@ -398,8 +398,6 @@ contract("Staking", async (accounts) => {
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
 
         await finalizeCommit([]);
-
-
         // previous block provision: 55,454153675
         // new block provision: 55,45415429
         // delegation rewards: 55,45415429 * 89% * (1/5) + 9.870839354 = 19,741678818;
@@ -548,8 +546,8 @@ contract("Staking", async (accounts) => {
         await utils.advanceTime(86401);
         await instance.withdraw(accounts[3], {from: accounts[3]});
         const totalSupply = await instance.getTotalSupply.call();
-        // totalSupply: 5000000386,27 - 14,75 = 5000000371,52
-        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000371.527930381262965107"));
+        // totalSupply: 5000000386,1890 - 14,7511 = 5000000371,43
+        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000371.437930381262965107"));
     });
 
     it ("test validate signature", async () => {
