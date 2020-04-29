@@ -4,6 +4,7 @@ import {IStaking} from "./IStaking.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
 
+
 contract Staking is IStaking, Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -104,8 +105,8 @@ contract Staking is IStaking, Ownable {
     mapping(address => EnumerableSet.AddressSet) dels;
 
     // sort
-    address[] valsRank;
-    mapping(address => uint256) validatorRankIndex;
+    address[] valRanks;
+    mapping(address => uint256) valRankIndexes;
 
     struct MissedBlock {
         mapping(uint256 => bool) items;
@@ -123,6 +124,7 @@ contract Staking is IStaking, Ownable {
 
     Params _params;
     address _previousProposer;
+
     constructor() public {
         _params = Params({
             maxValidators: 100,
@@ -282,13 +284,17 @@ contract Staking is IStaking, Ownable {
         valSigningInfos[valAddr].startHeight = block.number;
     }
 
-    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation) public {
+    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
+        public
+    {
         _updateValidator(msg.sender, commissionRate, minSelfDelegation);
     }
 
-    function _updateValidator(address valAddr, uint256 commissionRate, uint256 minSelfDelegation)
-        private
-    {
+    function _updateValidator(
+        address valAddr,
+        uint256 commissionRate,
+        uint256 minSelfDelegation
+    ) private {
         require(vals.contains(valAddr), "validator not found");
         Validator storage val = valByAddr[valAddr];
         if (commissionRate > 0) {
@@ -475,7 +481,7 @@ contract Staking is IStaking, Ownable {
         Validator storage val = valByAddr[valAddr];
         uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
         if (infrationHeight < block.number) {
-            uint totalDel = dels[valAddr].length();
+            uint256 totalDel = dels[valAddr].length();
             for (uint256 i = 0; i < totalDel; i++) {
                 address delAddr = dels[valAddr].at(i);
                 UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
@@ -822,9 +828,9 @@ contract Staking is IStaking, Ownable {
         view
         returns (address[] memory)
     {
-        uint total = delVals[delAddr].length();
+        uint256 total = delVals[delAddr].length();
         address[] memory addrs = new address[](total);
-        for (uint i = 0; i < total; i ++) {
+        for (uint256 i = 0; i < total; i++) {
             addrs[i] = delVals[delAddr].at(i);
         }
 
@@ -858,7 +864,7 @@ contract Staking is IStaking, Ownable {
         view
         returns (uint256)
     {
-       require(dels[valAddr].contains(delAddr), "delegation not found");
+        require(dels[valAddr].contains(delAddr), "delegation not found");
         Delegation memory del = delByAddr[valAddr][delAddr];
         return _tokenFromShare(valAddr, del.shares);
     }
@@ -1114,7 +1120,7 @@ contract Staking is IStaking, Ownable {
         returns (bool[] memory)
     {
         bool[] memory missedBlock = new bool[](_params.signedBlockWindow);
-        for (uint i = 0; i < _params.signedBlockWindow; i ++) {
+        for (uint256 i = 0; i < _params.signedBlockWindow; i++) {
             missedBlock[i] = valByAddr[valAddr].missedBlock.items[i];
         }
 
@@ -1177,7 +1183,7 @@ contract Staking is IStaking, Ownable {
         return inflationRate;
     }
 
-    function nextAnnualProvisions() public view returns(uint256) {
+    function nextAnnualProvisions() public view returns (uint256) {
         return inflation.mulTrun(totalSupply);
     }
 
@@ -1199,30 +1205,30 @@ contract Staking is IStaking, Ownable {
 
     // validator rank
     function addValidatorRank(address valAddr) private {
-        uint256 idx = validatorRankIndex[valAddr];
+        uint256 idx = valRankIndexes[valAddr];
         uint256 valPower = getValidatorPower(valAddr);
         if (valPower == 0) return;
         if (idx == 0) {
-            valsRank.push(valAddr);
-            validatorRankIndex[valAddr] = valsRank.length;
+            valRanks.push(valAddr);
+            valRankIndexes[valAddr] = valRanks.length;
         }
         _needSort = true;
     }
 
     function removeValidatorRank(address valAddr) private {
-        uint256 index = validatorRankIndex[valAddr];
-        if (index == 0) return;
-        uint256 lastIndex = valsRank.length;
-        address last = valsRank[lastIndex - 1];
-        valsRank[index - 1] = last;
-        validatorRankIndex[last] = index;
-        valsRank.pop();
-        delete validatorRankIndex[valAddr];
+        uint256 todDeleteIndex = valRankIndexes[valAddr];
+        if (todDeleteIndex == 0) return;
+        uint256 lastIndex = valRanks.length;
+        address last = valRanks[lastIndex - 1];
+        valRanks[todDeleteIndex - 1] = last;
+        valRankIndexes[last] = todDeleteIndex;
+        valRanks.pop();
+        delete valRankIndexes[valAddr];
         _needSort = true;
     }
 
     function getValPowerByRank(uint256 rank) private view returns (uint256) {
-        return getValidatorPower(valsRank[rank]);
+        return getValidatorPower(valRanks[rank]);
     }
 
     function _sortValidatorRank(int256 left, int256 right) internal {
@@ -1234,12 +1240,12 @@ contract Staking is IStaking, Ownable {
             while (getValPowerByRank(uint256(i)) > pivot) i++;
             while (pivot > getValPowerByRank(uint256(j))) j--;
             if (i <= j) {
-                address tmp = valsRank[uint256(i)];
-                valsRank[uint256(i)] = valsRank[uint256(j)];
-                valsRank[uint256(j)] = tmp;
+                address tmp = valRanks[uint256(i)];
+                valRanks[uint256(i)] = valRanks[uint256(j)];
+                valRanks[uint256(j)] = tmp;
 
-                validatorRankIndex[tmp] = uint256(j + 1);
-                validatorRankIndex[valsRank[uint256(i)]] = uint256(i + 1);
+                valRankIndexes[tmp] = uint256(j + 1);
+                valRankIndexes[valRanks[uint256(i)]] = uint256(i + 1);
 
                 i++;
                 j--;
@@ -1254,8 +1260,8 @@ contract Staking is IStaking, Ownable {
         onlyOwner
         returns (address[] memory, uint256[] memory)
     {
-        if (_needSort && valsRank.length > 0) {
-            _sortValidatorRank(0, int256(valsRank.length - 1));
+        if (_needSort && valRanks.length > 0) {
+            _sortValidatorRank(0, int256(valRanks.length - 1));
             _needSort = false;
         }
         return getValidatorSets();
@@ -1267,15 +1273,15 @@ contract Staking is IStaking, Ownable {
         returns (address[] memory, uint256[] memory)
     {
         uint256 maxVal = _params.maxValidators;
-        if (maxVal > valsRank.length) {
-            maxVal = valsRank.length;
+        if (maxVal > valRanks.length) {
+            maxVal = valRanks.length;
         }
         address[] memory valAddrs = new address[](maxVal);
         uint256[] memory powers = new uint256[](maxVal);
 
         for (uint256 i = 0; i < maxVal; i++) {
-            valAddrs[i] = valsRank[i];
-            powers[i] = getValidatorPower(valsRank[i]);
+            valAddrs[i] = valRanks[i];
+            powers[i] = getValidatorPower(valRanks[i]);
         }
         return (valAddrs, powers);
     }
