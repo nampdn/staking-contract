@@ -1,10 +1,12 @@
 pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
+import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 
 
 contract Staking is IStaking {
     using SafeMath for uint256;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     uint256 oneDec = 1 * 10**18;
     uint256 powerReduction = 1 * 10**6;
@@ -27,7 +29,6 @@ contract Staking is IStaking {
     }
 
     struct Validator {
-        uint256 id;
         address owner;
         uint256 tokens;
         uint256 delegationShares;
@@ -92,16 +93,15 @@ contract Staking is IStaking {
     }
 
     mapping(address => Validator) valByAddr;
-    address[] vals;
-    mapping(address => mapping(address => uint256)) delsIdx;
+    EnumerableSet.AddressSet vals;
     mapping(address => mapping(address => UBDEntry[])) ubdEntries;
     mapping(address => mapping(address => DelStartingInfo)) delStartingInfo;
     mapping(address => ValCurrentReward) valCurrentRewards;
     mapping(address => ValSigningInfo) valSigningInfos;
     mapping(address => uint256) valAccumulatedCommission;
-    mapping(address => Delegation[]) delegations;
-    mapping(address => address[]) delVals;
-    mapping(address => mapping(address => uint256)) delValsIndex;
+    mapping(address => mapping(address => Delegation)) delByAddr;
+    mapping(address => EnumerableSet.AddressSet) delVals;
+    mapping(address => EnumerableSet.AddressSet) dels;
 
     // sort
     address[] valsRank;
@@ -264,7 +264,7 @@ contract Staking is IStaking {
         uint256 maxChangeRate,
         uint256 minSelfDelegation
     ) private {
-        require(valByAddr[valAddr].id == 0, "validator already exist");
+        require(!vals.contains(valAddr), "validator already exist");
         require(amount > 0, "invalid delegation amount");
         require(amount > minSelfDelegation, "self delegation below minimum");
         require(
@@ -286,24 +286,27 @@ contract Staking is IStaking {
             maxChangeRate: maxChangeRate
         });
 
-        vals.push(valAddr);
+        vals.add(valAddr);
         // solhint-disable-next-line not-rely-on-time
         uint256 updateTime = block.timestamp;
         valByAddr[valAddr].commission = commission;
         valByAddr[valAddr].minSelfDelegation = minSelfDelegation;
         valByAddr[valAddr].updateTime = updateTime;
-        valByAddr[valAddr].id = vals.length;
         valByAddr[valAddr].owner = valAddr;
         _afterValidatorCreated(valAddr);
         _delegate(valAddr, valAddr, amount);
         valSigningInfos[valAddr].startHeight = block.number;
     }
 
-    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
-        public
+    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation) public {
+        _updateValidator(msg.sender, commissionRate, minSelfDelegation);
+    }
+
+    function _updateValidator(address valAddr, uint256 commissionRate, uint256 minSelfDelegation)
+        private
     {
-        require(valByAddr[msg.sender].id > 0, "validator not found");
-        Validator storage val = valByAddr[msg.sender];
+        require(vals.contains(valAddr), "validator not found");
+        Validator storage val = valByAddr[valAddr];
         if (commissionRate > 0) {
             require(
                 // solhint-disable-next-line not-rely-on-time
@@ -354,17 +357,11 @@ contract Staking is IStaking {
     function _delegate(address payable delAddr, address valAddr, uint256 amount)
         private
     {
-        uint256 delIndex = delsIdx[valAddr][delAddr];
         // add delegation if not exists;
-        if (delIndex == 0) {
-            delegations[valAddr].push(Delegation({owner: delAddr, shares: 0}));
-            delIndex = delegations[valAddr].length;
-            delsIdx[valAddr][delAddr] = delIndex;
-
-            // delegator validators index
-            delVals[delAddr].push(valAddr);
-            delValsIndex[delAddr][valAddr] = delVals[delAddr].length;
-
+        if (!dels[valAddr].contains(delAddr)) {
+            dels[valAddr].add(delAddr);
+            delVals[delAddr].add(valAddr);
+            delByAddr[valAddr][delAddr].owner = delAddr;
             _beforeDelegationCreated(valAddr);
         } else {
             _beforeDelegationSharesModified(valAddr, delAddr);
@@ -375,7 +372,7 @@ contract Staking is IStaking {
         totalBonded = totalBonded.add(amount);
 
         // increment stake amount
-        Delegation storage del = delegations[valAddr][delIndex - 1];
+        Delegation storage del = delByAddr[valAddr][delAddr];
         del.shares = del.shares.add(shared);
         _afterDelegationModified(valAddr, delAddr);
         addValidatorRank(valAddr);
@@ -399,7 +396,7 @@ contract Staking is IStaking {
     }
 
     function delegate(address valAddr) public payable {
-        require(valByAddr[valAddr].id > 0, "validator not found");
+        require(vals.contains(valAddr), "validator not found");
         require(msg.value > 0, "invalid delegation amount");
         _delegate(msg.sender, valAddr, msg.value);
     }
@@ -413,12 +410,11 @@ contract Staking is IStaking {
             ubdEntries[valAddr][delAddr].length < 7,
             "too many unbonding delegation entries"
         );
-        uint256 delegationIndex = delsIdx[valAddr][delAddr];
-        require(delegationIndex > 0, "delegation not found");
+        require(dels[valAddr].contains(delAddr), "delegation not found");
         _beforeDelegationSharesModified(valAddr, delAddr);
 
         Validator storage val = valByAddr[valAddr];
-        Delegation storage del = delegations[valAddr][delegationIndex - 1];
+        Delegation storage del = delByAddr[valAddr][delAddr];
         uint256 shares = _shareFromToken(valAddr, amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
@@ -495,8 +491,9 @@ contract Staking is IStaking {
         Validator storage val = valByAddr[valAddr];
         uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
         if (infrationHeight < block.number) {
-            for (uint256 i = 0; i < delegations[valAddr].length; i++) {
-                address delAddr = delegations[valAddr][i].owner;
+            uint totalDel = dels[valAddr].length();
+            for (uint256 i = 0; i < totalDel; i++) {
+                address delAddr = dels[valAddr].at(i);
                 UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
                 for (uint256 j = 0; j < entries.length; j++) {
                     UBDEntry storage entry = entries[j];
@@ -561,9 +558,8 @@ contract Staking is IStaking {
     }
 
     function _withdraw(address valAddr, address payable delAddr) private {
-        uint256 delIndex = delsIdx[valAddr][delAddr];
-        require(delIndex > 0, "delegation not found");
-        Delegation memory del = delegations[valAddr][delIndex - 1];
+        require(dels[valAddr].contains(delAddr), "delegation not found");
+        Delegation memory del = delByAddr[valAddr][delAddr];
         Validator storage val = valByAddr[valAddr];
         UBDEntry[] storage entries = ubdEntries[valAddr][delAddr];
         uint256 amount = 0;
@@ -596,43 +592,15 @@ contract Staking is IStaking {
     }
 
     function _removeDelegation(address valAddr, address delAddr) private {
-        // delete delegation and delegation index
-        uint256 index = delsIdx[valAddr][delAddr];
-        uint256 lastIndex = delegations[valAddr].length;
-        Delegation memory last = delegations[valAddr][lastIndex - 1];
-
-        delegations[valAddr][index - 1] = last;
-        delegations[valAddr].pop();
-        delsIdx[valAddr][last.owner] = index;
-
-        // delete other info
-        delete delsIdx[valAddr][delAddr];
+        dels[valAddr].remove(delAddr);
+        delete delByAddr[valAddr][delAddr];
         delete delStartingInfo[valAddr][delAddr];
-
-        _removeDelegatorValidatorIndex(valAddr, delAddr);
-    }
-
-    function _removeDelegatorValidatorIndex(address valAddr, address delAddr)
-        private
-    {
-        uint256 index = delValsIndex[delAddr][valAddr];
-        uint256 lastIndex = delVals[delAddr].length;
-        address last = delVals[delAddr][lastIndex - 1];
-        delVals[delAddr][index - 1] = last;
-        delValsIndex[delAddr][last] = index;
-        delVals[delAddr].pop();
-        delete delValsIndex[delAddr][valAddr];
+        delVals[delAddr].remove(valAddr);
     }
 
     function _removeValidator(address valAddr) private {
         // remove validator
-        uint256 valIdx = valByAddr[valAddr].id;
-        uint256 lastIndex = vals.length;
-        address last = vals[lastIndex - 1];
-        vals[valIdx - 1] = last;
-        vals.pop();
-        valByAddr[valAddr].id = valIdx;
-
+        vals.remove(valAddr);
         uint256 commission = valAccumulatedCommission[valAddr];
         if (commission > 0) {
             // substract total supply
@@ -741,13 +709,12 @@ contract Staking is IStaking {
     }
 
     function _initializeDelegation(address valAddr, address delAddr) private {
-        uint256 delIndex = delsIdx[valAddr][delAddr] - 1;
+        Delegation storage del = delByAddr[valAddr][delAddr];
         uint256 previousPeriod = valCurrentRewards[valAddr].period - 1;
         _incrementReferenceCount(valAddr, previousPeriod);
         delStartingInfo[valAddr][delAddr].height = block.number;
         delStartingInfo[valAddr][delAddr].previousPeriod = previousPeriod;
-        uint256 shares = delegations[valAddr][delIndex].shares;
-        uint256 stake = _tokenFromShare(valAddr, shares);
+        uint256 stake = _tokenFromShare(valAddr, del.shares);
         delStartingInfo[valAddr][delAddr].stake = stake;
     }
 
@@ -789,8 +756,7 @@ contract Staking is IStaking {
     }
 
     function withdrawReward(address valAddr) public {
-        require(valByAddr[valAddr].id > 0, "validator not found");
-        require(delsIdx[valAddr][msg.sender] > 0, "delegator not found");
+        require(dels[valAddr].contains(msg.sender), "delegator not found");
         _withdrawRewards(valAddr, msg.sender);
         _initializeDelegation(valAddr, msg.sender);
     }
@@ -800,10 +766,9 @@ contract Staking is IStaking {
         view
         returns (uint256)
     {
-        uint256 delIndex = delsIdx[valAddr][delAddr];
-        require(delIndex > 0, "delegation not found");
+        require(dels[valAddr].contains(delAddr), "delegation not found");
         Validator memory val = valByAddr[valAddr];
-        Delegation memory del = delegations[valAddr][delIndex - 1];
+        Delegation memory del = delByAddr[valAddr][delAddr];
         uint256 rewards = _calculateDelegationRewards(
             valAddr,
             delAddr,
@@ -819,7 +784,7 @@ contract Staking is IStaking {
     }
 
     function _withdrawValidatorCommission(address payable valAddr) private {
-        require(valByAddr[valAddr].id > 0, "validator not found");
+        require(vals.contains(valAddr), "validator not found");
         uint256 commission = valAccumulatedCommission[valAddr];
         require(commission > 0, "no validator commission to reward");
         valAddr.transfer(commission);
@@ -836,7 +801,7 @@ contract Staking is IStaking {
         view
         returns (uint256, uint256, bool)
     {
-        require(valByAddr[valAddr].id > 0, "validator not found");
+        require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
         return (val.tokens, val.delegationShares, val.jailed);
     }
@@ -846,15 +811,16 @@ contract Staking is IStaking {
         view
         returns (address[] memory, uint256[] memory)
     {
-        require(valByAddr[valAddr].id > 0, "validator not found");
-        uint256 total = delegations[valAddr].length;
-        address[] memory dels = new address[](total);
+        require(vals.contains(valAddr), "validator not found");
+        uint256 total = dels[valAddr].length();
+        address[] memory delAddrs = new address[](total);
         uint256[] memory shares = new uint256[](total);
         for (uint256 i = 0; i < total; i++) {
-            dels[i] = delegations[valAddr][i].owner;
-            shares[i] = delegations[valAddr][i].shares;
+            address delAddr = dels[valAddr].at(i);
+            delAddrs[i] = delAddr;
+            shares[i] = delByAddr[valAddr][delAddr].shares;
         }
-        return (dels, shares);
+        return (delAddrs, shares);
     }
 
     function getDelegation(address valAddr, address delAddr)
@@ -862,9 +828,8 @@ contract Staking is IStaking {
         view
         returns (uint256)
     {
-        uint256 delIndex = delsIdx[valAddr][delAddr];
-        require(delIndex > 0, "delegation not found");
-        Delegation memory del = delegations[valAddr][delIndex - 1];
+        require(dels[valAddr].contains(delAddr), "delegation not found");
+        Delegation memory del = delByAddr[valAddr][delAddr];
         return (del.shares);
     }
 
@@ -873,7 +838,13 @@ contract Staking is IStaking {
         view
         returns (address[] memory)
     {
-        return delVals[delAddr];
+        uint total = delVals[delAddr].length();
+        address[] memory addrs = new address[](total);
+        for (uint i = 0; i < total; i ++) {
+            addrs[i] = delVals[delAddr].at(i);
+        }
+
+        return addrs;
     }
 
     function getValidatorCommission(address valAddr)
@@ -889,10 +860,11 @@ contract Staking is IStaking {
         view
         returns (uint256)
     {
-        uint256 total = delVals[delAddr].length;
+        uint256 total = delVals[delAddr].length();
         uint256 rewards = 0;
         for (uint256 i = 0; i < total; i++) {
-            rewards += getDelegationRewards(delVals[delAddr][i], delAddr);
+            address valAddr = delVals[delAddr].at(i);
+            rewards += getDelegationRewards(valAddr, delAddr);
         }
         return rewards;
     }
@@ -902,9 +874,8 @@ contract Staking is IStaking {
         view
         returns (uint256)
     {
-        uint256 delIndex = delsIdx[valAddr][delAddr];
-        require(delIndex > 0, "delegation not found");
-        Delegation memory del = delegations[valAddr][delIndex - 1];
+       require(dels[valAddr].contains(delAddr), "delegation not found");
+        Delegation memory del = delByAddr[valAddr][delAddr];
         return _tokenFromShare(valAddr, del.shares);
     }
 
@@ -914,9 +885,10 @@ contract Staking is IStaking {
         returns (uint256)
     {
         uint256 stake = 0;
-        uint256 total = delVals[delAddr].length;
+        uint256 total = delVals[delAddr].length();
         for (uint256 i = 0; i < total; i++) {
-            stake += getDelegatorStake(delVals[delAddr][i], delAddr);
+            address valAddr = delVals[delAddr].at(i);
+            stake += getDelegatorStake(valAddr, delAddr);
         }
         return stake;
     }
@@ -975,7 +947,7 @@ contract Staking is IStaking {
         uint256 votingPower,
         uint256 distributionHeight
     ) private {
-        if (valByAddr[valAddr].id == 0) return;
+        if (!vals.contains(valAddr)) return;
 
         // reason: doubleSign
         emit Slashed(valAddr, votingPower, 2);
@@ -1139,14 +1111,15 @@ contract Staking is IStaking {
         view
         returns (address[] memory, uint256[] memory, uint256[] memory)
     {
-        uint256 total = vals.length;
+        uint256 total = vals.length();
         address[] memory valAddrs = new address[](total);
         uint256[] memory tokens = new uint256[](total);
         uint256[] memory delegationsShares = new uint256[](total);
         for (uint256 i = 0; i < total; i++) {
-            valAddrs[i] = valByAddr[vals[i]].owner;
-            tokens[i] = valByAddr[vals[i]].tokens;
-            delegationsShares[i] = valByAddr[vals[i]].delegationShares;
+            address valAddr = vals.at(i);
+            valAddrs[i] = valAddr;
+            tokens[i] = valByAddr[valAddr].tokens;
+            delegationsShares[i] = valByAddr[valAddr].delegationShares;
         }
         return (valAddrs, tokens, delegationsShares);
     }
@@ -1170,7 +1143,7 @@ contract Staking is IStaking {
     // @dev mints new tokens for the previous block. Returns fee collected
     function mint() public onlyRoot returns (uint256) {
         // recalculate inflation rate
-        inflation =  nextInflationRate();
+        inflation = nextInflationRate();
         // recalculate annual provisions
         annualProvision = nextAnnualProvisions();
         // update fee collected
@@ -1329,7 +1302,7 @@ contract Staking is IStaking {
 
     // slashing
     function _unjail(address valAddr) private {
-        require(valByAddr[valAddr].id > 0, "validator not found");
+        require(vals.contains(valAddr), "validator not found");
         Validator storage val = valByAddr[valAddr];
         require(val.jailed, "validator not jailed");
         // cannot be unjailed if tombstoned
@@ -1340,8 +1313,7 @@ contract Staking is IStaking {
         uint256 jailedUntil = valSigningInfos[valAddr].jailedUntil;
         // solhint-disable-next-line not-rely-on-time
         require(jailedUntil < block.timestamp, "validator jailed");
-        uint256 delIndex = delsIdx[valAddr][valAddr] - 1;
-        Delegation storage del = delegations[valAddr][delIndex];
+        Delegation storage del = delByAddr[valAddr][valAddr];
         uint256 tokens = _tokenFromShare(valAddr, del.shares);
         require(
             tokens > val.minSelfDelegation,

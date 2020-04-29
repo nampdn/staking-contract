@@ -7,7 +7,7 @@
     "test": "test"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^2.5.0"
+    "@openzeppelin/contracts": "^3.0.1"
   },
   "devDependencies": {
     "solidity-coverage": "^0.7.4"
