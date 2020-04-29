@@ -2,9 +2,9 @@ pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import {Ownable} from "./Ownable.sol";
 
-
-contract Staking is IStaking {
+contract Staking is IStaking, Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -119,26 +119,10 @@ contract Staking is IStaking {
     uint256 public inflation;
     uint256 public annualProvision;
     uint256 _feesCollected;
-
-    address _root;
-
     // mint
 
     Params _params;
     address _previousProposer;
-
-    modifier onlyRoot() {
-        require(msg.sender == _root, "permission denied");
-        _;
-    }
-
-    function setRoot(address newRoot) public {
-        if (_root != address(0x0)) {
-            require(msg.sender == _root, "permission denied");
-        }
-        _root = newRoot;
-    }
-
     constructor() public {
         _params = Params({
             maxValidators: 100,
@@ -171,7 +155,7 @@ contract Staking is IStaking {
         uint256 slashFractionDoubleSign,
         uint256 signedBlockWindow,
         uint256 minSignedPerWindow
-    ) public onlyRoot {
+    ) public onlyOwner {
         if (maxValidators > 0) {
             _params.maxValidators = maxValidators;
         }
@@ -203,7 +187,7 @@ contract Staking is IStaking {
         }
     }
 
-    function setTotalBonded(uint256 amount) public onlyRoot {
+    function setTotalBonded(uint256 amount) public onlyOwner {
         totalBonded = amount;
     }
 
@@ -213,7 +197,7 @@ contract Staking is IStaking {
         uint256 blocksPerYear,
         uint256 inflationMax,
         uint256 inflationMin
-    ) public onlyRoot {
+    ) public onlyOwner {
         if (inflationRateChange > 0) {
             _params.inflationRateChange = inflationRateChange;
         }
@@ -1098,11 +1082,11 @@ contract Staking is IStaking {
         address[] memory addrs,
         uint256[] memory powers,
         bool[] memory signed
-    ) public onlyRoot {
+    ) public onlyOwner {
         _finalizeCommit(addrs, powers, signed);
     }
 
-    function setPreviousProposer(address previousProposer) public onlyRoot {
+    function setPreviousProposer(address previousProposer) public onlyOwner {
         _previousProposer = previousProposer;
     }
 
@@ -1141,7 +1125,7 @@ contract Staking is IStaking {
     //  --------------------------------------------------
 
     // @dev mints new tokens for the previous block. Returns fee collected
-    function mint() public onlyRoot returns (uint256) {
+    function mint() public onlyOwner returns (uint256) {
         // recalculate inflation rate
         inflation = nextInflationRate();
         // recalculate annual provisions
@@ -1153,7 +1137,7 @@ contract Staking is IStaking {
         return _feesCollected;
     }
 
-    function setInflation(uint256 _inflation) public onlyRoot {
+    function setInflation(uint256 _inflation) public onlyOwner {
         inflation = _inflation;
     }
 
@@ -1197,7 +1181,7 @@ contract Staking is IStaking {
         return inflation.mulTrun(totalSupply);
     }
 
-    function setAnnualProvision(uint256 _annualProvision) public onlyRoot {
+    function setAnnualProvision(uint256 _annualProvision) public onlyOwner {
         annualProvision = _annualProvision;
     }
 
@@ -1205,7 +1189,7 @@ contract Staking is IStaking {
         return annualProvision.div(_params.blocksPerYear);
     }
 
-    function setTotalSupply(uint256 amount) public onlyRoot {
+    function setTotalSupply(uint256 amount) public onlyOwner {
         totalSupply = amount;
     }
 
@@ -1267,7 +1251,7 @@ contract Staking is IStaking {
 
     function applyAndReturnValidatorSets()
         public
-        onlyRoot
+        onlyOwner
         returns (address[] memory, uint256[] memory)
     {
         if (_needSort && valsRank.length > 0) {

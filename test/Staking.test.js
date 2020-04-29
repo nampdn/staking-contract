@@ -27,7 +27,7 @@ async function setParams(owner, isOk) {
     if (isOk) {
         await promise;
     } else {
-        await assertRevert(promise, "permission denied");
+        await assertRevert(promise, "Ownable: caller is not the owner");
     }
 }
 
@@ -58,14 +58,14 @@ contract("Staking", async (accounts) => {
         }
     }
 
-    it ("should set root", async() => {
+    it ("should transfer ownership", async() => {
         let instance = await Staking.deployed();
-        await instance.setRoot(accounts[0], {from: accounts[0]});
+        await instance.transferOwnership(accounts[0], {from: accounts[0]});
     });
 
-    it ("should not set root", async () => {
+    it ("should not transfer ownership", async () => {
         let instance = await Staking.deployed();
-        await assertRevert(instance.setRoot(accounts[0], {from: accounts[1]}), "permission denied");
+        await assertRevert(instance.transferOwnership(accounts[0], {from: accounts[1]}), "Ownable: caller is not the owner");
     });
 
     it ("should set previous proposer", async () => {
@@ -75,7 +75,7 @@ contract("Staking", async (accounts) => {
 
     it ("should not set previous proposer", async () => {
         let instance = await Staking.deployed();
-        await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}), "permission denied");
+        await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}), "Ownable: caller is not the owner");
     });
 
 
@@ -89,7 +89,7 @@ contract("Staking", async (accounts) => {
 
     it ("should not finalize", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.finalizeCommit([], [], [], {from: accounts[1]}), "permission denied");
+        await assertRevert(instance.finalizeCommit([], [], [], {from: accounts[1]}), "Ownable: caller is not the owner");
     });
 
 
@@ -100,22 +100,22 @@ contract("Staking", async (accounts) => {
 
     it ("should not set total bonded", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.setTotalBonded(1, {from: accounts[2]}), "permission denied");
+        await assertRevert(instance.setTotalBonded(1, {from: accounts[2]}), "Ownable: caller is not the owner");
     })
 
     it ("should not set total supply", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.setTotalSupply(1, {from: accounts[2]}), "permission denied");
+        await assertRevert(instance.setTotalSupply(1, {from: accounts[2]}), "Ownable: caller is not the owner");
     });
 
     it ("should not set inflation", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.setInflation(1, {from: accounts[2]}), "permission denied");
+        await assertRevert(instance.setInflation(1, {from: accounts[2]}), "Ownable: caller is not the owner");
     });
 
     it ("should not set mint params", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.setMintParams(0,0,5,0,0, {from: accounts[2]}), "permission denied");
+        await assertRevert(instance.setMintParams(0,0,5,0,0, {from: accounts[2]}), "Ownable: caller is not the owner");
     });
 
     it ("should set mint params", async () => {
@@ -130,7 +130,7 @@ contract("Staking", async (accounts) => {
 
     it ("should not set annual provision", async () => {
         const instance = await Staking.deployed();
-        await assertRevert( instance.setAnnualProvision(0, {from: accounts[2]}), "permission denied");
+        await assertRevert( instance.setAnnualProvision(0, {from: accounts[2]}), "Ownable: caller is not the owner");
     })
     
     it("should create validator", async () => {
