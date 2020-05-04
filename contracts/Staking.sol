@@ -1231,7 +1231,7 @@ contract Staking is IStaking, Ownable {
         return getValidatorPower(valRanks[rank]);
     }
 
-    function _sortValidatorRank(int256 left, int256 right) internal {
+    function _sortValRank(int256 left, int256 right) internal {
         int256 i = left;
         int256 j = right;
         if (i == j) return;
@@ -1251,8 +1251,15 @@ contract Staking is IStaking, Ownable {
                 j--;
             }
         }
-        if (left < j) _sortValidatorRank(left, j);
-        if (i < right) _sortValidatorRank(i, right);
+        if (left < j) _sortValRank(left, j);
+        if (i < right) _sortValRank(i, right);
+    }
+
+    function _clearValRank() private {
+        for (uint256 i = valRanks.length; i > 300; i --) {
+            delete valRankIndexes[valRanks[i - 1]];
+            valRanks.pop();
+        }
     }
 
     function applyAndReturnValidatorSets()
@@ -1261,7 +1268,8 @@ contract Staking is IStaking, Ownable {
         returns (address[] memory, uint256[] memory)
     {
         if (_needSort && valRanks.length > 0) {
-            _sortValidatorRank(0, int256(valRanks.length - 1));
+            _sortValRank(0, int256(valRanks.length - 1));
+            _clearValRank();
             _needSort = false;
         }
         return getValidatorSets();
