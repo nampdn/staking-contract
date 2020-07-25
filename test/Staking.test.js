@@ -78,7 +78,6 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.setPreviousProposer(accounts[0], { from: accounts[1]}), "Ownable: caller is not the owner");
     });
 
-
     it ("should set params", async() => {
         await setParams(accounts[0], true);
     });
@@ -87,15 +86,20 @@ contract("Staking", async (accounts) => {
         await setParams(accounts[1]);
     });
 
+    it ("should finalize", async () => {
+        const instance = await Staking.deployed();
+        await instance.finalizeCommit([accounts[0], accounts[1]], [1,2], [true, true], {from: accounts[0]})
+    });
+
     it ("should not finalize", async () => {
         const instance = await Staking.deployed();
-        await assertRevert(instance.finalizeCommit([], [], [], {from: accounts[1]}), "Ownable: caller is not the owner");
+        await assertRevert(instance.finalizeCommit([accounts[0], accounts[1]], [1, 2], [true, true], {from: accounts[1]}), "Ownable: caller is not the owner");
     });
 
 
     it ("should set total bonded", async () => {
         const instance = await Staking.deployed();
-        await instance.setTotalBonded(web3.utils.toWei("5000000000", "ether"));
+        await instance.setTotalBonded(web3.utils.toWei("5000000000", "ether"), {from: accounts[0]});
     });
 
     it ("should not set total bonded", async () => {
@@ -103,9 +107,25 @@ contract("Staking", async (accounts) => {
         await assertRevert(instance.setTotalBonded(1, {from: accounts[2]}), "Ownable: caller is not the owner");
     })
 
+    it ("should set total supply", async () => {
+        const instance = await Staking.deployed();
+        await instance.setTotalSupply(1, {from: accounts[0]});
+
+        const totalSupply = await instance.getTotalSupply();
+        assert.equal(totalSupply.words[0].toString(), "1");
+    });
+
     it ("should not set total supply", async () => {
         const instance = await Staking.deployed();
         await assertRevert(instance.setTotalSupply(1, {from: accounts[2]}), "Ownable: caller is not the owner");
+    });
+
+    it ("should set inflation", async () => {
+        const instance = await Staking.deployed();
+        await instance.setInflation(100, {from: accounts[0]});
+
+        let inflation = await instance.inflation();
+        assert.equal(inflation.words[0].toString(), "100");
     });
 
     it ("should not set inflation", async () => {
@@ -119,35 +139,46 @@ contract("Staking", async (accounts) => {
     });
 
     it ("should set mint params", async () => {
-        const inflationRateChange = web3.utils.toWei("0.13", "ether");
-        const goalBonded = web3.utils.toWei("0.67", "ether");
+        const inflationRateChange = web3.utils.toWei("0.013", "ether");
+        const goalBonded = web3.utils.toWei("0.067", "ether");
         const blocksPerYear = 6311520;
-        const inflationMax = web3.utils.toWei("0.2", "ether");
-        const inflationMin = web3.utils.toWei("0.07", "ether");
+        const inflationMax = web3.utils.toWei("0.02", "ether");
+        const inflationMin = web3.utils.toWei("0.007", "ether");
         const instance = await Staking.deployed();
         await instance.setMintParams(inflationRateChange,goalBonded,blocksPerYear,inflationMax,inflationMin);
-    })
+    });
+
+    it ("should set annual provision", async () => {
+        const instance = await Staking.deployed();
+        await instance.setAnnualProvision(10, {from: accounts[0]});
+
+        let annualProvision = await instance.annualProvision();
+        assert.equal(annualProvision.words[0].toString(), "10");
+    });
 
     it ("should not set annual provision", async () => {
         const instance = await Staking.deployed();
         await assertRevert( instance.setAnnualProvision(0, {from: accounts[2]}), "Ownable: caller is not the owner");
-    })
+    });
     
     it("should create validator", async () => {
         const instance = await Staking.deployed();
-        const maxRate = web3.utils.toWei("0.5", "ether");
-        const maxChangeRate = web3.utils.toWei("0.1", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
+        const maxRate = web3.utils.toWei("0.05", "ether");
+        const maxChangeRate = web3.utils.toWei("0.01", "ether");
+        const minSelfDelegation = web3.utils.toWei("0.05", "ether");
 
-        const bond = web3.utils.toWei("100", "ether")
+        const bond = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, maxRate, maxChangeRate ,minSelfDelegation, {from: accounts[0], value: bond});
         let validatorSet = await getCurrentValidatorSet();
         assert.equal(validatorSet[0][0], accounts[0]);
         assert.equal(validatorSet[1][0].toString(), bond/powerReduction);
 
-        // check delegation
+        // check get delegation
         const delegation = await instance.getDelegation.call(accounts[0], accounts[0]);
-        assert.equal(delegation.toString(), web3.utils.toWei("1", "ether"))
+        assert.equal(delegation.toString(), web3.utils.toWei("1", "ether"));
+
+        // check delegation not found
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
 
         // check validator
         const validator = await instance.getValidator(accounts[0]);
@@ -161,8 +192,7 @@ contract("Staking", async (accounts) => {
 
         const stake = await instance.getAllDelegatorStake.call(accounts[0]);
         assert.equal(stake.toString(), bond);
-    })
-
+    });
 
     it ("should not create validator", async() => {
         const instance = await Staking.deployed();
@@ -224,42 +254,37 @@ contract("Staking", async (accounts) => {
             }
         ];
 
-
         for(var testCase of testCases) {
             await assertRevert(instance.createValidator(testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
                 testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), testCase.message);
         }
-    })
+    });
 
     it ("should not update validator", async () => {
         const instance = await Staking.deployed();
         await assertRevert(instance.updateValidator(1, 0, {from: accounts[5]}), "validator not found");
 
-        let minSelfDelegation = web3.utils.toWei("0.4", "ether");
+        let minSelfDelegation = web3.utils.toWei("0.04", "ether");
         await assertRevert(instance.updateValidator(0, minSelfDelegation, {from: accounts[0]}), "minimum self delegation cannot be decrease");
 
-        minSelfDelegation = web3.utils.toWei("101", "ether");
+        minSelfDelegation = web3.utils.toWei("11", "ether");
         await assertRevert(instance.updateValidator(0, minSelfDelegation, {from: accounts[0]}), "self delegation below minimum");
 
-        let commissionRate = web3.utils.toWei("0.11", "ether");
+        let commissionRate = web3.utils.toWei("0.011", "ether");
         await assertRevert(instance.updateValidator(commissionRate, 0, {from: accounts[0]}), "commission cannot be changed more than one in 24h");
         await utils.advanceTime(86401);
 
-        commissionRate = web3.utils.toWei("0.3", "ether");
+        commissionRate = web3.utils.toWei("0.03", "ether");
         await assertRevert(instance.updateValidator(commissionRate, 0, {from: accounts[0]}), "commission cannot be changed more than max change rate");
     });
 
     it ("should update validator", async () => {
         const instance = await Staking.deployed();
 
-        let minSelfDelegation = web3.utils.toWei("0.51", "ether");
-        await instance.updateValidator(0, minSelfDelegation, {from: accounts[0]});
-
-        let commissionRate = web3.utils.toWei("0.09", "ether");
-        await instance.updateValidator(commissionRate, 0, {from: accounts[0]});
-
-
-    })
+        let minSelfDelegation = web3.utils.toWei("0.051", "ether");
+        let commissionRate = web3.utils.toWei("0.001", "ether");
+        await instance.updateValidator(commissionRate, minSelfDelegation, {from: accounts[0]});
+    });
 
     it ("should not delegate", async () => {
         const instance = await Staking.deployed();
@@ -277,17 +302,25 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const bond1to0 = web3.utils.toWei("0.5", "ether");
         await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
-        await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
+        await instance.delegate(accounts[0], {from: accounts[2], value: bond1to0});
 
         const delegations = await instance.getDelegationsByValidator.call(accounts[0]);
         assert.equal(delegations[0][1], accounts[1]);
+        assert.equal(delegations[0][2], accounts[2]);
+        assert.equal(delegations[1][1].toString(), bond1to0.toString());
+        assert.equal(delegations[1][2].toString(), bond1to0.toString());
 
-        const validators = await instance.getValidatorsByDelegator.call(accounts[1]);
-        assert.equal(validators[0], accounts[0]);
+        const validators1 = await instance.getValidatorsByDelegator.call(accounts[1]);
+        const validators2 = await instance.getValidatorsByDelegator.call(accounts[2]);
+        assert.equal(validators1[0], accounts[0]);
+        assert.equal(validators2[0], accounts[0]);
 
         // check delegation
         const delegation = await instance.getDelegation.call(accounts[0], accounts[1]);
-        assert.equal(delegation.toString(), web3.utils.toWei("0.01", "ether"))
+        assert.equal(delegation.toString(), web3.utils.toWei("0.5", "ether"))
+
+        // check delegation not found
+        await assertRevert( instance.getDelegation.call(accounts[0], accounts[4]), "delegation not found");
     });
 
     it ("should not undelegate", async () => {
@@ -303,30 +336,45 @@ contract("Staking", async (accounts) => {
 
     it ("should undelegate", async() => {
         const instance = await Staking.deployed();
-        const amount = web3.utils.toWei("0.5", "ether");
-        await instance.undelegate(accounts[0], amount, {from: accounts[1]});
+        const amount1 = web3.utils.toWei("0.4", "ether");
+        const amount2 = web3.utils.toWei("0.3", "ether");
+
+        await instance.undelegate(accounts[0], amount1, {from: accounts[1]});
+        await instance.undelegate(accounts[0], amount2, {from: accounts[2]});
 
         // check delegation
-        const delegation = await instance.getDelegation.call(accounts[0], accounts[1]);
-        assert.equal(delegation.toString(), web3.utils.toWei("0.005", "ether"))
+        const delegation1 = await instance.getDelegation.call(accounts[0], accounts[1]);
+        assert.equal(delegation1.toString(), web3.utils.toWei("0.1", "ether"))
 
-        const udbEntries = await instance.getUBDEntries.call(accounts[0], accounts[1]);
-        assert.equal(udbEntries[0][0].toString(), amount);
-    })
+        const delegation2 = await instance.getDelegation.call(accounts[0], accounts[2]);
+        assert.equal(delegation2.toString(), web3.utils.toWei("0.2", "ether"))
+
+        const udbEntries1 = await instance.getUBDEntries.call(accounts[0], accounts[1]);
+        const udbEntries2 = await instance.getUBDEntries.call(accounts[0], accounts[2]);
+
+        assert.equal(udbEntries1[0][0].toString(), amount1);
+        assert.equal(udbEntries2[0][0].toString(), amount2);
+    });
 
     it ("should remove delegation", async() => {
         const instance = await Staking.deployed();
-        const amount = web3.utils.toWei("0.5", "ether");
-        await instance.undelegate(accounts[0], amount, {from: accounts[1]});
+        const amount1 = web3.utils.toWei("0.1", "ether");
+        const amount2 = web3.utils.toWei("0.2", "ether");
+
+        await instance.undelegate(accounts[0], amount1, {from: accounts[1]});
+        await instance.undelegate(accounts[0], amount2, {from: accounts[2]});
 
         await utils.advanceTime(2001);
         await instance.withdraw(accounts[0], {from: accounts[1]});
-        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
-    })
+        await instance.withdraw(accounts[0], {from: accounts[2]});
 
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[1]), "delegation not found");
+        await assertRevert(instance.getDelegation.call(accounts[0], accounts[2]), "delegation not found");
+    });
+    
     it ("should not withdraw", async () => {
         const instance = await Staking.deployed();
-        const amount = web3.utils.toWei("100", "ether");
+        const amount = web3.utils.toWei("1", "ether");
         await instance.undelegate(accounts[0], amount, {from: accounts[0]});
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "no unbonding amount to withdraw");
     });
@@ -334,21 +382,22 @@ contract("Staking", async (accounts) => {
     it ("should withdraw", async () => {
         const instance = await Staking.deployed();
         await utils.advanceTime(2000);
-        await instance.withdraw(accounts[0], {from: accounts[0]}); 
+        await instance.withdraw(accounts[0], {from: accounts[0]});
+
+        // check delegation not found
         await assertRevert(instance.withdraw(accounts[0], {from: accounts[0]}), "delegation not found");
     });
-
 
     it ("should remove validator", async() => {
         const instance = await Staking.deployed();
         await assertRevert(instance.getValidator.call(accounts[0]), "validator not found");
         const validatorSets = await getCurrentValidatorSet();
         assert.equal(validatorSets[0].length, 0);
-    })
-
+    });
 
     it ("calculate delegation rewards", async () => {
         const instance = await Staking.deployed();
+
         const bond0to0 = web3.utils.toWei("1", "ether");
         const bond1to0 = web3.utils.toWei("1", "ether");
         const bond2to0 = web3.utils.toWei("1", "ether");
@@ -361,8 +410,6 @@ contract("Staking", async (accounts) => {
         await instance.delegate(accounts[0], {from: accounts[2], value: bond2to0});
         await instance.createValidator(0, 0,0, 0, {from: accounts[1], value: bond1to1});
         await instance.createValidator(0, 0,0, 0, {from: accounts[2], value: bond2to2});
-
-        
 
         await finalizeCommit([]);
 
@@ -387,13 +434,26 @@ contract("Staking", async (accounts) => {
         // rewards: 11,904158322 + 9,870839354 = 21,774997676
         const rewards = await instance.getAllDelegatorRewards.call(accounts[2]);
         assert.equal(rewards.toString(), web3.utils.toWei("21.774997676206893636", "ether"));
+        const rewards1 = await instance.getAllDelegatorRewards.call(accounts[0]);
+        assert.equal(rewards1.toString(), web3.utils.toWei("11.904158322136875638", "ether"));
+        const rewards2 = await instance.getAllDelegatorRewards.call(accounts[1]);
+        assert.equal(rewards2.toString(), web3.utils.toWei("21.774997676206893636", "ether"));
+    });
 
+    it ("should not withdraw delegation rewards", async () => {
+        const instance = await Staking.deployed();
+    
+        // check delegator not found
+        await assertRevert(instance.withdrawReward(accounts[0], {from: accounts[6]}), "delegator not found");  
     });
 
     it ("should withdraw delegation rewards", async () => {
         const instance = await Staking.deployed();
-
         await instance.withdrawReward(accounts[0], {from: accounts[0]});
+
+        // check delegator not found
+        await assertRevert(instance.getDelegationRewards.call(accounts[0], accounts[6]), "delegation not found");
+
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("0", "ether"));
 
@@ -402,8 +462,7 @@ contract("Staking", async (accounts) => {
         // new block provision: 55,45415429
         // delegation rewards: 55,45415429 * 89% * (1/5) + 9.870839354 = 19,741678818;
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
-        assert.equal(reward.toString(), web3.utils.toWei("19.741678817615844484", "ether"));
-        
+        assert.equal(reward.toString(), web3.utils.toWei("19.741681722076097486", "ether"));
     });
 
     it ("calculate delegation rewards after withdraw reward", async () => {
@@ -413,8 +472,8 @@ contract("Staking", async (accounts) => {
         // validator 1 reward: 55,45415429 * 89% * (3/5) + 6,099956972 = 35,712475363
         // delegation reward: 35,712475295/3 = 11,904158454;
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
-        assert.equal(reward.toString(), web3.utils.toWei("11.904158454163880631", "ether"));
-    })
+        assert.equal(reward.toString(), web3.utils.toWei("11.904161956921189495", "ether"));
+    });
 
     it ("should withdraw commission rewards", async() => {
         const instance = await Staking.deployed();
@@ -431,16 +490,21 @@ contract("Staking", async (accounts) => {
         // validator rewards: 55,454154905 * 89% * (1/6) = 8,225699644
         // validate commission: 8,225699644 * 50% = 4,112849822
         let commission = await instance.getValidatorCommission.call(accounts[3]);
-        assert.equal(commission.toString(), web3.utils.toWei("4.112849822092348395"));
+        assert.equal(commission.toString(), web3.utils.toWei("4.112852242475932477"));
 
         const reward = await instance.getDelegationRewards.call(accounts[3], accounts[3]);
-        assert.equal(reward.toString(), web3.utils.toWei("4.112849822092348395", "ether"));
+        assert.equal(reward.toString(), web3.utils.toWei("4.112852242475932478", "ether"));
+
+        // check validator not found
+        await assertRevert(instance.withdrawValidatorCommission({from: accounts[6]}), "validator not found");  
 
         await instance.withdrawValidatorCommission({from: accounts[3]});
 
-        commission = await instance.getValidatorCommission.call(accounts[3]);
-        assert.equal(commission.toString(), web3.utils.toWei("0"));
+        var commissionCheck = await instance.getValidatorCommission.call(accounts[3]);
+        assert.equal(commissionCheck.toString(), web3.utils.toWei("0"));
 
+        // check no validator commission to reward
+        await assertRevert(instance.withdrawValidatorCommission({from: accounts[3]}), "no validator commission to reward");
     });
 
     it ("calculate delegation reward after slash", async () => {
@@ -457,7 +521,7 @@ contract("Staking", async (accounts) => {
         // new block provision: 55,454156135
         // delegation reward: 55,454156135* 89,142857143% * (1/7) = 7,061917026
         await finalizeCommit([accounts[6]]);
-        // new block provision: 55,45415675
+        // new block provision: 55,454 15675
         // delegation reward: 0
         await finalizeCommit([]);
 
@@ -468,14 +532,16 @@ contract("Staking", async (accounts) => {
         await finalizeCommit([]);
         // total reward: 7,06191687 + 7,061917026 + 0 + 6,437504284 = 20,56133818;
         rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
-        assert.equal(rewards.toString(), web3.utils.toWei("20.561338328761406515"));
-
+        assert.equal(rewards.toString(), web3.utils.toWei("24.010829817464578594"));
     });
 
     it ("should not slash", async () => {
         const instance = await Staking.deployed();
         // validator not found
-        await instance.doubleSign(accounts[4], 1000000000000, 10);
+        await instance.doubleSign(accounts[4], 1000000000000, 10000);
+
+        // check cannot slash infrations in the future
+        await assertRevert(instance.doubleSign(accounts[1], 1000000000000, 10000))
     });
 
     it("should slash 50%", async () => {
@@ -542,12 +608,19 @@ contract("Staking", async (accounts) => {
 
     it ("should burn commission when delete validator", async () => {
         const instance = await Staking.deployed();
+        const commissionRate = web3.utils.toWei("0.5", "ether")
+        const maxRate = web3.utils.toWei("1", "ether");
+        await utils.advanceTime(86401);
+        const bond3to3 = web3.utils.toWei("1", "ether");
+        await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
+
         await instance.undelegate(accounts[3], web3.utils.toWei("1", "ether"), { from: accounts[3]});
         await utils.advanceTime(86401);
+
         await instance.withdraw(accounts[3], {from: accounts[3]});
         const totalSupply = await instance.getTotalSupply.call();
         // totalSupply: 5000000386,1890 - 14,7511 = 5000000371,43
-        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000371.437930381262965107"));
+        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000055.454153674550662914"));
     });
 
     it ("test validate signature", async () => {
@@ -556,14 +629,14 @@ contract("Staking", async (accounts) => {
         const maxRate = web3.utils.toWei("1", "ether");
         await utils.advanceTime(86401);
         const bond3to3 = web3.utils.toWei("1", "ether");
-        await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
+        await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[8], value: bond3to3});
 
-        await finalizeCommit([accounts[3]]);
-        let missedBlocks = await instance.getMissedBlock.call(accounts[3]);
+        await finalizeCommit([accounts[8]]);
+        let missedBlocks = await instance.getMissedBlock.call(accounts[8]);
         assert.equal(missedBlocks[0], true);
         await finalizeCommit([]);
         await finalizeCommit([]);
-        missedBlocks = await instance.getMissedBlock.call(accounts[3]);
+        missedBlocks = await instance.getMissedBlock.call(accounts[8]);
         assert.equal(missedBlocks[0], false);
     });
 
@@ -648,7 +721,6 @@ contract("Staking", async (accounts) => {
         assert.equal(inflation.toString(), web3.utils.toWei("0.187194029850746269", "ether"));
 
         
-
         await mint(5); // 1 year
         let newTotalSupply = await instance.getTotalSupply.call();
         await instance.setTotalBonded(newTotalSupply.toString());
@@ -663,7 +735,23 @@ contract("Staking", async (accounts) => {
         // inflation min : 7%
         inflation = await instance.getInflation.call();
         assert.equal(inflation.toString(), web3.utils.toWei("0.07", "ether")) // 7%
+    });
 
+    it ("should delegator stake", async () => {
+        const instance = await Staking.deployed();
 
-    })
+        // check delegation not found
+        await assertRevert(instance.getDelegatorStake(accounts[6], accounts[6]), "delegation not found");
+
+        var stake = await instance.getDelegatorStake(accounts[0], accounts[0]);
+        assert.equal(stake.toString(), web3.utils.toWei("1", "ether"));
+    });
+
+    it ("should all delegator stake", async () => {
+        const instance = await Staking.deployed();
+
+        var stake = await instance.getAllDelegatorStake(accounts[1]);
+        assert.equal(stake.toString(), web3.utils.toWei("2", "ether"));
+    });
+
 })

@@ -1,7 +1,7 @@
 pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "./EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
 
 

@@ -44,12 +44,12 @@ module.exports = {
     //
     development: {
      host: "127.0.0.1",     // Localhost (default: none)
-     port: 8545,            // Standard Ethereum port (default: none)
+     port: 7545,            // Standard Ethereum port (default: none)
      network_id: "*",       // Any network (default: none),
-     gas: 11000000,
-     allowUnlimitedContractSize: true,
-     gasLimit: 110000000,
-     defaultEtherBalance: 1000000
+     // gas: 11000000,
+     // allowUnlimitedContractSize: true,
+     // gasLimit: 110000000,
+     // defaultEtherBalance: 1000000
     },
 
     // Another network with more advanced options...
