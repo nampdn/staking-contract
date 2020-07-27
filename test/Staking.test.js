@@ -405,17 +405,19 @@ contract("Staking", async (accounts) => {
         const bond1to1 = web3.utils.toWei("1", "ether");
         const bond2to2 = web3.utils.toWei("1", "ether");
 
+
         await instance.createValidator(0, 0,0, 0, {from: accounts[0], value: bond0to0});
         await instance.delegate(accounts[0], {from: accounts[1], value: bond1to0});
         await instance.delegate(accounts[0], {from: accounts[2], value: bond2to0});
         await instance.createValidator(0, 0,0, 0, {from: accounts[1], value: bond1to1});
         await instance.createValidator(0, 0,0, 0, {from: accounts[2], value: bond2to2});
 
+
         await finalizeCommit([]);
 
         // proposer base reward: 55,454153675 *  (10+ 1)% = 6,099956904
         // validator 1 reward: 55,454153675 * 89% * (3/(3 + 1 + 1)) + 6,099956904 = 35,712474966
-        // delegation reward: 35,712474966/3 = 11,904158322;
+        // delegation reward: 35,712474966/3 = 11,904158322;    
         let reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("11.904158322136875638", "ether"));
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[1]);
@@ -431,7 +433,7 @@ contract("Staking", async (accounts) => {
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
         assert.equal(reward.toString(), web3.utils.toWei("9.870839354070017998", "ether"));
 
-        // rewards: 11,904158322 + 9,870839354 = 21,774997676
+        // rewards: 11,904158322 + 9,870839354 = 21,774997676 = valdition reward + delegation reward
         const rewards = await instance.getAllDelegatorRewards.call(accounts[2]);
         assert.equal(rewards.toString(), web3.utils.toWei("21.774997676206893636", "ether"));
         const rewards1 = await instance.getAllDelegatorRewards.call(accounts[0]);
@@ -459,8 +461,8 @@ contract("Staking", async (accounts) => {
 
         await finalizeCommit([]);
         // previous block provision: 55,454153675
-        // new block provision: 55,45415429
-        // delegation rewards: 55,45415429 * 89% * (1/5) + 9.870839354 = 19,741678818;
+        // new block provision: 55,4541706 = annualProvision / blocksPerYear
+        // delegation rewards: 55,4541706 * 89% * (1/5) + 9.870839354 = 19.7416817;
         reward = await instance.getDelegationRewards.call(accounts[2], accounts[2]);
         assert.equal(reward.toString(), web3.utils.toWei("19.741681722076097486", "ether"));
     });
@@ -468,9 +470,9 @@ contract("Staking", async (accounts) => {
     it ("calculate delegation rewards after withdraw reward", async () => {
         const instance = await Staking.deployed();
 
-        // proposer base reward: 55,45415429 *  (10+ 1)% = 6,099956972
-        // validator 1 reward: 55,45415429 * 89% * (3/5) + 6,099956972 = 35,712475363
-        // delegation reward: 35,712475295/3 = 11,904158454;
+        // proposer base reward: 55.4541706068  *  (10+ 1)% = 6.09995876675
+        // validator 1 reward: 55.4541706068 * 89% * (3/5) + 6.09995876675 = 35.7124858708
+        // delegation reward: 35.7124858708/3 = 11.904161956;
         reward = await instance.getDelegationRewards.call(accounts[0], accounts[0]);
         assert.equal(reward.toString(), web3.utils.toWei("11.904161956921189495", "ether"));
     });
@@ -511,27 +513,36 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const bond6to6 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
-        // new block provision: 55,45415552
-        // delegation reward: 55,454154905* 89,142857143% * (1/7) = 7,06191687
+
+        // var inflation = await instance.getInflation()
+        // console.log("sasasasasa", inflation.toString())
+        var annualProvision = await instance.nextAnnualProvisions()
+        console.log("annualProvision", Number(annualProvision.toString())/6311520)
+        // new block provision: 55.454154289583290000
+        // delegation reward: 55.454154289583290000 * 89,142857143% * (1/6) = 8.23890292304
         await finalizeCommit([accounts[6]]);
 
         const missedBlocks = await instance.getMissedBlock.call(accounts[6]);
         assert.equal(missedBlocks[0], true);
-
-        // new block provision: 55,454156135
-        // delegation reward: 55,454156135* 89,142857143% * (1/7) = 7,061917026
+        var annualProvision1 = await instance.nextAnnualProvisions()
+        console.log("annualProvision1", Number(annualProvision1.toString())/6311520)
+        // new block provision: 55.454171221808730000
+        // delegation reward: 55.454171221808730000 * 89,142857143% * (1/6) = 8.23890543868
         await finalizeCommit([accounts[6]]);
-        // new block provision: 55,454 15675
+        var annualProvision2 = await instance.nextAnnualProvisions()
+        console.log("annualProvision2", Number(annualProvision2.toString())/6311520)
+        // new block provision: 55.454188152925620000
         // delegation reward: 0
         await finalizeCommit([]);
 
         await utils.advanceTime(601);
         await instance.unjail({from: accounts[6]});
 
-        // delegation reward: 55,45415675* 89% * (0.9/6.9) = 6,437504284
+        // delegation reward: 55.4541881529256200005 * 89% * (0.9/5.9) = 7.54069541567
         await finalizeCommit([]);
-        // total reward: 7,06191687 + 7,061917026 + 0 + 6,437504284 = 20,56133818;
+        // total reward: 8.23890292304 + 8.23890543868 + 0 + 7.52861096748 = 24.0064193275;
         rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
+        console.log("sasasasasasas", rewards.toString())
         assert.equal(rewards.toString(), web3.utils.toWei("24.010829817464578594"));
     });
 
@@ -613,14 +624,17 @@ contract("Staking", async (accounts) => {
         await utils.advanceTime(86401);
         const bond3to3 = web3.utils.toWei("1", "ether");
         await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[3], value: bond3to3});
+        await finalizeCommit([]);
+        //commission = 41.12850986669199418
 
         await instance.undelegate(accounts[3], web3.utils.toWei("1", "ether"), { from: accounts[3]});
         await utils.advanceTime(86401);
-
+        
+        // totalSupply = 5000000110.908324281326385627
         await instance.withdraw(accounts[3], {from: accounts[3]});
         const totalSupply = await instance.getTotalSupply.call();
-        // totalSupply: 5000000386,1890 - 14,7511 = 5000000371,43
-        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000055.454153674550662914"));
+        // totalSupply = totalSupply - commission = 5000000110.908324281326385627 - 41.12850986669199418 = 5000000106.7954732 
+        assert.equal(totalSupply.toString(), web3.utils.toWei("5000000106.795473294657186209"));
     });
 
     it ("test validate signature", async () => {
@@ -628,7 +642,7 @@ contract("Staking", async (accounts) => {
         const commissionRate = web3.utils.toWei("0.5", "ether")
         const maxRate = web3.utils.toWei("1", "ether");
         await utils.advanceTime(86401);
-        const bond3to3 = web3.utils.toWei("1", "ether");
+        const bond3to8 = web3.utils.toWei("1", "ether");
         await instance.createValidator(commissionRate, maxRate, 0, 0, {from: accounts[8], value: bond3to3});
 
         await finalizeCommit([accounts[8]]);
