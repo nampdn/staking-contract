@@ -514,23 +514,17 @@ contract("Staking", async (accounts) => {
         const bond6to6 = web3.utils.toWei("1", "ether");
         await instance.createValidator(0, 0, 0, 0, {from: accounts[6], value: bond6to6});
 
-        // var inflation = await instance.getInflation()
-        // console.log("sasasasasa", inflation.toString())
-        var annualProvision = await instance.nextAnnualProvisions()
-        console.log("annualProvision", Number(annualProvision.toString())/6311520)
         // new block provision: 55.454154289583290000
         // delegation reward: 55.454154289583290000 * 89,142857143% * (1/6) = 8.23890292304
         await finalizeCommit([accounts[6]]);
 
         const missedBlocks = await instance.getMissedBlock.call(accounts[6]);
         assert.equal(missedBlocks[0], true);
-        var annualProvision1 = await instance.nextAnnualProvisions()
-        console.log("annualProvision1", Number(annualProvision1.toString())/6311520)
+
         // new block provision: 55.454171221808730000
         // delegation reward: 55.454171221808730000 * 89,142857143% * (1/6) = 8.23890543868
         await finalizeCommit([accounts[6]]);
-        var annualProvision2 = await instance.nextAnnualProvisions()
-        console.log("annualProvision2", Number(annualProvision2.toString())/6311520)
+
         // new block provision: 55.454188152925620000
         // delegation reward: 0
         await finalizeCommit([]);
@@ -540,9 +534,8 @@ contract("Staking", async (accounts) => {
 
         // delegation reward: 55.4541881529256200005 * 89% * (0.9/5.9) = 7.54069541567
         await finalizeCommit([]);
-        // total reward: 8.23890292304 + 8.23890543868 + 0 + 7.52861096748 = 24.0064193275;
+        // total reward: 8.23890292304 + 8.23890543868 + 0 + 7.52861096748 = 24.0185037774;
         rewards = await instance.getDelegationRewards.call(accounts[6], accounts[6]);
-        console.log("sasasasasasas", rewards.toString())
         assert.equal(rewards.toString(), web3.utils.toWei("24.010829817464578594"));
     });
 
