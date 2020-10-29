@@ -4,13 +4,12 @@ import {IStaking} from "./IStaking.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
 
-
 contract Staking is IStaking, Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     uint256 oneDec = 1 * 10**18;
-    uint256 powerReduction = 1 * 10**6;
+    uint256 powerReduction = 1 * 10**8;
 
     struct Delegation {
         uint256 shares;
@@ -18,79 +17,114 @@ contract Staking is IStaking, Ownable {
     }
 
     struct UBDEntry {
+        // KAI to receive at completion
         uint256 amount;
+         // height which the unbonding took place
         uint256 blockHeight;
+        // unix time for unbonding completion
         uint256 completionTime;
     }
 
     struct Commission {
-        uint256 rate;
+        // the commission rate charged to delegators, as a fraction
+        uint256 rate; 
+        // maximum commission rate which validator can ever charge, as a fraction
         uint256 maxRate;
+        // maximum daily increase of the validator commission, as a fraction
         uint256 maxChangeRate;
     }
 
     struct Validator {
-        address owner;
-        uint256 tokens;
-        uint256 delegationShares;
-        bool jailed;
-        Commission commission;
-        uint256 minSelfDelegation;
-        uint256 updateTime;
-        uint256 ubdEntryCount;
+        address owner; // address of the Validator
+        uint256 tokens; // delegated token
+        uint256 delegationShares; // total share issued to Validator's delegator
+        bool jailed; 
+        Commission commission; // commission paramater
+        uint256 minSelfDelegation; // Validator's self decalared  
+        uint256 updateTime; // the last time the validator was changed
+        uint256 ubdEntryCount; // unbonding delegation entries
         mapping(uint256 => ValHRewards) hRewards;
         mapping(uint256 => ValSlashEvent) slashEvents;
         uint256 slashEventCounter;
         MissedBlock missedBlock;
     }
 
-    struct DelStartingInfo {
-        uint256 stake;
-        uint256 previousPeriod;
-        uint256 height;
+    /*
+    DelStartingInfo represents the starting info for a delegator reward
+    period. It tracks the previous validator period, the delegation's amount of
+    staking token, and the creation height (to check later on if any slashes have
+    occurred)
+    */
+    struct DelStartingInfo {  
+        uint256 stake; // share delegator's
+        uint256 previousPeriod; // previousPeriod uses calculates reward
+        uint256 height; // creation heigh
     }
 
     struct ValSlashEvent {
-        uint256 validatorPeriod;
-        uint256 fraction;
-        uint256 height;
+        uint256 validatorPeriod; // slash validator period 
+        uint256 fraction; // fraction slash rate
+        uint256 height; 
     }
 
+    /*
+    ValCurrentReward represents current rewards and current period for 
+    a validator kept as a running counter and incremented each block 
+    as long as the validator's tokens remain constant.
+    */
     struct ValCurrentReward {
         uint256 period;
         uint256 reward;
     }
 
-    // validator historical rewards
+    /* 
+    ValHRewards represents historical rewards for a validator.
+    Height is implicit within the store key.
+    cumulativeRewardRatio is the sum from the zeroeth period
+    until this period of rewards / tokens, per the spec.
+    The reference_count indicates the number of objects
+    which might need to reference this historical entry at any point.
+    ReferenceCount = number of outstanding delegations which ended the associated period (and might need to read that record)
+        + number of slashes which ended the associated period (and might need to
+    read that record)
+        + one per validator for the zeroeth period, set on initialization
+    */
     struct ValHRewards {
-        uint256 cumulativeRewardRatio;
+        uint256 cumulativeRewardRatio; 
         uint256 reference_count;
     }
 
+    // ValSigningInfo defines a validator's signing info for monitoring their
+    // liveness activity.
     struct ValSigningInfo {
-        uint256 startHeight;
+        // height at which validator was first a candidate OR was unjailed
+        uint256 startHeight; 
+         // index offset into signed block bit array
         uint256 indexOffset;
+        // whether or not a validator has been tombstoned (killed out of validator set)
         bool tombstoned;
+         // missed blocks counter 
         uint256 missedBlockCounter;
+        // time for which the validator is jailed until.
         uint256 jailedUntil;
     }
 
     struct Params {
-        uint256 baseProposerReward;
-        uint256 bonusProposerReward;
-        uint256 maxValidators;
-        uint256 downtimeJailDuration;
-        uint256 slashFractionDowntime;
-        uint256 unbondingTime;
-        uint256 slashFractionDoubleSign;
-        uint256 signedBlockWindow;
-        uint256 minSignedPerWindow;
+        uint256 baseProposerReward; // the current distribution base proposer rate
+        uint256 bonusProposerReward; //  the current distribution bonus proposer reward rate
+        uint256 maxValidators;  // maximum number of Validators
+        uint256 downtimeJailDuration; // jail time
+        uint256 slashFractionDowntime; // percentage slash when the validator downtime
+        uint256 unbondingTime; // unbonding time
+        uint256 slashFractionDoubleSign; // percentage slash when the validator double signs 
+        uint256 signedBlockWindow; // sliding window for downtime slashing
+        uint256 minSignedPerWindow; // minimum blocks signed per window
         // mint params
-        uint256 inflationRateChange;
-        uint256 goalBonded;
-        uint256 blocksPerYear;
-        uint256 inflationMax;
-        uint256 inflationMin;
+        uint256 inflationRateChange;  // maximum annual change in inflation rate
+        uint256 goalBonded; // goal of percent bonded KAI
+        uint256 blocksPerYear; // expected blocks per year
+        uint256 inflationMax;  // maximum inflation rate
+        uint256 inflationMin; // minimum inflation rate
     }
 
     mapping(address => Validator) valByAddr;
@@ -137,10 +171,10 @@ contract Staking is IStaking, Ownable {
             signedBlockWindow: 100,
             minSignedPerWindow: 5 * 10**16,
             inflationRateChange: 13 * 10**16,
-            goalBonded: 67 * 10**16,
-            blocksPerYear: 6311520,
+            goalBonded: 67 * 10**16, 
+            blocksPerYear: 6311520,  
             inflationMax: 20 * 10**16,
-            inflationMin: 7 * 10**16
+            inflationMin: 7 * 10**16    
         });
     }
 
@@ -179,7 +213,7 @@ contract Staking is IStaking, Ownable {
         if (slashFractionDoubleSign > 0) {
             _params.slashFractionDoubleSign = slashFractionDoubleSign;
         }
-
+ 
         if (signedBlockWindow > 0) {
             _params.signedBlockWindow = signedBlockWindow;
         }
@@ -217,6 +251,7 @@ contract Staking is IStaking, Ownable {
         }
     }
 
+    // create new validator
     function createValidator(
         uint256 commssionRate,
         uint256 maxRate,
@@ -284,6 +319,7 @@ contract Staking is IStaking, Ownable {
         valSigningInfos[valAddr].startHeight = block.number;
     }
 
+    // update validator
     function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
         public
     {
@@ -369,6 +405,7 @@ contract Staking is IStaking, Ownable {
         emit Delegate(valAddr, delAddr, amount);
     }
 
+    // calculate share delegator's
     function _addTokenFromDel(address valAddr, uint256 amount)
         private
         returns (uint256)
@@ -438,7 +475,8 @@ contract Staking is IStaking, Ownable {
 
         emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
-
+    
+    // remove share delegator's
     function _removeDelShares(address valAddr, uint256 shares)
         private
         returns (uint256)
@@ -468,6 +506,7 @@ contract Staking is IStaking, Ownable {
         removeValidatorRank(valAddr);
     }
 
+    // slash Validator
     function _slash(
         address valAddr,
         uint256 infrationHeight,
@@ -580,14 +619,16 @@ contract Staking is IStaking, Ownable {
 
         emit Withdraw(valAddr, delAddr, amount);
     }
-
+    
+    // remove delegation
     function _removeDelegation(address valAddr, address delAddr) private {
         dels[valAddr].remove(delAddr);
         delete delByAddr[valAddr][delAddr];
         delete delStartingInfo[valAddr][delAddr];
         delVals[delAddr].remove(valAddr);
     }
-
+    
+    // remove validator
     function _removeValidator(address valAddr) private {
         // remove validator
         vals.remove(valAddr);
@@ -605,16 +646,19 @@ contract Staking is IStaking, Ownable {
         delete valByAddr[valAddr];
         removeValidatorRank(valAddr);
     }
-
+    
+    // withdraw token delegator's
     function withdraw(address valAddr) public {
         _withdraw(valAddr, msg.sender);
     }
 
+    // calculate the total rewards accrued by a delegation
     function _calculateDelegationRewards(
         address valAddr,
         address delAddr,
         uint256 endingPeriod
     ) private view returns (uint256) {
+        // fetch starting info for delegation
         DelStartingInfo memory startingInfo = delStartingInfo[valAddr][delAddr];
         uint256 rewards = 0;
         uint256 slashEventCounter = valByAddr[valAddr].slashEventCounter;
@@ -648,6 +692,7 @@ contract Staking is IStaking, Ownable {
         return rewards;
     }
 
+    // calculate the rewards accrued by a delegation between two periods
     function _calculateDelegationRewardsBetween(
         address valAddr,
         uint256 startingPeriod,
@@ -660,9 +705,10 @@ contract Staking is IStaking, Ownable {
         uint256 difference = ending.cumulativeRewardRatio.sub(
             starting.cumulativeRewardRatio
         );
-        return stake.mulTrun(difference);
+        return stake.mulTrun(difference); // return staking * (ending - starting)
     }
 
+    // increment validator period, returning the period just ended
     function _incrementValidatorPeriod(address valAddr)
         private
         returns (uint256)
@@ -687,6 +733,7 @@ contract Staking is IStaking, Ownable {
         return previousPeriod.add(1);
     }
 
+    // decrement the reference count for a historical rewards value, and delete if zero references remain
     function _decrementReferenceCount(address valAddr, uint256 period) private {
         valByAddr[valAddr].hRewards[period].reference_count--;
         if (valByAddr[valAddr].hRewards[period].reference_count == 0) {
@@ -694,10 +741,12 @@ contract Staking is IStaking, Ownable {
         }
     }
 
+    // increment the reference count for a historical rewards value
     function _incrementReferenceCount(address valAddr, uint256 period) private {
         valByAddr[valAddr].hRewards[period].reference_count++;
     }
 
+    // initialize starting info for a new delegation
     function _initializeDelegation(address valAddr, address delAddr) private {
         Delegation storage del = delByAddr[valAddr][delAddr];
         uint256 previousPeriod = valCurrentRewards[valAddr].period - 1;
@@ -708,6 +757,7 @@ contract Staking is IStaking, Ownable {
         delStartingInfo[valAddr][delAddr].stake = stake;
     }
 
+   // initialize starting info for a new validator
     function _initializeValidator(address valAddr) private {
         valCurrentRewards[valAddr].period = 1;
         valCurrentRewards[valAddr].reward = 0;
@@ -745,12 +795,14 @@ contract Staking is IStaking, Ownable {
         }
     }
 
+    // withdraw rewards from a delegation
     function withdrawReward(address valAddr) public {
         require(dels[valAddr].contains(msg.sender), "delegator not found");
         _withdrawRewards(valAddr, msg.sender);
         _initializeDelegation(valAddr, msg.sender);
     }
 
+    // get rewards from a delegation
     function getDelegationRewards(address valAddr, address delAddr)
         public
         view
@@ -782,10 +834,12 @@ contract Staking is IStaking, Ownable {
         emit WithdrawCommissionReward(valAddr, commission);
     }
 
+    // withdraw validator commission
     function withdrawValidatorCommission() public {
         _withdrawValidatorCommission(msg.sender);
     }
 
+    // get infor of validator
     function getValidator(address valAddr)
         public
         view
@@ -796,6 +850,7 @@ contract Staking is IStaking, Ownable {
         return (val.tokens, val.delegationShares, val.jailed);
     }
 
+    // get all delegation by validator
     function getDelegationsByValidator(address valAddr)
         public
         view
@@ -813,6 +868,7 @@ contract Staking is IStaking, Ownable {
         return (delAddrs, shares);
     }
 
+    // get delegation of a delegator
     function getDelegation(address valAddr, address delAddr)
         public
         view
@@ -823,6 +879,7 @@ contract Staking is IStaking, Ownable {
         return (del.shares);
     }
 
+    // get all validator of delegator delegated
     function getValidatorsByDelegator(address delAddr)
         public
         view
@@ -836,7 +893,8 @@ contract Staking is IStaking, Ownable {
 
         return addrs;
     }
-
+    
+    // get commission validator
     function getValidatorCommission(address valAddr)
         public
         view
@@ -844,7 +902,8 @@ contract Staking is IStaking, Ownable {
     {
         return valAccumulatedCommission[valAddr];
     }
-
+    
+    // get all reward of a delegator
     function getAllDelegatorRewards(address delAddr)
         public
         view
@@ -882,7 +941,8 @@ contract Staking is IStaking, Ownable {
         }
         return stake;
     }
-
+    
+    // token worth of provided delegator shares
     function _tokenFromShare(address valAddr, uint256 shares)
         private
         view
@@ -891,7 +951,8 @@ contract Staking is IStaking, Ownable {
         Validator memory val = valByAddr[valAddr];
         return shares.mul(val.tokens).div(val.delegationShares);
     }
-
+    
+    // shares worth of delegator's bond
     function _shareFromToken(address valAddr, uint256 amount)
         private
         view
@@ -917,6 +978,7 @@ contract Staking is IStaking, Ownable {
         return (balances, completionTime);
     }
 
+    // get slash event for Validator
     function getValidatorSlashEvents(address valAddr)
         public
         view
@@ -954,6 +1016,7 @@ contract Staking is IStaking, Ownable {
         valSigningInfos[valAddr].tombstoned = true;
     }
 
+    // check double sign, must be called once per validator per block
     function doubleSign(
         address valAddr,
         uint256 votingPower,
@@ -962,6 +1025,7 @@ contract Staking is IStaking, Ownable {
         _doubleSign(valAddr, votingPower, distributionHeight);
     }
 
+    // validate validator signature, must be called once per validator per block
     function _validateSignature(
         address valAddr,
         uint256 votingPower,
@@ -969,14 +1033,15 @@ contract Staking is IStaking, Ownable {
     ) private {
         Validator storage val = valByAddr[valAddr];
         ValSigningInfo storage signInfo = valSigningInfos[valAddr];
+        // counts blocks the validator should have signed
         uint256 index = signInfo.indexOffset % _params.signedBlockWindow;
         signInfo.indexOffset++;
         bool previous = valByAddr[valAddr].missedBlock.items[index];
         bool missed = !signed;
-        if (!previous && missed) {
+        if (!previous && missed) { // value has changed from not missed to missed, increment counter
             signInfo.missedBlockCounter++;
             valByAddr[valAddr].missedBlock.items[index] = true;
-        } else if (previous && !missed) {
+        } else if (previous && !missed) { // value has changed from missed to not missed, decrement counter
             signInfo.missedBlockCounter--;
             valByAddr[valAddr].missedBlock.items[index] = false;
         }
@@ -991,6 +1056,7 @@ contract Staking is IStaking, Ownable {
             _params.minSignedPerWindow
         );
         uint256 maxMissed = _params.signedBlockWindow - minSignedPerWindow;
+        // if past the minimum height and the validator has missed too many blocks, punish them
         if (
             block.number > minHeight && signInfo.missedBlockCounter > maxMissed
         ) {
@@ -1010,6 +1076,7 @@ contract Staking is IStaking, Ownable {
                 signInfo.jailedUntil = block.timestamp.add(
                     _params.downtimeJailDuration
                 );
+                // reset the counter & array so that the validator won't be immediately slashed for downtime upon rebonding
                 signInfo.missedBlockCounter = 0;
                 signInfo.indexOffset = 0;
                 delete valByAddr[valAddr].missedBlock;
@@ -1017,6 +1084,7 @@ contract Staking is IStaking, Ownable {
         }
     }
 
+    // _allocateTokens handles distribution of the collected fees
     function _allocateTokens(
         uint256 sumPreviousPrecommitPower,
         uint256 totalPreviousVotingPower,
@@ -1024,9 +1092,11 @@ contract Staking is IStaking, Ownable {
         address[] memory addrs,
         uint256[] memory powers
     ) private {
+        // calculate fraction votes
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(
             totalPreviousVotingPower
         );
+        // calculate previous proposer reward
         uint256 proposerMultiplier = _params.baseProposerReward.add(
             _params.bonusProposerReward.mulTrun(previousFractionVotes)
         );
@@ -1040,10 +1110,12 @@ contract Staking is IStaking, Ownable {
             uint256 rewards = _feesCollected.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
+            // allocate token to a validator
             _allocateTokensToValidator(addrs[i], rewards);
         }
     }
 
+    // _allocateTokensToValidator allocate tokens to a particular validator, splitting according to commission
     function _allocateTokensToValidator(address valAddr, uint256 rewards)
         private
     {
@@ -1084,6 +1156,7 @@ contract Staking is IStaking, Ownable {
         }
     }
 
+    // finalize commit, must be called once per validator per block
     function finalizeCommit(
         address[] memory addrs,
         uint256[] memory powers,
@@ -1114,6 +1187,7 @@ contract Staking is IStaking, Ownable {
         return (valAddrs, tokens, delegationsShares);
     }
 
+    // getMissedBlock returns array of missed blocks for given validator address
     function getMissedBlock(address valAddr)
         public
         view
@@ -1147,6 +1221,7 @@ contract Staking is IStaking, Ownable {
         inflation = _inflation;
     }
 
+    // recalculate inflation rate 
     function nextInflationRate() public view returns (uint256) {
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
         uint256 inflationRateChangePerYear;
@@ -1183,6 +1258,7 @@ contract Staking is IStaking, Ownable {
         return inflationRate;
     }
 
+    // recalculate annual provision
     function nextAnnualProvisions() public view returns (uint256) {
         return inflation.mulTrun(totalSupply);
     }
@@ -1294,6 +1370,7 @@ contract Staking is IStaking, Ownable {
         return (valAddrs, powers);
     }
 
+    // get voting power of the validator
     function getValidatorPower(address valAddr) public view returns (uint256) {
         return valByAddr[valAddr].tokens.div(powerReduction);
     }
@@ -1322,7 +1399,10 @@ contract Staking is IStaking, Ownable {
         val.jailed = false;
         addValidatorRank(valAddr);
     }
-
+    
+// Unjail is used for unjailing a jailed validator, thus returning
+// them into the bonded validator set, so they can begin receiving provisions
+// and rewards again.
     function unjail() public {
         _unjail(msg.sender);
         emit UnJail(msg.sender);
