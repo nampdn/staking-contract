@@ -1,7 +1,7 @@
 pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "./EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
 
 contract Staking is IStaking, Ownable {
@@ -129,17 +129,17 @@ contract Staking is IStaking, Ownable {
 
     mapping(address => Validator) valByAddr;
     EnumerableSet.AddressSet vals;
-    mapping(address => mapping(address => UBDEntry[])) ubdEntries;
-    mapping(address => mapping(address => DelStartingInfo)) delStartingInfo;
-    mapping(address => ValCurrentReward) valCurrentRewards;
-    mapping(address => ValSigningInfo) valSigningInfos;
-    mapping(address => uint256) valAccumulatedCommission;
-    mapping(address => mapping(address => Delegation)) delByAddr;
+    mapping(address => mapping(address => UBDEntry[])) public ubdEntries;
+    mapping(address => mapping(address => DelStartingInfo)) public delStartingInfo;
+    mapping(address => ValCurrentReward) public valCurrentRewards;
+    mapping(address => ValSigningInfo) public valSigningInfos;
+    mapping(address => uint256) public valAccumulatedCommission;
+    mapping(address => mapping(address => Delegation)) public delByAddr;
     mapping(address => EnumerableSet.AddressSet) delVals;
     mapping(address => EnumerableSet.AddressSet) dels;
 
     // sort
-    address[] valRanks;
+    address[] public valRanks;
     mapping(address => uint256) valRankIndexes;
 
     struct MissedBlock {
@@ -582,10 +582,6 @@ contract Staking is IStaking, Ownable {
         _updateValidatorSlashFraction(valAddr, fraction);
     }
 
-    function getTotalSupply() public view returns (uint256) {
-        return totalSupply;
-    }
-
     function _withdraw(address valAddr, address payable delAddr) private {
         require(dels[valAddr].contains(delAddr), "delegation not found");
         Delegation memory del = delByAddr[valAddr][delAddr];
@@ -843,11 +839,15 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
-        returns (uint256, uint256, bool)
+        returns (uint256, uint256, bool, uint256, uint256, uint256, uint256)
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
-        return (val.tokens, val.delegationShares, val.jailed);
+        uint256 rate = val.commission.rate;
+        uint256 maxRate = val.commission.maxRate;
+        uint256 maxChangeRate = val.commission.maxChangeRate;
+        uint256 slashEventCounter = val.slashEventCounter;
+        return (val.tokens, val.delegationShares, val.jailed, rate, maxRate, maxChangeRate, slashEventCounter);
     }
 
     // get all delegation by validator
@@ -868,17 +868,6 @@ contract Staking is IStaking, Ownable {
         return (delAddrs, shares);
     }
 
-    // get delegation of a delegator
-    function getDelegation(address valAddr, address delAddr)
-        public
-        view
-        returns (uint256)
-    {
-        require(dels[valAddr].contains(delAddr), "delegation not found");
-        Delegation memory del = delByAddr[valAddr][delAddr];
-        return (del.shares);
-    }
-
     // get all validator of delegator delegated
     function getValidatorsByDelegator(address delAddr)
         public
@@ -892,15 +881,6 @@ contract Staking is IStaking, Ownable {
         }
 
         return addrs;
-    }
-    
-    // get commission validator
-    function getValidatorCommission(address valAddr)
-        public
-        view
-        returns (uint256)
-    {
-        return valAccumulatedCommission[valAddr];
     }
     
     // get all reward of a delegator
@@ -1273,10 +1253,6 @@ contract Staking is IStaking, Ownable {
 
     function setTotalSupply(uint256 amount) public onlyOwner {
         totalSupply = amount;
-    }
-
-    function getInflation() public view returns (uint256) {
-        return inflation;
     }
 
     // validator rank
