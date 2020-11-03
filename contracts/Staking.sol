@@ -118,7 +118,7 @@ contract Staking is IStaking, Ownable {
         uint256 blocksPerYear; // expected blocks per year
         uint256 inflationMax;  // maximum inflation rate
         uint256 inflationMin; // minimum inflation rate
-        uint256 tokeValidatornMin; // minimum token become to the validator
+        uint256 tokeValidatorMin; // minimum token become to the validator
         uint256 tokenValidatorMax; // max token of the validator
     }
 
@@ -170,7 +170,7 @@ contract Staking is IStaking, Ownable {
             blocksPerYear: 6311520,  
             inflationMax: 20 * 10**16,
             inflationMin: 7 * 10**16,
-            tokeValidatornMin: 1 * 10**16, // 0.01 kai
+            tokeValidatorMin: 1 * 10**16, // 0.01 kai
             tokenValidatorMax: 40000000 * 10**18 // 4M kai
         });
     }
@@ -281,7 +281,7 @@ contract Staking is IStaking, Ownable {
         require(!vals.contains(valAddr), "validator already exist");
         require(amount > 0, "invalid delegation amount");
         require(amount > minSelfDelegation, "self delegation below minimum");
-        require(amount >= _params.tokeValidatornMin, "self delegation below minimum validator token");
+        require(amount >= _params.tokeValidatorMin, "self delegation below minimum validator token");
         require(amount <= _params.tokenValidatorMax, "self delegation greater than maximum validator token");
 
         require(
@@ -1182,8 +1182,8 @@ contract Staking is IStaking, Ownable {
         inflation = _inflation;
     }
     
-    function setDelegationTokenMin(uint256 _tokeValidatornMin) public onlyOwner {
-        _params.tokeValidatornMin = _tokeValidatornMin;
+    function setDelegationTokenMin(uint256 _tokeValidatorMin) public onlyOwner {
+        _params.tokeValidatorMin = _tokeValidatorMin;
     }
     
     function setTokenValidatorMax(uint256 _tokenValidatorMax) public onlyOwner {
