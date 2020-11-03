@@ -11,6 +11,7 @@ contract Staking is IStaking, Ownable {
     uint256 oneDec = 1 * 10**18;
     uint256 powerReduction = 1 * 10**8;
 
+
     struct Delegation {
         uint256 shares;
         address owner;
@@ -25,23 +26,13 @@ contract Staking is IStaking, Ownable {
         uint256 completionTime;
     }
 
-    struct Commission {
-        // the commission rate charged to delegators, as a fraction
-        uint256 rate; 
-        // maximum commission rate which validator can ever charge, as a fraction
-        uint256 maxRate;
-        // maximum daily increase of the validator commission, as a fraction
-        uint256 maxChangeRate;
-    }
-
     struct Validator {
         address owner; // address of the Validator
         uint256 tokens; // total delegated token
         uint256 delegationShares; // total share issued to Validator's delegator
-        uint256 selfDelegation; // token self delegation
-        uint256 countDelegator; // number of delegators that delegated to the validator
+        uint256 minDelegation; // minimum token delegate to the validator
         bool jailed; 
-        Commission commission; // commission paramater
+        uint256 commissionRate; // the commission rate charged to delegators, as a fraction
         uint256 minSelfDelegation; // Validator's self decalared  
         uint256 updateTime; // the last time the validator was changed
         uint256 ubdEntryCount; // unbonding delegation entries
@@ -127,6 +118,8 @@ contract Staking is IStaking, Ownable {
         uint256 blocksPerYear; // expected blocks per year
         uint256 inflationMax;  // maximum inflation rate
         uint256 inflationMin; // minimum inflation rate
+        uint256 delegationTokenMin; // minimum token become to the validator
+        uint256 tokenValidatorMax; // max token of the validator
     }
 
     mapping(address => Validator) valByAddr;
@@ -176,7 +169,9 @@ contract Staking is IStaking, Ownable {
             goalBonded: 67 * 10**16, 
             blocksPerYear: 6311520,  
             inflationMax: 20 * 10**16,
-            inflationMin: 7 * 10**16    
+            inflationMin: 7 * 10**16    ,
+            delegationTokenMin: 1 * 10**16, // 0.01 kai
+            tokenValidatorMax: 40000000 * 10**18 // 4M kai
         });
     }
 
@@ -256,16 +251,14 @@ contract Staking is IStaking, Ownable {
     // create new validator
     function createValidator(
         uint256 commssionRate,
-        uint256 maxRate,
-        uint256 maxChangeRate,
+        uint256 minDelegation,
         uint256 minSeftDelegation
     ) public payable {
         _createValidator(
             msg.sender,
             msg.value,
             commssionRate,
-            maxRate,
-            maxChangeRate,
+            minDelegation,
             minSeftDelegation
         );
 
@@ -273,8 +266,7 @@ contract Staking is IStaking, Ownable {
             msg.sender,
             msg.value,
             commssionRate,
-            maxRate,
-            maxChangeRate,
+            minDelegation,
             minSeftDelegation
         );
     }
@@ -283,56 +275,45 @@ contract Staking is IStaking, Ownable {
         address payable valAddr,
         uint256 amount,
         uint256 rate,
-        uint256 maxRate,
-        uint256 maxChangeRate,
+        uint256 minDelegation,
         uint256 minSelfDelegation
     ) private {
         require(!vals.contains(valAddr), "validator already exist");
         require(amount > 0, "invalid delegation amount");
         require(amount > minSelfDelegation, "self delegation below minimum");
+        require(amount >= _params.delegationTokenMin, "self delegation below minimum delegation token");
+        require(amount <= _params.tokenValidatorMax, "self delegation greater than maximum token validator ");
+
         require(
-            maxRate <= oneDec,
-            "commission max rate cannot be more than 100%"
-        );
-        require(
-            maxChangeRate <= maxRate,
-            "commission max change rate can not be more than the max rate"
-        );
-        require(
-            rate <= maxRate,
+            rate <= oneDec,
             "commission rate cannot be more than the max rate"
         );
-
-        Commission memory commission = Commission({
-            rate: rate,
-            maxRate: maxRate,
-            maxChangeRate: maxChangeRate
-        });
 
         vals.add(valAddr);
         // solhint-disable-next-line not-rely-on-time
         uint256 updateTime = block.timestamp;
-        valByAddr[valAddr].commission = commission;
+        valByAddr[valAddr].commissionRate = rate;
         valByAddr[valAddr].minSelfDelegation = minSelfDelegation;
         valByAddr[valAddr].updateTime = updateTime;
         valByAddr[valAddr].owner = valAddr;
-        valByAddr[valAddr].selfDelegation = amount;
+        valByAddr[valAddr].minDelegation = minDelegation;
         _afterValidatorCreated(valAddr);
         _delegate(valAddr, valAddr, amount);
         valSigningInfos[valAddr].startHeight = block.number;
     }
 
     // update validator
-    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation)
+    function updateValidator(uint256 commissionRate, uint256 minSelfDelegation, uint256 minDelegation)
         public
     {
-        _updateValidator(msg.sender, commissionRate, minSelfDelegation);
+        _updateValidator(msg.sender, commissionRate, minSelfDelegation, minDelegation);
     }
 
     function _updateValidator(
         address valAddr,
         uint256 commissionRate,
-        uint256 minSelfDelegation
+        uint256 minSelfDelegation,
+        uint256 minDelegation
     ) private {
         require(vals.contains(valAddr), "validator not found");
         Validator storage val = valByAddr[valAddr];
@@ -343,13 +324,8 @@ contract Staking is IStaking, Ownable {
                 "commission cannot be changed more than one in 24h"
             );
             require(
-                commissionRate <= val.commission.maxRate,
+                commissionRate <= oneDec,
                 "commission cannot be more than the max rate"
-            );
-            require(
-                commissionRate.sub(val.commission.rate) <=
-                    val.commission.maxChangeRate,
-                "commission cannot be changed more than max change rate"
             );
         }
         if (minSelfDelegation > 0) {
@@ -363,14 +339,16 @@ contract Staking is IStaking, Ownable {
             );
             val.minSelfDelegation = minSelfDelegation;
         }
-
+        if (minDelegation > 0) {
+            val.minDelegation = minDelegation;
+        }
         if (commissionRate > 0) {
-            val.commission.rate = commissionRate;
+            val.commissionRate = commissionRate;
             // solhint-disable-next-line not-rely-on-time
             val.updateTime = block.timestamp;
         }
 
-        emit UpdateValidator(msg.sender, commissionRate, minSelfDelegation);
+        emit UpdateValidator(msg.sender, commissionRate, minSelfDelegation, minDelegation);
     }
 
     function _afterValidatorCreated(address valAddr) private {
@@ -391,16 +369,11 @@ contract Staking is IStaking, Ownable {
             dels[valAddr].add(delAddr);
             delVals[delAddr].add(valAddr);
             delByAddr[valAddr][delAddr].owner = delAddr;
-            valByAddr[valAddr].countDelegator += 1;
             _beforeDelegationCreated(valAddr);
         } else {
             _beforeDelegationSharesModified(valAddr, delAddr);
         }
         
-        if (delAddr == valAddr) {
-             valByAddr[valAddr].selfDelegation += amount;
-        }
-
         uint256 shared = _addTokenFromDel(valAddr, amount);
 
         totalBonded = totalBonded.add(amount);
@@ -433,6 +406,9 @@ contract Staking is IStaking, Ownable {
     function delegate(address valAddr) public payable {
         require(vals.contains(valAddr), "validator not found");
         require(msg.value > 0, "invalid delegation amount");
+        require(msg.value >= valByAddr[valAddr].minDelegation, "delegation amount below minimum");
+        require(valByAddr[valAddr].tokens.add(msg.value) <= _params.tokenValidatorMax);
+
         _delegate(msg.sender, valAddr, msg.value);
     }
 
@@ -847,15 +823,12 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
-        returns (uint256, uint256, bool, uint256, uint256, uint256)
+        returns (uint256, uint256, bool, uint256, uint256, uint256, uint256)
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
-        uint256 slashEventCounter = val.slashEventCounter;
-
-        // uint256 rate = val.commission.rate;
-        // uint256 maxRate = val.commission.maxRate;
-        return (val.tokens, val.delegationShares, val.jailed, val.countDelegator, val.selfDelegation, slashEventCounter);
+        return (val.tokens, val.delegationShares, val.jailed, val.commissionRate, 
+        val.minDelegation, val.slashEventCounter, val.minSelfDelegation);
     }
 
     // get all delegation by validator
@@ -1108,7 +1081,7 @@ contract Staking is IStaking, Ownable {
         private
     {
         uint256 commission = rewards.mulTrun(
-            valByAddr[valAddr].commission.rate
+            valByAddr[valAddr].commissionRate
         );
         uint256 shared = rewards.sub(commission);
         valAccumulatedCommission[valAddr] += commission;
@@ -1207,6 +1180,14 @@ contract Staking is IStaking, Ownable {
 
     function setInflation(uint256 _inflation) public onlyOwner {
         inflation = _inflation;
+    }
+    
+    function setDelegationTokenMin(uint256 _delegationTokenMin) public onlyOwner {
+        _params.delegationTokenMin = _delegationTokenMin;
+    }
+    
+    function setTokenValidatorMax(uint256 _tokenValidatorMax) public onlyOwner {
+        _params.tokenValidatorMax = _tokenValidatorMax;
     }
 
     // recalculate inflation rate 

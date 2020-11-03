@@ -9,13 +9,12 @@ interface IStaking {
         address payable valAddr,
         uint256 amount,
         uint256 commissionRate,
-        uint256 commissionMaxRate,
-        uint256 commissionMaxChangeRate,
+        uint256 minDelegation,
         uint256 minSelfDelegation
     );
 
     // @dev Emitted when validator is updated;
-    event UpdateValidator(address valAddr, uint256 commissionRate, uint256 minSelfDelegation);
+    event UpdateValidator(address valAddr, uint256 commissionRate, uint256 minSelfDelegation, uint256 minDelegation);
 
     // @dev Emitted when delegation rewards is withdraw
     event WithdrawDelegationRewards(
