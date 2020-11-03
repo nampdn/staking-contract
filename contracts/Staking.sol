@@ -36,8 +36,10 @@ contract Staking is IStaking, Ownable {
 
     struct Validator {
         address owner; // address of the Validator
-        uint256 tokens; // delegated token
+        uint256 tokens; // total delegated token
         uint256 delegationShares; // total share issued to Validator's delegator
+        uint256 selfDelegation; // token self delegation
+        uint256 countDelegator; // number of delegators that delegated to the validator
         bool jailed; 
         Commission commission; // commission paramater
         uint256 minSelfDelegation; // Validator's self decalared  
@@ -314,6 +316,7 @@ contract Staking is IStaking, Ownable {
         valByAddr[valAddr].minSelfDelegation = minSelfDelegation;
         valByAddr[valAddr].updateTime = updateTime;
         valByAddr[valAddr].owner = valAddr;
+        valByAddr[valAddr].selfDelegation = amount;
         _afterValidatorCreated(valAddr);
         _delegate(valAddr, valAddr, amount);
         valSigningInfos[valAddr].startHeight = block.number;
@@ -388,9 +391,14 @@ contract Staking is IStaking, Ownable {
             dels[valAddr].add(delAddr);
             delVals[delAddr].add(valAddr);
             delByAddr[valAddr][delAddr].owner = delAddr;
+            valByAddr[valAddr].countDelegator += 1;
             _beforeDelegationCreated(valAddr);
         } else {
             _beforeDelegationSharesModified(valAddr, delAddr);
+        }
+        
+        if (delAddr == valAddr) {
+             valByAddr[valAddr].selfDelegation += amount;
         }
 
         uint256 shared = _addTokenFromDel(valAddr, amount);
@@ -839,15 +847,15 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
-        returns (uint256, uint256, bool, uint256, uint256, uint256, uint256)
+        returns (uint256, uint256, bool, uint256, uint256, uint256)
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
-        uint256 rate = val.commission.rate;
-        uint256 maxRate = val.commission.maxRate;
-        uint256 maxChangeRate = val.commission.maxChangeRate;
         uint256 slashEventCounter = val.slashEventCounter;
-        return (val.tokens, val.delegationShares, val.jailed, rate, maxRate, maxChangeRate, slashEventCounter);
+
+        // uint256 rate = val.commission.rate;
+        // uint256 maxRate = val.commission.maxRate;
+        return (val.tokens, val.delegationShares, val.jailed, val.countDelegator, val.selfDelegation, slashEventCounter);
     }
 
     // get all delegation by validator
