@@ -15,6 +15,5 @@ interface IValidator {
     function undelegate(uint64 amount) external;
     function getCommissionRewards() external;
     function getDelegationRewards(address delAddr) external;
-    function getDelegation(address delAddr) external;
 
 }

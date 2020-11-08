@@ -7,4 +7,6 @@ interface IStaking {
     function finalize() external;
     function doubleSign() external;
     function mint() external;
+    function getTotalSupply() external;
+    function getTotalBonded() external;
 }
