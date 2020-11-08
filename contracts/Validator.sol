@@ -5,6 +5,7 @@ import "./interfaces/IValidator.sol";
 
 contract Validator is IValidator {
     using EnumerableSet for EnumerableSet.AddressSet;
+    uint256 oneDec = 1 * 10**18;
 
     // Delegation
     struct Delegation {
@@ -68,22 +69,53 @@ contract Validator is IValidator {
     SlashEvent[] private slashEvents // slash events
     SigningInfo private signingInfo // signing info
     MissedBlock public missedBlock // missed block
+    address public stakingAddr; // staking address
+    uint256 minSelfDelegation; 
+    uint64 tokens; // all token stake
+    uint256 delegationShares; // delegation shares
 
 
     // called one by the staking at time of deployment  
-    function initialize(_name string, uint64 rate, uint64 maxRate, uint64 maxChangeRate) external {
+    function initialize(_name string, address _stakingAddr, uint64 rate, uint64 maxRate, 
+        uint64 maxChangeRate, uint64 _minSelfDelegation) external {
         name = name;
+        minSelfDelegation = _minSelfDelegation
+        stakingAddr = _stakingAddr
         commission = Commission{
             maxRate: maxRate,
             maxChangeRate: maxChangeRate,
             rate: rate,
         }
     }
+
     
     // delegate for this validator
     function delegate() external payable {
-        Delegation storage del = delegationByAddr[msg.sender]
-        del.share = 1;
+        _delegate(msg.sender, msg.value)
+    }
+
+    function _delegate(address delAddr, uint256 amount) private{
+        uint256 shared = _addTokenFromDel(valAddr, amount);
+        // increment stake amount
+        Delegation storage del = delegationByAddr[delAddr];
+        del.shares = shared
+    }
+
+    function _addToken(uint64 amount) private returns(uint256) {
+        uint256 issuedShares = 0;
+        if (val.tokens == 0) {
+            issuedShares = oneDec;
+        } else {
+            issuedShares = _shareFromToken(valAddr, amount);
+        }
+        tokens = tokens.add(amount)
+        delegationShares = delegationShares.add(issuedShares)
+        return delegationShares;
+    }
+
+
+    function _shareFromToken(uint64 amount) private view returns(uint256){
+        return delegationShares.mul(amount).div(tokens)
     }
 
 
