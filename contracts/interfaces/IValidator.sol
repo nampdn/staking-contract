@@ -5,7 +5,7 @@ interface IValidator {
         uint64 commissionMaxChangeRate, uint64 minSelfDelegation) external payable;
     function update(uint64 commissionRate) external;
     function unjail() external;
-    function allocateToken() external;
+    function allocateToken(uint64 amount) external;
     function slash() external;
     function jail() external;
     function delegate() external payable;
@@ -13,7 +13,7 @@ interface IValidator {
     function withdrawCommission()external;
     function withdraw() external;
     function undelegate(uint64 amount) external;
-    function getCommissionRewards() external;
-    function getDelegationRewards(address delAddr) external;
+    function getCommissionRewards() external view returns (uint64);
+    function getDelegationRewards(address delAddr) external view returns (uint64);
 
 }

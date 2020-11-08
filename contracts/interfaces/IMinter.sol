@@ -1,6 +1,5 @@
 pragma solidity >=0.5.0;
 
-
 interface IMinter {
-    function mint() external;
+    function mint() external returns (uint64);
 }
