@@ -5,6 +5,7 @@ import "./Safemath.sol";
 
 
 contract Validator is IValidator {
+    using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
