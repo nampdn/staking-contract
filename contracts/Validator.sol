@@ -4,6 +4,7 @@ import "./IValidator.sol";
 
 
 contract Validator is IValidator {
+    using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     uint256 oneDec = 1 * 10**18;
 
