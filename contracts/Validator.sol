@@ -246,6 +246,7 @@ contract Validator is IValidator {
         _initializeDelegation(msg.sender);
     }
     
+    // the validator withdraws commission
     function withdrawCommission() public {
         require(msg.sender == inforValidator.valAddr, "validator not found");
         uint256 commission = inforValidator.accumulatedCommission;
@@ -254,7 +255,46 @@ contract Validator is IValidator {
         inforValidator.accumulatedCommission = 0;
         // emit WithdrawCommissionReward(valAddr, commission);
     }
+    
+    // withdraw token delegator's
+    function withdraw() public {
+        require(delegations.contains(msg.sender), "delegation not found");
+        DelegationShare memory del = delShare[msg.sender];
+        UBDEntry[] storage entries = ubdEntries[msg.sender];
+        uint256 amount = 0;
+        uint256 entryCount = 0;
 
+        for (uint256 i = 0; i < entries.length; i++) {
+            // solhint-disable-next-line not-rely-on-time
+            if (entries[i].completionTime < block.timestamp) {
+                amount = amount.add(entries[i].amount);
+                entries[i] = entries[entries.length - 1];
+                entries.pop();
+                i--;
+                entryCount++;
+            }
+        }
+        require(amount > 0, "no unbonding amount to withdraw");
+        msg.sender.transfer(amount);
+        // totalBonded = totalBonded.sub(amount);
+
+        if (del.shares == 0 && entries.length == 0) {
+            _removeDelegation(msg.sender);
+        }
+
+        inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
+        // if (inforValidator.delegationShares == 0 && inforValidator.ubdEntryCount == 0) {
+        //     _removeValidator(valAddr);
+        // }
+    }
+    
+    // remove delegation
+    function _removeDelegation(address _delAddr) private {
+        delegations.remove(_delAddr);
+        delete delegationByAddr[_delAddr];
+        delete delegationByAddr[_delAddr];
+        // delVals[delAddr].remove(valAddr);
+    }
     
     // remove share delegator's
     function _removeDelShares(uint256 _shares) private returns (uint256) {
