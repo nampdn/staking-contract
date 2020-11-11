@@ -12,11 +12,16 @@ contract Validator is IValidator {
     uint256 oneDec = 1 * 10**18;
     uint256 powerReduction = 1 * 10**8;
 
-    // Delegation
+    /*
+     * DelStartingInfo represents the starting info for a delegator reward
+     * period. It tracks the previous validator period, the delegation's amount of
+     * staking token, and the creation height (to check later on if any slashes have
+     * occurred)
+    */
     struct Delegation {
-        uint256 stake;
-        uint256 previousPeriod;
-        uint256 height;
+        uint256 stake; // share delegator's
+        uint256 previousPeriod; // previousPeriod uses calculates reward
+        uint256 height; // creation height
     }
     
     struct DelegationShare {
@@ -26,42 +31,70 @@ contract Validator is IValidator {
 
     // Validator Commission
     struct Commission {
+        // the commission rate charged to delegators, as a fraction
         uint256 rate;
+        // maximum commission rate which validator can ever charge, as a fraction
         uint256 maxRate;
+        // maximum daily increase of the validator commission, as a fraction
         uint256 maxChangeRate;
     }
 
     // Unbounding Entry
     struct UBDEntry {
+         // KAI to receive at completion
         uint256 amount;
+        // height which the unbonding took place
         uint256 blockHeight;
+        // unix time for unbonding completion
         uint256 completionTime;
     }
 
     // validator slash event
     struct SlashEvent {
-        uint256 period;
-        uint256 fraction;
+        uint256 period; // slash validator period 
+        uint256 fraction; // fraction slash rate
         uint256 height;
     }
 
-    // Validator current rewards
+    /*
+     * CurrentReward represents current rewards and current period for 
+     * a validator kept as a running counter and incremented each block 
+     * as long as the validator's tokens remain constant.
+    */
     struct CurrentReward {
         uint256 period;
         uint256 reward;
     }
 
-    // Validator Historical Reward
+    /* 
+     * HistoricalReward represents historical rewards for a validator.
+     * Height is implicit within the store key.
+     * cumulativeRewardRatio is the sum from the zeroeth period
+     * until this period of rewards / tokens, per the spec.
+     * The referenceCount indicates the number of objects
+     * which might need to reference this historical entry at any point.
+     * ReferenceCount = number of outstanding delegations which ended the associated period (and might need to read that record)
+     *   + number of slashes which ended the associated period (and might need to
+     *  read that record)
+     *   + one per validator for the zeroeth period, set on initialization
+    */
     struct HistoricalReward {
         uint256 cumulativeRewardRatio;
         uint256 referenceCount;
     }
 
+    // SigningInfo defines a validator's signing info for monitoring their
+    // liveness activity.
     struct SigningInfo {
+        // height at which validator was first a candidate OR was unjailed
         uint256 startHeight;
+        // index offset into signed block bit array
         uint256 indexOffset;
+        // whether or not a validator has been tombstoned (killed out of validator set)
         bool tombstoned;
+        // missed blocks counter 
         uint256 missedBlockCounter;
+        // time for which the validator is jailed until.
         uint256 jailedUntil;
     }
     
@@ -92,7 +125,7 @@ contract Validator is IValidator {
     
     InforValidator public inforValidator;
     Commission public commission; // validator commission
-    CurrentReward private currentRewwards;// current validator rewards
+    CurrentReward private currentRewards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
     SlashEvent[] private slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
@@ -130,7 +163,7 @@ contract Validator is IValidator {
         
         _initializeValidator();
         _delegate(inforValidator.valAddr, _amount);
-        // valSigningInfos[valAddr].startHeight = block.number;
+        signingInfo.startHeight = block.number;
     }
     
     // delegate for this validator
@@ -151,7 +184,7 @@ contract Validator is IValidator {
         uint256 commission = rewards.mulTrun(commission.rate);
         uint256 shared = rewards.sub(commission);
         inforValidator.accumulatedCommission += commission;
-        currentRewwards.reward += shared;
+        currentRewards.reward += shared;
     }
     
     // validator is jailed when the validator operation misbehave
@@ -221,12 +254,7 @@ contract Validator is IValidator {
 
         uint256 amountRemoved = _removeDelShares(shares);
         inforValidator.ubdEntryCount++;
-        // if (inforValidator.tokens.div(powerReduction) == 0) {
-        //     removeValidatorRank(valAddr);
-        // } else {
-        //     addValidatorRank(valAddr);
-        // }
-
+ 
         uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
         ubdEntries[_delAddr].push(
             UBDEntry({
@@ -283,10 +311,29 @@ contract Validator is IValidator {
         }
 
         inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
-        // if (inforValidator.delegationShares == 0 && inforValidator.ubdEntryCount == 0) {
-        //     _removeValidator(valAddr);
-        // }
     }
+    
+    function getCommissionRewards() public view returns(uint256) {
+        return inforValidator.accumulatedCommission;
+    }
+    
+    // get rewards from a delegation
+    function getDelegationRewards(address _delAddr) public view returns (uint256) {
+        require(delegations.contains(_delAddr), "delegation not found");
+        DelegationShare memory del = delShare[_delAddr];
+        uint256 rewards = _calculateDelegationRewards(
+            _delAddr,
+            currentRewards.period - 1
+        );
+
+        uint256 currentReward = currentRewards.reward;
+        if (currentReward > 0) {
+            uint256 stake = _tokenFromShare(del.shares);
+            rewards += stake.mulTrun(currentReward.divTrun(inforValidator.tokens));
+        }
+        return rewards;
+    }
+
     
     // remove delegation
     function _removeDelegation(address _delAddr) private {
@@ -325,9 +372,9 @@ contract Validator is IValidator {
 
     // initialize starting info for a new validator
     function _initializeValidator() private {
-        CurrentReward memory currentRewwards;
-        currentRewwards.period = 1;
-        currentRewwards.reward = 0;
+        CurrentReward memory currentRewards;
+        currentRewards.period = 1;
+        currentRewards.reward = 0;
         inforValidator.accumulatedCommission = 0;
     }
     
@@ -342,8 +389,6 @@ contract Validator is IValidator {
         }
 
         uint256 shared = _addTokenFromDel(_amount);
-
-        // totalBonded = totalBonded.add(_amount);
 
         // increment stake amount
         DelegationShare storage del = delShare[_delAddr];
@@ -483,7 +528,7 @@ contract Validator is IValidator {
     // initialize starting info for a new delegation
     function _initializeDelegation(address _delAddr) private {
         DelegationShare storage del = delShare[_delAddr];
-        uint256 previousPeriod = currentRewwards.period - 1;
+        uint256 previousPeriod = currentRewards.period - 1;
         _incrementReferenceCount(inforValidator.valAddr, previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
