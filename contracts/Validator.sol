@@ -68,34 +68,40 @@ contract Validator is IValidator {
     struct MissedBlock {
         mapping(uint256 => bool) items;
     }
+    
 
-    string public name; // validator name
-    address payable public valAddr;
+    struct InforValidator {
+        string name;  // validator name
+        address payable valAddr; // address of the validator
+        address stakingAddr; // staking address
+        uint256 tokens; // all token stake
+        bool jailed;
+        uint256 slashEventCounter;
+        uint256 minSelfDelegation;
+        uint256 delegationShares; // delegation shares
+        uint256 accumulatedCommission;
+    }
+
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
     mapping(address => DelegationShare) delShare;
     mapping(address => UBDEntry[]) ubdEntries;
+    
+    InforValidator public inforValidator;
     Commission public commission; // validator commission
     CurrentReward private currentRewwards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
     SlashEvent[] private slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
-    address public stakingAddr; // staking address
-    uint256 public minSelfDelegation; 
-    uint256 public tokens; // all token stake
-    uint256 public delegationShares; // delegation shares
-    uint256 public accumulatedCommission;
-    uint256 public slashEventCounter;
-    bool public jailed; // status of the validator
 
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
         uint256 _maxChangeRate, uint256 _minSelfDelegation, uint256 _amount) external {
             
         require(_amount > 0, "invalid delegation amount");
-        require(_amount > minSelfDelegation, "self delegation below minimum");
+        require(_amount > _minSelfDelegation, "self delegation below minimum");
         require(
             _maxRate <= oneDec,
             "commission max rate cannot be more than 100%"
@@ -109,10 +115,10 @@ contract Validator is IValidator {
             "commission rate cannot be more than the max rate"
         );
 
-        name = _name;
-        minSelfDelegation = _minSelfDelegation;
-        stakingAddr = _stakingAddr;
-        valAddr = _valAddr;
+        inforValidator.name = _name;
+        inforValidator.minSelfDelegation = _minSelfDelegation;
+        inforValidator.stakingAddr = _stakingAddr;
+        inforValidator.valAddr = _valAddr;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -121,7 +127,7 @@ contract Validator is IValidator {
         });
         
         _initializeValidator();
-        _delegate(valAddr, _amount);
+        _delegate(inforValidator.valAddr, _amount);
         // valSigningInfos[valAddr].startHeight = block.number;
     }
     
@@ -142,13 +148,13 @@ contract Validator is IValidator {
     function allocateToken(uint256 rewards) private {
         uint256 commission = rewards.mulTrun(commission.rate);
         uint256 shared = rewards.sub(commission);
-        accumulatedCommission += commission;
+        inforValidator.accumulatedCommission += commission;
         currentRewwards.reward += shared;
     }
     
     // validator is jailed when the validator operation misbehave
     function jail() external {
-        jailed = true;
+        inforValidator.jailed = true;
     }
     
     // Validator is slashed when the Validator operation misbehave 
@@ -179,28 +185,28 @@ contract Validator is IValidator {
         }
 
         uint256 tokensToBurn = slashAmount;
-        if (tokensToBurn > tokens) {
-            tokensToBurn = tokens;
+        if (tokensToBurn > inforValidator.tokens) {
+            tokensToBurn = inforValidator.tokens;
         }
 
-        if (tokens > 0) {
-            uint256 effectiveFraction = tokensToBurn.divTrun(tokens);
+        if (inforValidator.tokens > 0) {
+            uint256 effectiveFraction = tokensToBurn.divTrun(inforValidator.tokens);
             _updateValidatorSlashFraction(effectiveFraction);
         }
 
-        tokens = tokens.sub(tokensToBurn);
+        inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
         // removeValidatorRank(valAddr);
     }
     
     function _updateValidatorSlashFraction(uint256 fraction) private {
         uint256 newPeriod = _incrementValidatorPeriod();
-        _incrementReferenceCount(valAddr, newPeriod);
-        slashEvents[slashEventCounter] = SlashEvent({
+        _incrementReferenceCount(inforValidator.valAddr, newPeriod);
+        slashEvents[inforValidator.slashEventCounter] = SlashEvent({
             period: newPeriod,
             fraction: fraction,
             height: block.number
         });
-        slashEventCounter++;
+        inforValidator.slashEventCounter++;
     }
 
     
@@ -209,7 +215,7 @@ contract Validator is IValidator {
         CurrentReward memory currentRewwards;
         currentRewwards.period = 1;
         currentRewwards.reward = 0;
-        accumulatedCommission = 0;
+        inforValidator.accumulatedCommission = 0;
     }
     
     function _delegate(address payable _delAddr, uint256 _amount) private {
@@ -243,7 +249,7 @@ contract Validator is IValidator {
         uint256 previousPeriod = rewards.period.sub(1);
         uint256 current = 0;
         if (rewards.reward > 0) {
-            current = rewards.reward.divTrun(tokens);
+            current = rewards.reward.divTrun(inforValidator.tokens);
         }
         uint256 historical = hRewards[previousPeriod]
             .cumulativeRewardRatio;
@@ -333,30 +339,31 @@ contract Validator is IValidator {
     
     function _addToken(uint256 _amount) private returns(uint256) {
         uint256 issuedShares = 0;
-        if (tokens == 0) {
+        if (inforValidator.tokens == 0) {
             issuedShares = oneDec;
         } else {
             issuedShares = _shareFromToken(_amount);
         }
-        tokens = tokens.add(_amount);
-        delegationShares = delegationShares.add(issuedShares);
-        return delegationShares;
+        inforValidator.tokens = inforValidator.tokens.add(_amount);
+        inforValidator.delegationShares = inforValidator.delegationShares.add(issuedShares);
+        return inforValidator.delegationShares;
     }
     
     function _shareFromToken(uint256 _amount) private view returns(uint256) {
-        return delegationShares.mul(_amount).div(tokens);
+        return inforValidator.delegationShares.
+        mul(_amount).div(inforValidator.tokens);
     }
     
     // calculate share delegator's
     function _addTokenFromDel(uint256 _amount) private returns (uint256) {
         uint256 issuedShares = 0;
-        if (tokens == 0) {
+        if (inforValidator.tokens == 0) {
             issuedShares = oneDec;
         } else {
             issuedShares = _shareFromToken(_amount);
         }
-        tokens = tokens.add(_amount);
-        delegationShares = delegationShares.add(issuedShares);
+        inforValidator.tokens = inforValidator.tokens.add(_amount);
+        inforValidator.delegationShares = inforValidator.delegationShares.add(issuedShares);
         return issuedShares;
     }
     
@@ -364,10 +371,10 @@ contract Validator is IValidator {
     function _initializeDelegation(address _delAddr) private {
         DelegationShare storage del = delShare[_delAddr];
         uint256 previousPeriod = currentRewwards.period - 1;
-        _incrementReferenceCount(valAddr, previousPeriod);
+        _incrementReferenceCount(inforValidator.valAddr, previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
-        uint256 stake = _tokenFromShare(valAddr, del.shares);
+        uint256 stake = _tokenFromShare(inforValidator.valAddr, del.shares);
         delegationByAddr[_delAddr].stake = stake;
     }
     
@@ -378,7 +385,7 @@ contract Validator is IValidator {
     
     // token worth of provided delegator shares
     function _tokenFromShare(address valAddr, uint256 _shares) private view returns (uint256) {
-        return _shares.mul(tokens).div(delegationShares);
+        return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
     
 
