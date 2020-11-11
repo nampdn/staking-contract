@@ -130,10 +130,11 @@ contract Validator is IValidator {
     SlashEvent[] private slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
-
+    
+    
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
-        uint256 _maxChangeRate, uint256 _minSelfDelegation, uint256 _amount) external {
+        uint256 _maxChangeRate, uint256 _minSelfDelegation, uint256 _amount) external payable {
             
         require(_amount > 0, "invalid delegation amount");
         require(_amount > _minSelfDelegation, "self delegation below minimum");
@@ -172,17 +173,17 @@ contract Validator is IValidator {
     }
     
     // update Commission rate of the validator
-    function update(uint256 commissionRate) external {
-        require(commissionRate >= 0, "commission rate must greater than 0");
-        require(commissionRate <= oneDec, "commission cannot be more than the max rate");
+    function update(uint256 _commissionRate) external {
+        require(_commissionRate >= 0, "commission rate must greater than 0");
+        require(_commissionRate <= oneDec, "commission cannot be more than the max rate");
         
-        commission.rate = commissionRate;
+        commission.rate = _commissionRate;
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
-    function allocateToken(uint256 rewards) private {
-        uint256 commission = rewards.mulTrun(commission.rate);
-        uint256 shared = rewards.sub(commission);
+    function allocateToken(uint256 _rewards) external {
+        uint256 commission = _rewards.mulTrun(commission.rate);
+        uint256 shared = _rewards.sub(commission);
         inforValidator.accumulatedCommission += commission;
         currentRewards.reward += shared;
     }
@@ -192,8 +193,30 @@ contract Validator is IValidator {
         inforValidator.jailed = true;
     }
     
+    // Unjail is used for unjailing a jailed validator, thus returning
+    // them into the bonded validator set, so they can begin receiving provisions
+    // and rewards again.
+    function unjail() external {
+        require(inforValidator.jailed, "validator not jailed");
+        // cannot be unjailed if tombstoned
+        require(signingInfo.tombstoned == false, "validator jailed");
+        uint256 jailedUntil = signingInfo.jailedUntil;
+        // solhint-disable-next-line not-rely-on-time
+        require(jailedUntil < block.timestamp, "validator jailed");
+        DelegationShare storage del = delShare[inforValidator.valAddr];
+        uint256 tokens = _tokenFromShare(del.shares);
+        require(
+            tokens > inforValidator.minSelfDelegation,
+            "self delegation too low to unjail"
+        );
+
+        signingInfo.jailedUntil = 0;
+        inforValidator.jailed = false;
+    }
+    
+    
     // Validator is slashed when the Validator operation misbehave 
-    function slash(uint256 infrationHeight, uint256 power, uint256 slashFactor) private {
+    function slash(uint256 infrationHeight, uint256 power, uint256 slashFactor) external {
         require( infrationHeight <= block.number, "cannot slash infrations in the future");
         
         uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
@@ -230,19 +253,20 @@ contract Validator is IValidator {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
+        // removeValidatorRank(valAddr);
     }
     
-    function undelegate(address payable _delAddr, uint256 _amount) private {
-        require(ubdEntries[_delAddr].length < 7, "too many unbonding delegation entries");
-        require(delegations.contains(_delAddr), "delegation not found");
+    function undelegate(uint256 _amount) external {
+        require(ubdEntries[msg.sender].length < 7, "too many unbonding delegation entries");
+        require(delegations.contains(msg.sender), "delegation not found");
         
-        _withdrawRewards(_delAddr);
-        DelegationShare storage del = delShare[_delAddr];
+        _withdrawRewards(msg.sender);
+        DelegationShare storage del = delShare[msg.sender];
         uint256 shares = _shareFromToken(_amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
-        _initializeDelegation(_delAddr);
-        bool isValidatorOperator = inforValidator.valAddr == _delAddr;
+        _initializeDelegation(msg.sender);
+        bool isValidatorOperator = inforValidator.valAddr == msg.sender;
         if (
             isValidatorOperator &&
             !inforValidator.jailed &&
@@ -255,7 +279,7 @@ contract Validator is IValidator {
         inforValidator.ubdEntryCount++;
  
         uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
-        ubdEntries[_delAddr].push(
+        ubdEntries[msg.sender].push(
             UBDEntry({
                 completionTime: completionTime,
                 blockHeight: block.number,
@@ -267,14 +291,14 @@ contract Validator is IValidator {
     }
     
     // withdraw rewards from a delegation
-    function withdrawRewards() public {
+    function withdrawRewards() external {
         require(delegations.contains(msg.sender), "delegator not found");
         _withdrawRewards(msg.sender);
         _initializeDelegation(msg.sender);
     }
     
     // the validator withdraws commission
-    function withdrawCommission() public {
+    function withdrawCommission() external {
         require(msg.sender == inforValidator.valAddr, "validator not found");
         uint256 commission = inforValidator.accumulatedCommission;
         require(commission > 0, "no validator commission to reward");
@@ -284,7 +308,7 @@ contract Validator is IValidator {
     }
     
     // withdraw token delegator's
-    function withdraw() public {
+    function withdraw() external {
         require(delegations.contains(msg.sender), "delegation not found");
         DelegationShare memory del = delShare[msg.sender];
         UBDEntry[] storage entries = ubdEntries[msg.sender];
@@ -303,6 +327,7 @@ contract Validator is IValidator {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
+        // totalBonded = totalBonded.sub(amount);
 
         if (del.shares == 0 && entries.length == 0) {
             _removeDelegation(msg.sender);
@@ -311,12 +336,12 @@ contract Validator is IValidator {
         inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
     }
     
-    function getCommissionRewards() public view returns(uint256) {
+    function getCommissionRewards() external view returns(uint256) {
         return inforValidator.accumulatedCommission;
     }
     
     // get rewards from a delegation
-    function getDelegationRewards(address _delAddr) public view returns (uint256) {
+    function getDelegationRewards(address _delAddr) external view returns (uint256) {
         require(delegations.contains(_delAddr), "delegation not found");
         DelegationShare memory del = delShare[_delAddr];
         uint256 rewards = _calculateDelegationRewards(
@@ -332,6 +357,7 @@ contract Validator is IValidator {
         return rewards;
     }
 
+    
     // remove delegation
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);
