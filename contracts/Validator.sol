@@ -214,7 +214,7 @@ contract Validator is IValidator {
         if (
             isValidatorOperator &&
             !inforValidator.jailed &&
-            _tokenFromShare( inforValidator.valAddr, del.shares) < inforValidator.minSelfDelegation
+            _tokenFromShare(del.shares) < inforValidator.minSelfDelegation
         ) {
             inforValidator.jailed = true; // jail validator
         }
@@ -239,6 +239,13 @@ contract Validator is IValidator {
         // emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
     
+    // withdraw rewards from a delegation
+    function withdrawReward() public {
+        require(delegations.contains(msg.sender), "delegator not found");
+        _withdrawRewards(msg.sender);
+        _initializeDelegation(msg.sender);
+    }
+    
     // remove share delegator's
     function _removeDelShares(uint256 _shares) private returns (uint256) {
         uint256 remainingShares = inforValidator.delegationShares;
@@ -248,25 +255,24 @@ contract Validator is IValidator {
             issuedTokens = inforValidator.tokens;
             inforValidator.tokens = 0;
         } else {
-            issuedTokens = _tokenFromShare(inforValidator.valAddr, _shares);
+            issuedTokens = _tokenFromShare(_shares);
             inforValidator.tokens = inforValidator.tokens.sub(issuedTokens);
         }
         inforValidator.delegationShares = remainingShares;
         return issuedTokens;
     }
     
-    function _updateValidatorSlashFraction(uint256 fraction) private {
+    function _updateValidatorSlashFraction(uint256 _fraction) private {
         uint256 newPeriod = _incrementValidatorPeriod();
         _incrementReferenceCount(inforValidator.valAddr, newPeriod);
         slashEvents[inforValidator.slashEventCounter] = SlashEvent({
             period: newPeriod,
-            fraction: fraction,
+            fraction: _fraction,
             height: block.number
         });
         inforValidator.slashEventCounter++;
     }
 
-    
     // initialize starting info for a new validator
     function _initializeValidator() private {
         CurrentReward memory currentRewwards;
@@ -320,10 +326,10 @@ contract Validator is IValidator {
     }
     
     // decrement the reference count for a historical rewards value, and delete if zero references remain
-    function _decrementReferenceCount(uint256 period) private {
-        hRewards[period].referenceCount--;
-        if (hRewards[period].referenceCount == 0) {
-            delete hRewards[period];
+    function _decrementReferenceCount(uint256 _period) private {
+        hRewards[_period].referenceCount--;
+        if (hRewards[_period].referenceCount == 0) {
+            delete hRewards[_period];
         }
     }
     
@@ -331,25 +337,25 @@ contract Validator is IValidator {
         _withdrawRewards(delAddr);
     }
     
-    function _withdrawRewards(address payable delAddr) private {
+    function _withdrawRewards(address payable _delAddr) private {
         uint256 endingPeriod = _incrementValidatorPeriod();
-        uint256 rewards = _calculateDelegationRewards(delAddr, endingPeriod);
-        _decrementReferenceCount(delegationByAddr[delAddr].previousPeriod);
+        uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
+        _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
         
-        delete delegationByAddr[delAddr];
+        delete delegationByAddr[_delAddr];
         if (rewards > 0) {
-            delAddr.transfer(rewards);
+            _delAddr.transfer(rewards);
             // emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
         }
     }
     
     // calculate the total rewards accrued by a delegation
     function _calculateDelegationRewards(
-        address delAddr,
-        uint256 endingPeriod
+        address _delAddr,
+        uint256 _endingPeriod
     ) private view returns (uint256) {
         // fetch starting info for delegation
-        Delegation memory delegationInfo = delegationByAddr[delAddr];
+        Delegation memory delegationInfo = delegationByAddr[_delAddr];
         uint256 rewards = 0;
         uint256 slashEventCounter = slashEvents.length;
         for (uint256 i = 0; i < slashEventCounter; i++) {
@@ -374,7 +380,7 @@ contract Validator is IValidator {
         }
         rewards += _calculateDelegationRewardsBetween(
             delegationInfo.previousPeriod,
-            endingPeriod,
+            _endingPeriod,
             delegationInfo.stake
         );
         return rewards;
@@ -382,16 +388,16 @@ contract Validator is IValidator {
     
     // calculate the rewards accrued by a delegation between two periods
     function _calculateDelegationRewardsBetween(
-        uint256 startingPeriod,
-        uint256 endingPeriod,
-        uint256 stake
+        uint256 _startingPeriod,
+        uint256 _endingPeriod,
+        uint256 _stake
     ) private view returns (uint256) {
-        HistoricalReward memory starting = hRewards[startingPeriod];
-        HistoricalReward storage ending = hRewards[endingPeriod];
+        HistoricalReward memory starting = hRewards[_startingPeriod];
+        HistoricalReward storage ending = hRewards[_endingPeriod];
         uint256 difference = ending.cumulativeRewardRatio.sub(
             starting.cumulativeRewardRatio
         );
-        return stake.mulTrun(difference); // return staking * (ending - starting)
+        return _stake.mulTrun(difference); // return staking * (ending - starting)
     }
     
     function _addToken(uint256 _amount) private returns(uint256) {
@@ -431,7 +437,7 @@ contract Validator is IValidator {
         _incrementReferenceCount(inforValidator.valAddr, previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
-        uint256 stake = _tokenFromShare(inforValidator.valAddr, del.shares);
+        uint256 stake = _tokenFromShare(del.shares);
         delegationByAddr[_delAddr].stake = stake;
     }
     
@@ -441,7 +447,7 @@ contract Validator is IValidator {
     }
     
     // token worth of provided delegator shares
-    function _tokenFromShare(address valAddr, uint256 _shares) private view returns (uint256) {
+    function _tokenFromShare(uint256 _shares) private view returns (uint256) {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
     
