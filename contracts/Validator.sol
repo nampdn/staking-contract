@@ -85,6 +85,7 @@ contract Validator is IValidator {
     uint256 public tokens; // all token stake
     uint256 public delegationShares; // delegation shares
     uint256 public accumulatedCommission;
+    bool public jailed; // status of the validator
 
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
@@ -135,13 +136,15 @@ contract Validator is IValidator {
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
-    function allocateToken(uint256 rewards)
-        private
-    {
+    function allocateToken(uint256 rewards) private {
         uint256 commission = rewards.mulTrun(commission.rate);
         uint256 shared = rewards.sub(commission);
         accumulatedCommission += commission;
         currentRewwards.reward += shared;
+    }
+    
+    function jail() external {
+        jailed = true;
     }
     
     // initialize starting info for a new validator
