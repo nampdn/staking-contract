@@ -7,7 +7,7 @@ interface IValidator {
     function unjail() external;
     function allocateToken(uint256 _rewards) external;
     function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external;
-    function jail() external;
+    function jail(uint64 jailedUntil, bool tombstoned) external;
     function delegate() external payable;
     function withdrawRewards() external;
     function withdrawCommission()external;

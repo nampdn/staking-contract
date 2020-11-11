@@ -131,18 +131,39 @@ contract Staking is IStaking, Ownable {
 
 
 
-    function _allocateTokensToValidator(address valAddr, uint256 rewards)
-        private
-    {
+    function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
         IValidator(ownerOf[valAddr]).allocateToken(rewards);
     }
 
 
-    function _validateSignature(
-        address valAddr,
-        uint256 votingPower,
-        bool signed
-    ) private {
+    function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
         IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
     }
+
+
+    // slash and jail validator forever
+    function doubleSign(
+        address valAddr,
+        uint256 votingPower,
+        uint256 distributionHeight
+    ) external onlyOwner {
+        _doubleSign(valAddr, votingPower, distributionHeight);
+    }
+
+
+    function _doubleSign(
+        address valAddr,
+        uint256 votingPower,
+        uint256 distributionHeight
+    ) private {
+        val = IValidator(ownerOf[valAddr]);
+        val.slash(
+            distributionHeight.sub(1),
+            votingPower,
+            _params.slashFractionDoubleSign
+        );
+        // // (Dec 31, 9999 - 23:59:59 GMT).
+        val.jail(253402300799, true);
+    }
+
 }
