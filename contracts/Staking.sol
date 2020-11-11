@@ -2,6 +2,7 @@ pragma solidity >=0.5.0;
 import "./interfaces/IStaking.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IMinter.sol";
+import "./Validator.sol";
 import {SafeMath} from "./Safemath.sol";
 
 contract Staking is IStaking {
@@ -31,12 +32,23 @@ contract Staking is IStaking {
 
     // Staking Params
     Params public  params;
-    
+    address[] public allVals;
+    mapping(address => address) public ownerOf;
+    mapping(address => address) public valOf;
     
 
     // create new validator
-    function createValidator(string memory name, uint64 maxRate, uint64 maxChangeRate, uint64 minSelfDelegation) public payable{
-
+    function createValidator(string calldata _name, uint64 _maxRate, uint64 _maxChangeRate, uint64 _minSelfDelegation) public{
+        require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
+        bytes memory bytecode = type(Validator).creationCode;
+        bytes32 salt = keccak256(abi.encodePacked(_name, _maxRate, _maxChangeRate, _minSelfDelegation, msg.sender));
+        assembly {
+            val := create2(0, add(bytecode, 32), mload(bytecode), salt)
+        }
+        IValidator(val).initialize(_name, msg.sender, _maxRate, _maxChangeRate, _minSelfDelegation);
+        allVals.push(val);
+        onwerOf[msg.sender] = val;
+        valOf[val] = msg.sender;
     }
 
 
@@ -99,7 +111,7 @@ contract Staking is IStaking {
     function _allocateTokensToValidator(address valAddr, uint256 rewards)
         private
     {
-        IValidator(valAddr).allocateToken(rewards);
+        IValidator(ownerOf[valAddr]).allocateToken(rewards);
     }
 
 
@@ -108,6 +120,6 @@ contract Staking is IStaking {
         uint256 votingPower,
         bool signed
     ) private {
-        IValidator(valAddr).validateSignature(votingPower, signed);
+        IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
     }
 }
