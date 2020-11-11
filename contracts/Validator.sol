@@ -134,6 +134,15 @@ contract Validator is IValidator {
         commission.rate = commissionRate;
     }
     
+    // _allocateTokens allocate tokens to a particular validator, splitting according to commission
+    function allocateToken(uint256 rewards)
+        private
+    {
+        uint256 commission = rewards.mulTrun(commission.rate);
+        uint256 shared = rewards.sub(commission);
+        accumulatedCommission += commission;
+        currentRewwards.reward += shared;
+    }
     
     // initialize starting info for a new validator
     function _initializeValidator() private {
