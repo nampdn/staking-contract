@@ -10,6 +10,7 @@ contract Validator is IValidator {
     using SafeMath for uint256;
 
     uint256 oneDec = 1 * 10**18;
+    uint256 powerReduction = 1 * 10**8;
 
     // Delegation
     struct Delegation {
@@ -74,6 +75,7 @@ contract Validator is IValidator {
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
     mapping(address => DelegationShare) delShare;
+    mapping(address => UBDEntry[]) ubdEntries;
     Commission public commission; // validator commission
     CurrentReward private currentRewwards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
@@ -85,6 +87,7 @@ contract Validator is IValidator {
     uint256 public tokens; // all token stake
     uint256 public delegationShares; // delegation shares
     uint256 public accumulatedCommission;
+    uint256 public slashEventCounter;
     bool public jailed; // status of the validator
 
     // called one by the staking at time of deployment  
@@ -143,9 +146,63 @@ contract Validator is IValidator {
         currentRewwards.reward += shared;
     }
     
+    // validator is jailed when the validator operation misbehave
     function jail() external {
         jailed = true;
     }
+    
+    // Validator is slashed when the Validator operation misbehave 
+    function slash(uint256 infrationHeight, uint256 power, uint256 slashFactor) private {
+        require( infrationHeight <= block.number, "cannot slash infrations in the future");
+        
+        uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
+        if (infrationHeight < block.number) {
+            uint256 totalDel = delegations.length();
+            for (uint256 i = 0; i < totalDel; i++) {
+                address delAddr = delegations.at(i);
+                UBDEntry[] storage entries = ubdEntries[delAddr];
+                for (uint256 j = 0; j < entries.length; j++) {
+                    UBDEntry storage entry = entries[j];
+                    if (entry.amount == 0) continue;
+                    // if unbonding started before this height, stake did not contribute to infraction;
+                    if (entry.blockHeight < infrationHeight) continue;
+                    // solhint-disable-next-line not-rely-on-time
+                    if (entry.completionTime < block.timestamp) {
+                        // unbonding delegation no longer eligible for slashing, skip it
+                        continue;
+                    }
+                    uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
+                    entry.amount = entry.amount.sub(amountSlashed);
+                    slashAmount = slashAmount.sub(amountSlashed);
+                }
+            }
+        }
+
+        uint256 tokensToBurn = slashAmount;
+        if (tokensToBurn > tokens) {
+            tokensToBurn = tokens;
+        }
+
+        if (tokens > 0) {
+            uint256 effectiveFraction = tokensToBurn.divTrun(tokens);
+            _updateValidatorSlashFraction(effectiveFraction);
+        }
+
+        tokens = tokens.sub(tokensToBurn);
+        // removeValidatorRank(valAddr);
+    }
+    
+    function _updateValidatorSlashFraction(uint256 fraction) private {
+        uint256 newPeriod = _incrementValidatorPeriod();
+        _incrementReferenceCount(valAddr, newPeriod);
+        slashEvents[slashEventCounter] = SlashEvent({
+            period: newPeriod,
+            fraction: fraction,
+            height: block.number
+        });
+        slashEventCounter++;
+    }
+
     
     // initialize starting info for a new validator
     function _initializeValidator() private {
@@ -155,9 +212,7 @@ contract Validator is IValidator {
         accumulatedCommission = 0;
     }
     
-    function _delegate(address payable _delAddr, uint256 _amount)
-        private
-    {
+    function _delegate(address payable _delAddr, uint256 _amount) private {
         // add delegation if not exists;
         if (!delegations.contains(_delAddr)) {
             delegations.add(_delAddr);
@@ -174,8 +229,7 @@ contract Validator is IValidator {
         // increment stake amount
         DelegationShare storage del = delShare[_delAddr];
         del.shares = del.shares.add(shared);
-        _afterDelegationModified(_delAddr);
-        // addValidatorRank(valAddr);
+        _initializeDelegation(_delAddr);
         // emit Delegate(valAddr, delAddr, amount);
     }
     
@@ -289,15 +343,12 @@ contract Validator is IValidator {
         return delegationShares;
     }
     
-    function _shareFromToken(uint256 _amount) private view returns(uint256){
+    function _shareFromToken(uint256 _amount) private view returns(uint256) {
         return delegationShares.mul(_amount).div(tokens);
     }
     
     // calculate share delegator's
-    function _addTokenFromDel(uint256 _amount)
-        private
-        returns (uint256)
-    {
+    function _addTokenFromDel(uint256 _amount) private returns (uint256) {
         uint256 issuedShares = 0;
         if (tokens == 0) {
             issuedShares = oneDec;
@@ -307,10 +358,6 @@ contract Validator is IValidator {
         tokens = tokens.add(_amount);
         delegationShares = delegationShares.add(issuedShares);
         return issuedShares;
-    }
-    
-    function _afterDelegationModified(address _delAddr) private {
-        _initializeDelegation(_delAddr);
     }
     
     // initialize starting info for a new delegation
