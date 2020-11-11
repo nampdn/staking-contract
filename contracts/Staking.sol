@@ -17,12 +17,10 @@ contract Staking is IStaking {
         uint256 slashFractionDoubleSign;
         uint256 signedBlockWindow;
         uint256 minSignedPerWindow;
-        // mint params
-        uint256 inflationRateChange;
-        uint256 goalBonded;
-        uint256 blocksPerYear;
-        uint256 inflationMax;
-        uint256 inflationMin;
+    }
+
+    struct ValidatorState {
+        uint64 amount;
     }
 
     // Private
@@ -35,7 +33,7 @@ contract Staking is IStaking {
     address[] public allVals;
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
-    
+    mapping(address => ValidatorState) private _validatorState;
 
     // create new validator
     function createValidator(string calldata _name, uint64 _maxRate, uint64 _maxChangeRate, uint64 _minSelfDelegation) public{
@@ -106,6 +104,14 @@ contract Staking is IStaking {
             _allocateTokensToValidator(addrs[i], rewards);
         }
     }
+
+    // update validator amount
+    function updateValidatorAmount(uint64 amount) external{
+        require(valOf[msg.sender] != address(0x0), "validator not found");
+        _validatorState[msg.sender].amount = amount;
+        // sort validator rank
+    }
+
 
 
     function _allocateTokensToValidator(address valAddr, uint256 rewards)
