@@ -6,7 +6,7 @@ interface IValidator {
     function update(uint256 _commissionRate) external;
     function unjail() external;
     function allocateToken(uint256 _rewards) external;
-    function slash() external;
+    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external;
     function jail() external;
     function delegate() external payable;
     function withdrawRewards() external;

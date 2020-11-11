@@ -216,11 +216,11 @@ contract Validator is IValidator {
     
     
     // Validator is slashed when the Validator operation misbehave 
-    function slash(uint256 infrationHeight, uint256 power, uint256 slashFactor) external {
-        require( infrationHeight <= block.number, "cannot slash infrations in the future");
+    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external {
+        require(_infrationHeight <= block.number, "cannot slash infrations in the future");
         
-        uint256 slashAmount = power.mul(powerReduction).mulTrun(slashFactor);
-        if (infrationHeight < block.number) {
+        uint256 slashAmount = _power.mul(powerReduction).mulTrun(_slashFactor);
+        if (_infrationHeight < block.number) {
             uint256 totalDel = delegations.length();
             for (uint256 i = 0; i < totalDel; i++) {
                 address delAddr = delegations.at(i);
@@ -229,13 +229,13 @@ contract Validator is IValidator {
                     UBDEntry storage entry = entries[j];
                     if (entry.amount == 0) continue;
                     // if unbonding started before this height, stake did not contribute to infraction;
-                    if (entry.blockHeight < infrationHeight) continue;
+                    if (entry.blockHeight < _infrationHeight) continue;
                     // solhint-disable-next-line not-rely-on-time
                     if (entry.completionTime < block.timestamp) {
                         // unbonding delegation no longer eligible for slashing, skip it
                         continue;
                     }
-                    uint256 amountSlashed = entry.amount.mulTrun(slashFactor);
+                    uint256 amountSlashed = entry.amount.mulTrun(_slashFactor);
                     entry.amount = entry.amount.sub(amountSlashed);
                     slashAmount = slashAmount.sub(amountSlashed);
                 }
