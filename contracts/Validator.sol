@@ -240,11 +240,21 @@ contract Validator is IValidator {
     }
     
     // withdraw rewards from a delegation
-    function withdrawReward() public {
+    function withdrawRewards() public {
         require(delegations.contains(msg.sender), "delegator not found");
         _withdrawRewards(msg.sender);
         _initializeDelegation(msg.sender);
     }
+    
+    function withdrawCommission() public {
+        require(msg.sender == inforValidator.valAddr, "validator not found");
+        uint256 commission = inforValidator.accumulatedCommission;
+        require(commission > 0, "no validator commission to reward");
+        inforValidator.valAddr.transfer(commission);
+        inforValidator.accumulatedCommission = 0;
+        // emit WithdrawCommissionReward(valAddr, commission);
+    }
+
     
     // remove share delegator's
     function _removeDelShares(uint256 _shares) private returns (uint256) {
@@ -450,21 +460,4 @@ contract Validator is IValidator {
     function _tokenFromShare(uint256 _shares) private view returns (uint256) {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
-    
-
-
-
-
-    // function _delegate(address delAddr, uint256 amount) private{
-    //     uint256 shared = _addTokenFromDel(valAddr, amount);
-    //     // increment stake amount
-    //     Delegation storage del = delegationByAddr[delAddr];
-    //     del.shares = shared
-    // }
-
-
-    // // undelegate
-    // function undelegate(uint64 amount) external {
-        
-    // }
 }
