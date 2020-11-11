@@ -68,10 +68,9 @@ contract Validator is IValidator {
         mapping(uint256 => bool) items;
     }
 
-
-    string name; // validator name
+    string public name; // validator name
+    address payable public valAddr;
     EnumerableSet.AddressSet private delegations; // all delegations
-    mapping(address => EnumerableSet.AddressSet) private delValidator;
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
     mapping(address => DelegationShare) delShare;
@@ -86,8 +85,6 @@ contract Validator is IValidator {
     uint256 public tokens; // all token stake
     uint256 public delegationShares; // delegation shares
     uint256 public accumulatedCommission;
-    address payable public valAddr;
-
 
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
@@ -119,16 +116,17 @@ contract Validator is IValidator {
             rate: _rate
         });
         
-         _afterValidatorCreated();
-        _delegate(_valAddr, _valAddr, _amount);
+        _initializeValidator();
+        _delegate(valAddr, _amount);
         // valSigningInfos[valAddr].startHeight = block.number;
     }
     
-    function _afterValidatorCreated() private {
-        _initializeValidator();
+    // delegate for this validator
+    function delegate() external payable {
+        _delegate(msg.sender, msg.value);
     }
     
-     // initialize starting info for a new validator
+    // initialize starting info for a new validator
     function _initializeValidator() private {
         CurrentReward memory currentRewwards;
         currentRewwards.period = 1;
@@ -136,40 +134,36 @@ contract Validator is IValidator {
         accumulatedCommission = 0;
     }
     
-    function _delegate(address payable _delAddr, address _valAddr, uint256 _amount)
+    function _delegate(address payable _delAddr, uint256 _amount)
         private
     {
         // add delegation if not exists;
         if (!delegations.contains(_delAddr)) {
             delegations.add(_delAddr);
-            delValidator[_delAddr].add(_valAddr);
             delShare[_delAddr].owner = _delAddr;
-            _beforeDelegationCreated(_valAddr);
+            _beforeDelegationCreated();
         } else {
-            _beforeDelegationSharesModified(_valAddr, _delAddr);
+            _beforeDelegationSharesModified(_delAddr);
         }
 
-        uint256 shared = _addTokenFromDel(_valAddr, _amount);
+        uint256 shared = _addTokenFromDel(_amount);
 
         // totalBonded = totalBonded.add(_amount);
 
         // increment stake amount
         DelegationShare storage del = delShare[_delAddr];
         del.shares = del.shares.add(shared);
-        _afterDelegationModified(_valAddr, _delAddr);
-        // addValidatorRank(_valAddr);
+        _afterDelegationModified(_delAddr);
+        // addValidatorRank(valAddr);
         // emit Delegate(valAddr, delAddr, amount);
     }
     
-    function _beforeDelegationCreated(address valAddr) private {
-        _incrementValidatorPeriod(valAddr);
+    function _beforeDelegationCreated() private {
+        _incrementValidatorPeriod();
     }
     
     // increment validator period, returning the period just ended
-    function _incrementValidatorPeriod(address valAddr)
-        private
-        returns (uint256)
-    {
+    function _incrementValidatorPeriod() private returns (uint256) {
         CurrentReward memory rewards;
         uint256 previousPeriod = rewards.period.sub(1);
         uint256 current = 0;
@@ -178,7 +172,7 @@ contract Validator is IValidator {
         }
         uint256 historical = hRewards[previousPeriod]
             .cumulativeRewardRatio;
-        _decrementReferenceCount(valAddr, previousPeriod);
+        _decrementReferenceCount(previousPeriod);
 
         hRewards[rewards.period].cumulativeRewardRatio = historical.add(current);
         hRewards[rewards.period].referenceCount = 1;
@@ -188,32 +182,21 @@ contract Validator is IValidator {
     }
     
     // decrement the reference count for a historical rewards value, and delete if zero references remain
-    function _decrementReferenceCount(address valAddr, uint256 period) private {
+    function _decrementReferenceCount(uint256 period) private {
         hRewards[period].referenceCount--;
         if (hRewards[period].referenceCount == 0) {
             delete hRewards[period];
         }
     }
     
-    
-    function _beforeDelegationSharesModified(
-        address valAddr,
-        address payable delAddr
-    ) private {
-        _withdrawRewards(valAddr, delAddr);
+    function _beforeDelegationSharesModified(address payable delAddr) private {
+        _withdrawRewards(delAddr);
     }
     
-    function _withdrawRewards(address valAddr, address payable delAddr) private {
-        uint256 endingPeriod = _incrementValidatorPeriod(valAddr);
-        uint256 rewards = _calculateDelegationRewards(
-            valAddr,
-            delAddr,
-            endingPeriod
-        );
-        _decrementReferenceCount(
-            valAddr,
-            delegationByAddr[delAddr].previousPeriod
-        );
+    function _withdrawRewards(address payable delAddr) private {
+        uint256 endingPeriod = _incrementValidatorPeriod();
+        uint256 rewards = _calculateDelegationRewards(delAddr, endingPeriod);
+        _decrementReferenceCount(delegationByAddr[delAddr].previousPeriod);
         
         delete delegationByAddr[delAddr];
         if (rewards > 0) {
@@ -222,9 +205,8 @@ contract Validator is IValidator {
         }
     }
     
-        // calculate the total rewards accrued by a delegation
+    // calculate the total rewards accrued by a delegation
     function _calculateDelegationRewards(
-        address valAddr,
         address delAddr,
         uint256 endingPeriod
     ) private view returns (uint256) {
@@ -241,7 +223,6 @@ contract Validator is IValidator {
                 uint256 _endingPeriod = slashEvent.period;
                 if (_endingPeriod > delegationInfo.previousPeriod) {
                     rewards += _calculateDelegationRewardsBetween(
-                        valAddr,
                         delegationInfo.previousPeriod,
                         slashEvent.period,
                         delegationInfo.stake
@@ -254,7 +235,6 @@ contract Validator is IValidator {
             }
         }
         rewards += _calculateDelegationRewardsBetween(
-            valAddr,
             delegationInfo.previousPeriod,
             endingPeriod,
             delegationInfo.stake
@@ -264,7 +244,6 @@ contract Validator is IValidator {
     
     // calculate the rewards accrued by a delegation between two periods
     function _calculateDelegationRewardsBetween(
-        address valAddr,
         uint256 startingPeriod,
         uint256 endingPeriod,
         uint256 stake
@@ -277,24 +256,24 @@ contract Validator is IValidator {
         return stake.mulTrun(difference); // return staking * (ending - starting)
     }
     
-    function _addToken(uint256 amount) private returns(uint256) {
+    function _addToken(uint256 _amount) private returns(uint256) {
         uint256 issuedShares = 0;
         if (tokens == 0) {
             issuedShares = oneDec;
         } else {
-            issuedShares = _shareFromToken(amount);
+            issuedShares = _shareFromToken(_amount);
         }
-        tokens = tokens.add(amount);
+        tokens = tokens.add(_amount);
         delegationShares = delegationShares.add(issuedShares);
         return delegationShares;
     }
     
-    function _shareFromToken(uint256 amount) private view returns(uint256){
-        return delegationShares.mul(amount).div(tokens);
+    function _shareFromToken(uint256 _amount) private view returns(uint256){
+        return delegationShares.mul(_amount).div(tokens);
     }
     
     // calculate share delegator's
-    function _addTokenFromDel(address _valAddr, uint256 _amount)
+    function _addTokenFromDel(uint256 _amount)
         private
         returns (uint256)
     {
@@ -309,37 +288,34 @@ contract Validator is IValidator {
         return issuedShares;
     }
     
-    function _afterDelegationModified(address _valAddr, address _delAddr) private {
-        _initializeDelegation(_valAddr, _delAddr);
+    function _afterDelegationModified(address _delAddr) private {
+        _initializeDelegation(_delAddr);
     }
     
     // initialize starting info for a new delegation
-    function _initializeDelegation(address _valAddr, address _delAddr) private {
+    function _initializeDelegation(address _delAddr) private {
         DelegationShare storage del = delShare[_delAddr];
         uint256 previousPeriod = currentRewwards.period - 1;
-        _incrementReferenceCount(_valAddr, previousPeriod);
+        _incrementReferenceCount(valAddr, previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
-        uint256 stake = _tokenFromShare(_valAddr, del.shares);
+        uint256 stake = _tokenFromShare(valAddr, del.shares);
         delegationByAddr[_delAddr].stake = stake;
     }
     
     // increment the reference count for a historical rewards value
-    function _incrementReferenceCount(address _valAddr, uint256 _period) private {
+    function _incrementReferenceCount(address valAddr, uint256 _period) private {
         hRewards[_period].referenceCount++;
     }
     
     // token worth of provided delegator shares
-    function _tokenFromShare(address _valAddr, uint256 _shares) private view returns (uint256) {
+    function _tokenFromShare(address valAddr, uint256 _shares) private view returns (uint256) {
         return _shares.mul(tokens).div(delegationShares);
     }
     
 
 
-    // // delegate for this validator
-    // function delegate() external payable {
-    //     _delegate(msg.sender, msg.value)
-    // }
+
 
     // function _delegate(address delAddr, uint256 amount) private{
     //     uint256 shared = _addTokenFromDel(valAddr, amount);
