@@ -69,7 +69,6 @@ contract Validator is IValidator {
         mapping(uint256 => bool) items;
     }
     
-
     struct InforValidator {
         string name;  // validator name
         address payable valAddr; // address of the validator
@@ -80,8 +79,11 @@ contract Validator is IValidator {
         uint256 minSelfDelegation;
         uint256 delegationShares; // delegation shares
         uint256 accumulatedCommission;
+        uint256 ubdEntryCount; // unbonding delegation entries
     }
-
+    
+    uint256 constant public UNBONDING_TiME = 604800; // 7 days
+    
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
@@ -198,6 +200,61 @@ contract Validator is IValidator {
         // removeValidatorRank(valAddr);
     }
     
+    function undelegate(address payable _delAddr, uint256 _amount) private {
+        require(ubdEntries[_delAddr].length < 7, "too many unbonding delegation entries");
+        require(delegations.contains(_delAddr), "delegation not found");
+        
+        _withdrawRewards(_delAddr);
+        DelegationShare storage del = delShare[_delAddr];
+        uint256 shares = _shareFromToken(_amount);
+        require(del.shares >= shares, "not enough delegation shares");
+        del.shares -= shares;
+        _initializeDelegation(_delAddr);
+        bool isValidatorOperator = inforValidator.valAddr == _delAddr;
+        if (
+            isValidatorOperator &&
+            !inforValidator.jailed &&
+            _tokenFromShare( inforValidator.valAddr, del.shares) < inforValidator.minSelfDelegation
+        ) {
+            inforValidator.jailed = true; // jail validator
+        }
+
+        uint256 amountRemoved = _removeDelShares(shares);
+        inforValidator.ubdEntryCount++;
+        // if (inforValidator.tokens.div(powerReduction) == 0) {
+        //     removeValidatorRank(valAddr);
+        // } else {
+        //     addValidatorRank(valAddr);
+        // }
+
+        uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
+        ubdEntries[_delAddr].push(
+            UBDEntry({
+                completionTime: completionTime,
+                blockHeight: block.number,
+                amount: amountRemoved
+            })
+        );
+
+        // emit Undelegate(valAddr, msg.sender, amount, completionTime);
+    }
+    
+    // remove share delegator's
+    function _removeDelShares(uint256 _shares) private returns (uint256) {
+        uint256 remainingShares = inforValidator.delegationShares;
+        uint256 issuedTokens = 0;
+        remainingShares = remainingShares.sub(_shares);
+        if (remainingShares == 0) {
+            issuedTokens = inforValidator.tokens;
+            inforValidator.tokens = 0;
+        } else {
+            issuedTokens = _tokenFromShare(inforValidator.valAddr, _shares);
+            inforValidator.tokens = inforValidator.tokens.sub(issuedTokens);
+        }
+        inforValidator.delegationShares = remainingShares;
+        return issuedTokens;
+    }
+    
     function _updateValidatorSlashFraction(uint256 fraction) private {
         uint256 newPeriod = _incrementValidatorPeriod();
         _incrementReferenceCount(inforValidator.valAddr, newPeriod);
@@ -222,7 +279,7 @@ contract Validator is IValidator {
         // add delegation if not exists;
         if (!delegations.contains(_delAddr)) {
             delegations.add(_delAddr);
-            delShare[_delAddr].owner = _delAddr;
+            delShare[_delAddr].owner = _delAddr; 
             _beforeDelegationCreated();
         } else {
             _beforeDelegationSharesModified(_delAddr);
