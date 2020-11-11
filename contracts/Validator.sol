@@ -126,6 +126,15 @@ contract Validator is IValidator {
         _delegate(msg.sender, msg.value);
     }
     
+    // update Commission rate of the validator
+    function update(uint256 commissionRate) external {
+        require(commissionRate >= 0, "commission rate must greater than 0");
+        require(commissionRate <= oneDec, "commission cannot be more than the max rate");
+        
+        commission.rate = commissionRate;
+    }
+    
+    
     // initialize starting info for a new validator
     function _initializeValidator() private {
         CurrentReward memory currentRewwards;
