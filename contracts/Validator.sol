@@ -230,7 +230,6 @@ contract Validator is IValidator {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
-        // removeValidatorRank(valAddr);
     }
     
     function undelegate(address payable _delAddr, uint256 _amount) private {
@@ -304,7 +303,6 @@ contract Validator is IValidator {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
-        // totalBonded = totalBonded.sub(amount);
 
         if (del.shares == 0 && entries.length == 0) {
             _removeDelegation(msg.sender);
@@ -334,7 +332,6 @@ contract Validator is IValidator {
         return rewards;
     }
 
-    
     // remove delegation
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);
