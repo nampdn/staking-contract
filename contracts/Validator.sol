@@ -131,6 +131,11 @@ contract Validator is IValidator {
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
     
+    // Functions with this modifier can only be executed by the owner
+    modifier onlyValidator() {
+        require(msg.sender == inforValidator.valAddr);
+        _;
+    }
     
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
@@ -173,7 +178,7 @@ contract Validator is IValidator {
     }
     
     // update Commission rate of the validator
-    function update(uint256 _commissionRate) external {
+    function update(uint256 _commissionRate) external onlyValidator {
         require(_commissionRate >= 0, "commission rate must greater than 0");
         require(_commissionRate <= oneDec, "commission cannot be more than the max rate");
         
@@ -196,7 +201,7 @@ contract Validator is IValidator {
     // Unjail is used for unjailing a jailed validator, thus returning
     // them into the bonded validator set, so they can begin receiving provisions
     // and rewards again.
-    function unjail() external {
+    function unjail() external onlyValidator {
         require(inforValidator.jailed, "validator not jailed");
         // cannot be unjailed if tombstoned
         require(signingInfo.tombstoned == false, "validator jailed");
@@ -261,8 +266,7 @@ contract Validator is IValidator {
     }
     
     // the validator withdraws commission
-    function withdrawCommission() external {
-        require(msg.sender == inforValidator.valAddr, "validator not found");
+    function withdrawCommission() external onlyValidator {
         uint256 commission = inforValidator.accumulatedCommission;
         require(commission > 0, "no validator commission to reward");
         inforValidator.valAddr.transfer(commission);
