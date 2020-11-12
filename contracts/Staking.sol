@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 import {IStaking} from "./interfaces/IStaking.sol";
 import {IValidator} from  "./interfaces/IValidator.sol";
-import {IMinter} from "./interfaces/IMinter.sol";
+import {Minter} from "./Minter.sol";
 import {Validator} from "./Validator.sol";
 import {SafeMath} from "./Safemath.sol";
 import {Ownable} from "./Ownable.sol";
@@ -41,6 +41,10 @@ contract Staking is IStaking, Ownable {
     mapping(address => uint256) public valRank;
     bool private _neededSort; 
 
+    Minter public minter;
+    uint256 public totalSupply = 5000000000 * 10**18;
+    uint256 public totalBonded;
+
 
     constructor() public {
         params = Params({
@@ -54,6 +58,8 @@ contract Staking is IStaking, Ownable {
             signedBlockWindow: 100,
             minSignedPerWindow: 5 * 10**16
         });
+
+        minter = new Minter();
     }
 
 
@@ -111,8 +117,7 @@ contract Staking is IStaking, Ownable {
             params.bonusProposerReward.mulTrun(previousFractionVotes)
         );
 
-        IMinter minter = IMinter();
-        uint64 fees = minter.getFeesCollected();
+        uint64 fees = minter.feesCollected();
         uint256 proposerReward = fees.mulTrun(proposerMultiplier);
         _allocateTokensToValidator(_previousProposer, proposerReward);
 
@@ -270,6 +275,13 @@ contract Staking is IStaking, Ownable {
         rank.pop();
         delete valRank[valAddr];
         _neededSort = true;
+    }
+
+
+    function mint() public onlyOwner returns (uint256) {
+        fees =  minter.mint(); 
+        totalSupply += fees;
+        return fees;
     }
 
 }

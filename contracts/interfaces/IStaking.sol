@@ -7,6 +7,6 @@ interface IStaking {
     function doubleSign(address valAddr, uint64 votingPower, uint64 height) external;
     function mint() external returns (uint64);
     function updateValidatorAmount(uint64 amount) external;
-    function getTotalSupply() external returns (uint64);
-    function getTotalBonded() external returns (uint64);
+    function getTotalSupply() external view returns (uint64);
+    function getTotalBonded() external view returns (uint64);
 }
