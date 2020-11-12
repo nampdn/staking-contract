@@ -189,10 +189,10 @@ contract Validator is IValidator {
     }
     
     // validator is jailed when the validator operation misbehave
-    function jail() external {
-        inforValidator.jailed = true;
+    function jail(uint256 _jailedUntil, bool _tombstoned) external {
+        _jail(_jailedUntil, _tombstoned);
     }
-    
+
     // Unjail is used for unjailing a jailed validator, thus returning
     // them into the bonded validator set, so they can begin receiving provisions
     // and rewards again.
@@ -201,7 +201,7 @@ contract Validator is IValidator {
         // cannot be unjailed if tombstoned
         require(signingInfo.tombstoned == false, "validator jailed");
         uint256 jailedUntil = signingInfo.jailedUntil;
-        // solhint-disable-next-line not-rely-on-time
+
         require(jailedUntil < block.timestamp, "validator jailed");
         DelegationShare storage del = delShare[inforValidator.valAddr];
         uint256 tokens = _tokenFromShare(del.shares);
@@ -571,7 +571,7 @@ contract Validator is IValidator {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
     
-        function _slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) private {
+    function _slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) private {
         require(_infrationHeight <= block.number, "cannot slash infrations in the future");
         
         uint256 slashAmount = _power.mul(powerReduction).mulTrun(_slashFactor);
@@ -608,6 +608,11 @@ contract Validator is IValidator {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
-        // removeValidatorRank(valAddr);
+    }
+    
+    function _jail(uint256 _jailedUntil, bool _tombstoned) private {
+        inforValidator.jailed = true;
+        signingInfo.jailedUntil = _jailedUntil;
+        signingInfo.tombstoned = _tombstoned;
     }
 }
