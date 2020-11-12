@@ -214,48 +214,11 @@ contract Validator is IValidator {
         inforValidator.jailed = false;
     }
     
-    
     // Validator is slashed when the Validator operation misbehave 
     function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external {
-        require(_infrationHeight <= block.number, "cannot slash infrations in the future");
-        
-        uint256 slashAmount = _power.mul(powerReduction).mulTrun(_slashFactor);
-        if (_infrationHeight < block.number) {
-            uint256 totalDel = delegations.length();
-            for (uint256 i = 0; i < totalDel; i++) {
-                address delAddr = delegations.at(i);
-                UBDEntry[] storage entries = ubdEntries[delAddr];
-                for (uint256 j = 0; j < entries.length; j++) {
-                    UBDEntry storage entry = entries[j];
-                    if (entry.amount == 0) continue;
-                    // if unbonding started before this height, stake did not contribute to infraction;
-                    if (entry.blockHeight < _infrationHeight) continue;
-                    // solhint-disable-next-line not-rely-on-time
-                    if (entry.completionTime < block.timestamp) {
-                        // unbonding delegation no longer eligible for slashing, skip it
-                        continue;
-                    }
-                    uint256 amountSlashed = entry.amount.mulTrun(_slashFactor);
-                    entry.amount = entry.amount.sub(amountSlashed);
-                    slashAmount = slashAmount.sub(amountSlashed);
-                }
-            }
-        }
-
-        uint256 tokensToBurn = slashAmount;
-        if (tokensToBurn > inforValidator.tokens) {
-            tokensToBurn = inforValidator.tokens;
-        }
-
-        if (inforValidator.tokens > 0) {
-            uint256 effectiveFraction = tokensToBurn.divTrun(inforValidator.tokens);
-            _updateValidatorSlashFraction(effectiveFraction);
-        }
-
-        inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
-        // removeValidatorRank(valAddr);
+        _slash(_infrationHeight, _power, _slashFactor);
     }
-    
+
     function undelegate(uint256 _amount) external {
         require(ubdEntries[msg.sender].length < 7, "too many unbonding delegation entries");
         require(delegations.contains(msg.sender), "delegation not found");
@@ -356,6 +319,45 @@ contract Validator is IValidator {
         }
         return rewards;
     }
+    
+    // validate validator signature, must be called once per validator per block
+    function validateSignature(uint256 _votingPower,
+        bool _signed,
+        uint256 _signedBlockWindow,
+        uint256 _minSignedPerWindow, 
+        uint256 _slashFractionDowntime,
+        uint256 _downtimeJailDuration)
+        external {
+        // counts blocks the validator should have signed
+        uint256 index = signingInfo.indexOffset % _signedBlockWindow;
+        signingInfo.indexOffset++;
+        bool previous = missedBlock.items[index];
+        bool missed = !_signed;
+        if (!previous && missed) { // value has changed from not missed to missed, increment counter
+            signingInfo.missedBlockCounter++;
+            missedBlock.items[index] = true;
+        } else if (previous && !missed) { // value has changed from missed to not missed, decrement counter
+            signingInfo.missedBlockCounter--;
+            missedBlock.items[index] = false;
+        }
+        
+        uint256 minHeight = signingInfo.startHeight + _signedBlockWindow;
+        uint256 minSignedPerWindow = _signedBlockWindow.mulTrun(_minSignedPerWindow);
+        uint256 maxMissed = _signedBlockWindow - minSignedPerWindow;
+        
+        // if past the minimum height and the validator has missed too many blocks, punish them
+        if (block.number > minHeight && signingInfo.missedBlockCounter > maxMissed) {
+            if (!inforValidator.jailed) {
+                _slash(block.number - 2, _votingPower, _slashFractionDowntime);
+                inforValidator.jailed = true; // jail validator
+
+                signingInfo.jailedUntil = block.timestamp.add(_downtimeJailDuration);
+                signingInfo.missedBlockCounter = 0;
+                signingInfo.indexOffset = 0;
+                delete missedBlock;
+            }
+        }
+     }
 
     
     // remove delegation
@@ -567,5 +569,45 @@ contract Validator is IValidator {
     // token worth of provided delegator shares
     function _tokenFromShare(uint256 _shares) private view returns (uint256) {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
+    }
+    
+        function _slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) private {
+        require(_infrationHeight <= block.number, "cannot slash infrations in the future");
+        
+        uint256 slashAmount = _power.mul(powerReduction).mulTrun(_slashFactor);
+        if (_infrationHeight < block.number) {
+            uint256 totalDel = delegations.length();
+            for (uint256 i = 0; i < totalDel; i++) {
+                address delAddr = delegations.at(i);
+                UBDEntry[] storage entries = ubdEntries[delAddr];
+                for (uint256 j = 0; j < entries.length; j++) {
+                    UBDEntry storage entry = entries[j];
+                    if (entry.amount == 0) continue;
+                    // if unbonding started before this height, stake did not contribute to infraction;
+                    if (entry.blockHeight < _infrationHeight) continue;
+                    // solhint-disable-next-line not-rely-on-time
+                    if (entry.completionTime < block.timestamp) {
+                        // unbonding delegation no longer eligible for slashing, skip it
+                        continue;
+                    }
+                    uint256 amountSlashed = entry.amount.mulTrun(_slashFactor);
+                    entry.amount = entry.amount.sub(amountSlashed);
+                    slashAmount = slashAmount.sub(amountSlashed);
+                }
+            }
+        }
+
+        uint256 tokensToBurn = slashAmount;
+        if (tokensToBurn > inforValidator.tokens) {
+            tokensToBurn = inforValidator.tokens;
+        }
+
+        if (inforValidator.tokens > 0) {
+            uint256 effectiveFraction = tokensToBurn.divTrun(inforValidator.tokens);
+            _updateValidatorSlashFraction(effectiveFraction);
+        }
+
+        inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
+        // removeValidatorRank(valAddr);
     }
 }
