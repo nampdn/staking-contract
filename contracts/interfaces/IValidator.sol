@@ -15,5 +15,5 @@ interface IValidator {
     function undelegate(uint256 _amount) external;
     function getCommissionRewards() external view returns (uint256);
     function getDelegationRewards(address _delAddr) external view returns (uint256);
-    function validateSignature(uint256 _votingPower, bool _signed, uint256 _signedBlockWindow, uint256 _minSignedPerWindow,  uint256 _slashFractionDowntime, uint256 _downtimeJailDuration) external;
+    function validateSignature(uint256 _votingPower, bool _signed, uint256 _signedBlockWindow, uint256 _minSignedPerWindow,  uint256 _slashFractionDowntime, uint256 _downtimeJailDuration) external returns (bool);
 }
