@@ -36,6 +36,11 @@ contract Staking is IStaking, Ownable {
     mapping(address => address) public valOf;
     mapping(address => ValidatorState) private _validatorState;
 
+    // validator rank
+    address[] public rank;
+    mapping(address => uint256) public valRank;
+    bool private _neededSort; 
+
 
     constructor() public {
         params = Params({
@@ -125,10 +130,18 @@ contract Staking is IStaking, Ownable {
     // update validator amount
     function updateValidatorAmount(uint64 amount) external{
         require(valOf[msg.sender] != address(0x0), "validator not found");
-        _validatorState[msg.sender].amount = amount;
-        // sort validator rank
+        _updateValidatorAmount(msg.sender, amount);
     }
 
+
+    function _updateValidatorAmount(address valAddr, uint64 amount) private {
+        _validatorState[valAddr].amount = amount;
+        if (amount > 0) {
+            _addToRank(valAddr);
+        } else {
+            _removeValidatorRank(valAddr);
+        }
+    }
 
 
     function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
@@ -137,7 +150,10 @@ contract Staking is IStaking, Ownable {
 
 
     function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
-        IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
+        bool memory jailed = IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
+        if (jailed) {
+            _updateValidatorAmount(ownerOf[valAddr], 0);
+        }
     }
 
 
@@ -164,6 +180,96 @@ contract Staking is IStaking, Ownable {
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
         val.jail(253402300799, true);
+        _updateValidatorAmount(ownerOf[valAddr], 0);
+    }
+
+
+    function _addToRank(address valAddr) private {
+        uint256 idx = valRank[valAddr];
+        uint256 power = getValidatorPower(valAddr);
+        if (power == 0) return;
+        if (idx == 0) {
+            rank.push(valAddr);
+            rank[valAddr] = rank.length;
+        }
+        _neededSort = true;
+    }
+
+
+    function getValidatorPower(address valAddr) public view returns (uint256) {
+        return validatorState[valAddr].tokens.div(powerReduction);
+    }
+
+     function getValidatorSets()
+        public
+        view
+        returns (address[] memory, uint256[] memory)
+    {
+        uint256 maxVal = params.maxValidators;
+        if (maxVal > rank.length) {
+            maxVal = rank.length;
+        }
+        address[] memory valAddrs = new address[](maxVal);
+        uint256[] memory powers = new uint256[](maxVal);
+
+        for (uint256 i = 0; i < maxVal; i++) {
+            valAddrs[i] = rank[i];
+            powers[i] = getValidatorPower(rank[i]);
+        }
+        return (valAddrs, powers);
+    }
+
+
+    function applyAndReturnValidatorSets()
+        public
+        onlyOwner
+        returns (address[] memory, uint256[] memory)
+    {
+        if (_neededSort && rank.length > 0) {
+            _sortValRank(0, int256(rank.length - 1));
+            for (uint256 i = valRanks.length; i > 300; i --) {
+                delete valRank[rank[i - 1]];
+                rank.pop();
+            }
+            _neededSort = false;
+        }
+        return getValidatorSets();
+    }
+
+    function _sortValRank(int256 left, int256 right) internal {
+        int256 i = left;
+        int256 j = right;
+        if (i == j) return;
+        uint256 pivot = getValPowerByRank(uint256(left + (right - left) / 2));
+        while (i <= j) {
+            while (getValPowerByRank(uint256(i)) > pivot) i++;
+            while (pivot > getValPowerByRank(uint256(j))) j--;
+            if (i <= j) {
+                address tmp = rank[uint256(i)];
+                rank[uint256(i)] = valRank[uint256(j)];
+                rank[uint256(j)] = tmp;
+
+                valRank[tmp] = uint256(j + 1);
+                valRank[valRank[uint256(i)]] = uint256(i + 1);
+
+                i++;
+                j--;
+            }
+        }
+        if (left < j) _sortValRank(left, j);
+        if (i < right) _sortValRank(i, right);
+    }
+
+    function _removeValidatorRank(address valAddr) private {
+        uint256 todDeleteIndex = valRank[valAddr];
+        if (todDeleteIndex == 0) return;
+        uint256 lastIndex = rank.length;
+        address last = valRank[lastIndex - 1];
+        rank[todDeleteIndex - 1] = last;
+        valRank[last] = todDeleteIndex;
+        rank.pop();
+        delete valRank[valAddr];
+        _neededSort = true;
     }
 
 }
