@@ -136,10 +136,8 @@ contract Validator is IValidator, Ownable {
 
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
-        uint256 _maxChangeRate, uint256 _minSelfDelegation, uint256 _amount) external payable {
+        uint256 _maxChangeRate, uint256 _minSelfDelegation) external {
             
-        require(_amount > 0, "invalid delegation amount");
-        require(_amount > _minSelfDelegation, "self delegation below minimum");
         require(
             _maxRate <= oneDec,
             "commission max rate cannot be more than 100%"
@@ -168,7 +166,6 @@ contract Validator is IValidator, Ownable {
         transferOwnership(_stakingOwner);
         transferValidatorship(_valAddr);
         _initializeValidator();
-        _delegate(inforValidator.valAddr, _amount);
         signingInfo.startHeight = block.number;
     }
     
