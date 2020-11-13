@@ -14,6 +14,7 @@ pragma solidity >=0.5.0;
  */
 contract Ownable {
     address private _owner;
+    address private _validator;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -31,6 +32,13 @@ contract Ownable {
         require(_owner == address(0x0) || _owner == msg.sender, "Ownable: caller is not the owner");
         _;
     }
+    
+    // Functions with this modifier can only be executed by the validator
+    modifier onlyValidator() {
+        require(_validator == address(0x0) || _validator == msg.sender, "Ownable: caller is not the validator");
+        _;
+    }
+    
 
     /**
      * @dev Leaves the contract without owner. It will not be possible to call
@@ -52,5 +60,11 @@ contract Ownable {
         require(newOwner != address(0), "Ownable: new owner is the zero address");
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
+    }
+    
+    function transferValidatorship(address newOwner) public onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        emit OwnershipTransferred(_validator, newOwner);
+        _validator = newOwner;
     }
 }
