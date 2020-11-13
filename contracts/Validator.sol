@@ -331,7 +331,7 @@ contract Validator is IValidator {
         uint256 _minSignedPerWindow, 
         uint256 _slashFractionDowntime,
         uint256 _downtimeJailDuration)
-        external {
+        external returns (bool) {
         // counts blocks the validator should have signed
         uint256 index = signingInfo.indexOffset % _signedBlockWindow;
         signingInfo.indexOffset++;
@@ -359,8 +359,11 @@ contract Validator is IValidator {
                 signingInfo.missedBlockCounter = 0;
                 signingInfo.indexOffset = 0;
                 delete missedBlock;
+                
+                return true;
             }
         }
+        return false;
      }
 
     
