@@ -1,6 +1,7 @@
-pragma solidity 0.5.0;
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.5.0;
 import "./EnumerableSet.sol";
-import "./IValidator.sol";
+import "./interfaces/IValidator.sol";
 import "./Safemath.sol";
 import "./Ownable.sol";
 import "./Initializable.sol";

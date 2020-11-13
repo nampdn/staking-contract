@@ -36,7 +36,7 @@ contract Minter is Ownable {
     }
 
     function getNextAnnualProvisions() public view returns (uint256) {
-        uint256 totalSupply = IStaking(owner()).getTotalSupply();
+        uint256 totalSupply = IStaking(owner()).totalSupply();
         return inflation.mulTrun(totalSupply);
     }
 
@@ -45,8 +45,8 @@ contract Minter is Ownable {
     }
 
     function getNextInflationRate() public view returns (uint256) {
-        uint256 totalBonded = IStaking(owner()).getTotalBonded();
-        uint256 totalSupply = IStaking(owner()).getTotalSupply();
+        uint256 totalBonded = IStaking(owner()).totalBonded();
+        uint256 totalSupply = IStaking(owner()).totalSupply();
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
         uint256 inflationRateChangePerYear;
         uint256 infRateChange;

@@ -1,4 +1,5 @@
-pragma solidity 0.5.0;
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.5.0;
 
 interface IValidator {
     function initialize (string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 

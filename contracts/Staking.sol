@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.5.0;
 import {IStaking} from "./interfaces/IStaking.sol";
 import {IValidator} from  "./interfaces/IValidator.sol";
@@ -44,6 +45,15 @@ contract Staking is IStaking, Ownable {
     Minter public minter;
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
+
+
+    mapping(address => EnumerableSet.AddressSet) public valOfDel;
+
+     // Functions with this modifier can only be executed by the validator
+    modifier onlyValidator() {
+        require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
+        _;
+    }
 
 
     constructor() public {
@@ -133,13 +143,6 @@ contract Staking is IStaking, Ownable {
         }
     }
 
-    // update validator amount
-    function updateValidatorAmount(uint64 amount) external{
-        require(valOf[msg.sender] != address(0x0), "validator not found");
-        _updateValidatorAmount(msg.sender, amount);
-    }
-
-
     function _updateValidatorAmount(address valAddr, uint64 amount) private {
         _validatorState[valAddr].amount = amount;
         if (amount > 0) {
@@ -160,6 +163,31 @@ contract Staking is IStaking, Ownable {
         if (jailed) {
             _updateValidatorAmount(ownerOf[valAddr], 0);
         }
+    }
+
+    
+    function delegate(address delAddr, uint64 amount) external onlyValidator {
+        valOfDel[delAddr].add(msg.sender);
+        totalBonded += amount;
+        _validatorState[msg.sender].amount += amount;
+        _addToRank(msg.sender);
+    }
+
+    function undelegate(uint64 amount) external onlyValidator{
+        totalBonded -= amount;
+        _validatorState[msg.sender].amount -= amount;
+        if (_validatorState[msg.sender].amount == 0) {
+            _removeValidatorRank(msg.sender);
+        }
+    }
+
+    function removeDelegation(address delAddr) external onlyValidator{
+        valOfDel[delAddr].remove(msg.sender);
+    }
+
+    function burn(uint64 amount) external onlyValidator{
+        totalBonded -= amount;
+        totalSupply -= amount;
     }
 
 
@@ -227,7 +255,7 @@ contract Staking is IStaking, Ownable {
 
 
     function applyAndReturnValidatorSets()
-        public
+        external
         onlyOwner
         returns (address[] memory, uint256[] memory)
     {
@@ -285,4 +313,18 @@ contract Staking is IStaking, Ownable {
         return fees;
     }
 
+
+    function getValidatorsByDelegator(address delAddr)
+        public
+        view
+        returns (address[] memory)
+    {
+        uint256 total = valOfDel[delAddr].length();
+        address[] memory addrs = new address[](total);
+        for (uint256 i = 0; i < total; i++) {
+            addrs[i] = valOfDel[delAddr].at(i);
+        }
+
+        return addrs;
+    }
 }

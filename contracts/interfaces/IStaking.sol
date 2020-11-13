@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.5.0;
 
 interface IStaking {
@@ -7,6 +8,13 @@ interface IStaking {
     function doubleSign(address valAddr, uint64 votingPower, uint64 height) external;
     function mint() external returns (uint64);
     function updateValidatorAmount(uint64 amount) external;
-    function getTotalSupply() external view returns (uint64);
-    function getTotalBonded() external view returns (uint64);
+    function totalSupply() external view returns (uint64);
+    function totalBonded() external view returns (uint64);
+    function delegate(address delAddr, uint64 amount) external;
+    function undelegate(uint64 amount) external;
+    function burn(uint64 amount) external;
+    function removeDelegation(address delAddr) external;
+    function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
+    function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
+    function getValidatorsByDelegator() external view returns (address[] memory);
 }
