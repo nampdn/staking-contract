@@ -2,9 +2,10 @@ pragma solidity 0.5.0;
 import "./EnumerableSet.sol";
 import "./IValidator.sol";
 import "./Safemath.sol";
+import "./Ownable.sol";
 
 
-contract Validator is IValidator {
+contract Validator is IValidator, Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
@@ -106,6 +107,7 @@ contract Validator is IValidator {
         string name;  // validator name
         address payable valAddr; // address of the validator
         address stakingAddr; // staking address
+        address stakingOwner; // address of the staking owner
         uint256 tokens; // all token stake
         bool jailed;
         uint256 slashEventCounter;
@@ -131,14 +133,9 @@ contract Validator is IValidator {
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
     
-    // Functions with this modifier can only be executed by the owner
-    modifier onlyValidator() {
-        require(msg.sender == inforValidator.valAddr);
-        _;
-    }
-    
+
     // called one by the staking at time of deployment  
-    function initialize(string calldata _name, address _stakingAddr, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
+    function initialize(string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
         uint256 _maxChangeRate, uint256 _minSelfDelegation, uint256 _amount) external payable {
             
         require(_amount > 0, "invalid delegation amount");
@@ -160,6 +157,7 @@ contract Validator is IValidator {
         inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.stakingAddr = _stakingAddr;
         inforValidator.valAddr = _valAddr;
+        inforValidator.stakingOwner = _stakingOwner;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -167,6 +165,8 @@ contract Validator is IValidator {
             rate: _rate
         });
         
+        transferOwnership(_stakingOwner);
+        transferValidatorship(_valAddr);
         _initializeValidator();
         _delegate(inforValidator.valAddr, _amount);
         signingInfo.startHeight = block.number;
@@ -186,7 +186,7 @@ contract Validator is IValidator {
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
-    function allocateToken(uint256 _rewards) external {
+    function allocateToken(uint256 _rewards) external onlyOwner {
         uint256 commission = _rewards.mulTrun(commission.rate);
         uint256 shared = _rewards.sub(commission);
         inforValidator.accumulatedCommission += commission;
@@ -194,7 +194,7 @@ contract Validator is IValidator {
     }
     
     // validator is jailed when the validator operation misbehave
-    function jail(uint256 _jailedUntil, bool _tombstoned) external {
+    function jail(uint256 _jailedUntil, bool _tombstoned) external onlyOwner {
         _jail(_jailedUntil, _tombstoned);
     }
 
@@ -220,7 +220,7 @@ contract Validator is IValidator {
     }
     
     // Validator is slashed when the Validator operation misbehave 
-    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external {
+    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external onlyOwner {
         _slash(_infrationHeight, _power, _slashFactor);
     }
 
@@ -331,7 +331,7 @@ contract Validator is IValidator {
         uint256 _minSignedPerWindow, 
         uint256 _slashFractionDowntime,
         uint256 _downtimeJailDuration)
-        external returns (bool) {
+        external onlyOwner returns (bool) {
         // counts blocks the validator should have signed
         uint256 index = signingInfo.indexOffset % _signedBlockWindow;
         signingInfo.indexOffset++;
