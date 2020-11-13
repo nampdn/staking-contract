@@ -3,9 +3,10 @@ import "./EnumerableSet.sol";
 import "./IValidator.sol";
 import "./Safemath.sol";
 import "./Ownable.sol";
+import "./Initializable.sol";
 
 
-contract Validator is IValidator, Ownable {
+contract Validator is IValidator, Ownable, Initializable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
@@ -136,7 +137,7 @@ contract Validator is IValidator, Ownable {
 
     // called one by the staking at time of deployment  
     function initialize(string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
-        uint256 _maxChangeRate, uint256 _minSelfDelegation) external {
+        uint256 _maxChangeRate, uint256 _minSelfDelegation) external initializer {
             
         require(
             _maxRate <= oneDec,
