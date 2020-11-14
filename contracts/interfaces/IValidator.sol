@@ -2,8 +2,14 @@
 pragma solidity >=0.5.0;
 
 interface IValidator {
-    function initialize (string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
-        uint256 _maxChangeRate, uint256 _minSelfDelegation) external;
+    function initialize (
+        bytes32 _name, 
+        address _owner,
+        uint256 _rate, 
+        uint256 _maxRate, 
+        uint256 _maxChangeRate, 
+        uint256 _minSelfDelegation
+    ) external;
     function update(uint256 _commissionRate) external;
     function unjail() external;
     function allocateToken(uint256 _rewards) external;

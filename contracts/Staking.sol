@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0;
-import {IStaking} from "./interfaces/IStaking.sol";
-import {IValidator} from  "./interfaces/IValidator.sol";
-import {Minter} from "./Minter.sol";
-import {Validator} from "./Validator.sol";
-import {SafeMath} from "./Safemath.sol";
-import {Ownable} from "./Ownable.sol";
+pragma solidity =0.5.16;
+import "./interfaces/IStaking.sol";
+import "./interfaces/IValidator.sol";
+import "./Minter.sol";
+import "./Safemath.sol";
+import "./Ownable.sol";
 import "./EnumerableSet.sol";
+import "./Validator.sol";
 
 contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -32,21 +32,16 @@ contract Staking is IStaking, Ownable {
     uint256 private _oneDec = 1 * 10**18;
     // Previous Proposer
     address private _previousProposer;
-
     uint256 private _powerReduction = 1 * 10**8;
-
     // Staking Params
     Params public  params;
     address[] public allVals;
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
     mapping(address => ValidatorState) private _validatorState;
-
-    // validator rank
     address[] private _rank;
     mapping(address => uint256) private  _valRank;
     bool private _neededSort; 
-
     Minter public minter;
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
@@ -59,7 +54,6 @@ contract Staking is IStaking, Ownable {
         require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
         _;
     }
-
 
     constructor() public {
         params = Params({
@@ -77,7 +71,6 @@ contract Staking is IStaking, Ownable {
         minter = new Minter();
         transferOwnership(address(this));
     }
-
 
     // create new validator
     function createValidator(
@@ -98,7 +91,6 @@ contract Staking is IStaking, Ownable {
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
     }
-
 
     function finalize(address[] calldata valAddr, uint256[] calldata votingPower, bool[] calldata signed) external onlyOwner{
         uint256 previousTotalPower = 0;
@@ -157,7 +149,6 @@ contract Staking is IStaking, Ownable {
         IValidator(ownerOf[valAddr]).allocateToken(rewards);
     }
 
-
     function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
         bool jailed = IValidator(ownerOf[valAddr]).validateSignature(
             votingPower, signed, params.signedBlockWindow, params.minSignedPerWindow,
@@ -168,7 +159,6 @@ contract Staking is IStaking, Ownable {
         }
     }
 
-    
     function delegate(address delAddr, uint64 amount) external onlyValidator {
         valOfDel[delAddr].add(msg.sender);
         totalBonded += amount;
@@ -194,7 +184,6 @@ contract Staking is IStaking, Ownable {
         _validatorState[msg.sender].tokens -= amount;
     }
 
-
     // slash and jail validator forever
     function doubleSign(
         address valAddr,
@@ -203,7 +192,6 @@ contract Staking is IStaking, Ownable {
     ) external onlyOwner {
         _doubleSign(valAddr, votingPower, distributionHeight);
     }
-
 
     function _doubleSign(
         address valAddr,
@@ -221,7 +209,6 @@ contract Staking is IStaking, Ownable {
         _removeValidatorRank(ownerOf[valAddr]);
     }
 
-
     function _addToRank(address valAddr) private {
         uint256 idx = _valRank[valAddr];
         uint256 power = _getValidatorPower(valAddr);
@@ -233,12 +220,11 @@ contract Staking is IStaking, Ownable {
         _neededSort = true;
     }
 
-
     function _getValidatorPower(address valAddr) private view returns (uint256) {
         return _validatorState[valAddr].tokens.div(_powerReduction);
     }
 
-     function getValidatorSets()
+    function getValidatorSets()
         public
         view
         returns (address[] memory, uint256[] memory)
@@ -256,7 +242,6 @@ contract Staking is IStaking, Ownable {
         }
         return (valAddrs, powers);
     }
-
 
     function applyAndReturnValidatorSets()
         external
@@ -314,13 +299,11 @@ contract Staking is IStaking, Ownable {
         _neededSort = true;
     }
 
-
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
         totalSupply += fees;
         return fees;
     }
-
 
     function getValidatorsByDelegator(address delAddr)
         public

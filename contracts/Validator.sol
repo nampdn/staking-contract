@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0;
+pragma solidity =0.5.16;
 import "./EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
 import "./Safemath.sol";
@@ -145,8 +145,14 @@ contract Validator is IValidator, Ownable, Initializable {
     
 
     // called one by the staking at time of deployment  
-    function initialize(bytes32 _name, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
-        uint256 _maxChangeRate, uint256 _minSelfDelegation) external initializer {
+    function initialize (
+        bytes32 _name, 
+        address _owner,
+        uint256 _rate, 
+        uint256 _maxRate, 
+        uint256 _maxChangeRate, 
+        uint256 _minSelfDelegation
+    ) external initializer {
             
         require(
             _maxRate <= oneDec,
@@ -163,7 +169,7 @@ contract Validator is IValidator, Ownable, Initializable {
 
         inforValidator.name = _name;
         inforValidator.minSelfDelegation = _minSelfDelegation;
-        inforValidator.valAddr = _valAddr;
+        inforValidator.valAddr = _owner;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -396,7 +402,7 @@ contract Validator is IValidator, Ownable, Initializable {
     
     function _updateValidatorSlashFraction(uint256 _fraction) private {
         uint256 newPeriod = _incrementValidatorPeriod();
-        _incrementReferenceCount(inforValidator.valAddr, newPeriod);
+        _incrementReferenceCount(newPeriod);
         slashEvents[inforValidator.slashEventCounter] = SlashEvent({
             period: newPeriod,
             fraction: _fraction,
@@ -563,7 +569,7 @@ contract Validator is IValidator, Ownable, Initializable {
     function _initializeDelegation(address _delAddr) private {
         DelegationShare storage del = delShare[_delAddr];
         uint256 previousPeriod = currentRewards.period - 1;
-        _incrementReferenceCount(inforValidator.valAddr, previousPeriod);
+        _incrementReferenceCount(previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
         uint256 stake = _tokenFromShare(del.shares);
@@ -571,7 +577,7 @@ contract Validator is IValidator, Ownable, Initializable {
     }
     
     // increment the reference count for a historical rewards value
-    function _incrementReferenceCount(address valAddr, uint256 _period) private {
+    function _incrementReferenceCount(uint256 _period) private {
         hRewards[_period].referenceCount++;
     }
     
