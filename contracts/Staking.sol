@@ -52,7 +52,7 @@ contract Staking is IStaking, Ownable {
     uint256 public totalBonded;
 
 
-    mapping(address => EnumerableSet.AddressSet) public valOfDel;
+    mapping(address => EnumerableSet.AddressSet) private valOfDel;
 
      // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
@@ -80,21 +80,27 @@ contract Staking is IStaking, Ownable {
 
 
     // create new validator
-    function createValidator(string calldata _name, uint64 _maxRate, uint64 _maxChangeRate, uint64 _minSelfDelegation) external returns (address val){
+    function createValidator(
+        bytes32 name,
+        uint64 commissionRate, 
+        uint64 commissionMaxRate, 
+        uint64 commissionMaxChangeRate, 
+        uint64 minSelfDelegation
+    ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         bytes memory bytecode = type(Validator).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(_name, _maxRate, _maxChangeRate, _minSelfDelegation, msg.sender));
+        bytes32 salt = keccak256(abi.encodePacked(name, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation, msg.sender));
         assembly {
             val := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
-        IValidator(val).initialize(_name, msg.sender, _maxRate, _maxChangeRate, _minSelfDelegation);
+        IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation);
         allVals.push(val);
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
     }
 
 
-    function finalize(address[] calldata valAddr, uint64[] calldata votingPower, bool[] calldata signed) external onlyOwner{
+    function finalize(address[] calldata valAddr, uint256[] calldata votingPower, bool[] calldata signed) external onlyOwner{
         uint256 previousTotalPower = 0;
         uint256 sumPreviousPrecommitPower = 0;
         for (uint256 i = 0; i < votingPower.length; i++) {

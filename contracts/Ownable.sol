@@ -33,11 +33,7 @@ contract Ownable {
         _;
     }
     
-    // Functions with this modifier can only be executed by the validator
-    modifier onlyValidator() {
-        require(_validator == address(0x0) || _validator == msg.sender, "Ownable: caller is not the validator");
-        _;
-    }
+    
     
 
     /**
@@ -61,10 +57,5 @@ contract Ownable {
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }
-    
-    function transferValidatorship(address newOwner) public onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
-        emit OwnershipTransferred(_validator, newOwner);
-        _validator = newOwner;
-    }
+
 }

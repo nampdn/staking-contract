@@ -106,10 +106,8 @@ contract Validator is IValidator, Ownable, Initializable {
     }
     
     struct InforValidator {
-        string name;  // validator name
-        address payable valAddr; // address of the validator
-        address stakingAddr; // staking address
-        address stakingOwner; // address of the staking owner
+        bytes32 name;  // validator name
+        address valAddr; // address of the validator
         uint256 tokens; // all token stake
         bool jailed;
         uint256 slashEventCounter;
@@ -134,10 +132,20 @@ contract Validator is IValidator, Ownable, Initializable {
     SlashEvent[] private slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
+
+     // Functions with this modifier can only be executed by the validator
+    modifier onlyValidator() {
+        require(inforValidator.valAddr == msg.sender, "Ownable: caller is not the validator");
+        _;
+    }
+
+    constructor() public {
+        transferOwnership(msg.sender);
+    }
     
 
     // called one by the staking at time of deployment  
-    function initialize(string calldata _name, address _stakingAddr, address _stakingOwner, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
+    function initialize(bytes32 _name, address payable _valAddr, uint256 _rate, uint256 _maxRate, 
         uint256 _maxChangeRate, uint256 _minSelfDelegation) external initializer {
             
         require(
@@ -155,9 +163,7 @@ contract Validator is IValidator, Ownable, Initializable {
 
         inforValidator.name = _name;
         inforValidator.minSelfDelegation = _minSelfDelegation;
-        inforValidator.stakingAddr = _stakingAddr;
         inforValidator.valAddr = _valAddr;
-        inforValidator.stakingOwner = _stakingOwner;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -165,8 +171,6 @@ contract Validator is IValidator, Ownable, Initializable {
             rate: _rate
         });
         
-        transferOwnership(_stakingOwner);
-        transferValidatorship(_valAddr);
         _initializeValidator();
         signingInfo.startHeight = block.number;
     }
@@ -186,9 +190,9 @@ contract Validator is IValidator, Ownable, Initializable {
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
     function allocateToken(uint256 _rewards) external onlyOwner {
-        uint256 commission = _rewards.mulTrun(commission.rate);
-        uint256 shared = _rewards.sub(commission);
-        inforValidator.accumulatedCommission += commission;
+        uint256 _commission = _rewards.mulTrun(commission.rate);
+        uint256 shared = _rewards.sub(_commission);
+        inforValidator.accumulatedCommission += _commission;
         currentRewards.reward += shared;
     }
     
@@ -266,9 +270,9 @@ contract Validator is IValidator, Ownable, Initializable {
     
     // the validator withdraws commission
     function withdrawCommission() external onlyValidator {
-        uint256 commission = inforValidator.accumulatedCommission;
-        require(commission > 0, "no validator commission to reward");
-        inforValidator.valAddr.transfer(commission);
+        uint256 _commission = inforValidator.accumulatedCommission;
+        require(_commission > 0, "no validator commission to reward");
+        msg.sender.transfer(_commission);
         inforValidator.accumulatedCommission = 0;
         // emit WithdrawCommissionReward(valAddr, commission);
     }
@@ -403,7 +407,6 @@ contract Validator is IValidator, Ownable, Initializable {
 
     // initialize starting info for a new validator
     function _initializeValidator() private {
-        CurrentReward memory currentRewards;
         currentRewards.period = 1;
         currentRewards.reward = 0;
         inforValidator.accumulatedCommission = 0;
@@ -478,7 +481,7 @@ contract Validator is IValidator, Ownable, Initializable {
     // calculate the total rewards accrued by a delegation
     function _calculateDelegationRewards(
         address _delAddr,
-        uint256 _endingPeriod
+        uint256 endingPeriod
     ) private view returns (uint256) {
         // fetch starting info for delegation
         Delegation memory delegationInfo = delegationByAddr[_delAddr];
@@ -506,7 +509,7 @@ contract Validator is IValidator, Ownable, Initializable {
         }
         rewards += _calculateDelegationRewardsBetween(
             delegationInfo.previousPeriod,
-            _endingPeriod,
+            endingPeriod,
             delegationInfo.stake
         );
         return rewards;
