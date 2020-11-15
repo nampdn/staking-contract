@@ -8,7 +8,7 @@ import "./Ownable.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
 
-contract Staking is Ownable {
+contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
@@ -92,28 +92,36 @@ contract Staking is Ownable {
         valOf[val] = msg.sender;
     }
 
-    function finalize(address[] calldata valAddr, uint256[] calldata votingPower, bool[] calldata signed) external onlyOwner{
+    function allValsLength() external view returns(uint) {
+        return allVals.length;
+    }
+
+    function finalize(
+        address[] calldata _vals, 
+        uint256[] calldata _votingPower, 
+        bool[] calldata _signed
+    ) external onlyOwner{
         uint256 previousTotalPower = 0;
         uint256 sumPreviousPrecommitPower = 0;
-        for (uint256 i = 0; i < votingPower.length; i++) {
-            previousTotalPower += votingPower[i];
-            if (signed[i]) {
-                sumPreviousPrecommitPower += votingPower[i];
+        for (uint256 i = 0; i < _votingPower.length; i++) {
+            previousTotalPower += _votingPower[i];
+            if (_signed[i]) {
+                sumPreviousPrecommitPower += _votingPower[i];
             }
         }
          if (block.number > 1) {
             _allocateTokens(
                 sumPreviousPrecommitPower,
                 previousTotalPower,
-                valAddr,
-                votingPower
+                _vals,
+                _votingPower
             );
         }
 
         _previousProposer = block.coinbase;
 
-        for (uint256 i = 0; i < votingPower.length; i++) {
-            _validateSignature(valAddr[i], votingPower[i], signed[i]);
+        for (uint256 i = 0; i < _votingPower.length; i++) {
+            _validateSignature(_vals[i], _votingPower[i], _signed[i]);
         }
     }
 

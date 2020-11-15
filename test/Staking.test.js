@@ -40,6 +40,8 @@ contract("Staking", async (accounts) => {
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         await instance.createValidator(web3.utils.fromAscii("val1"), rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
+        const total = await instance.allValsLength()
+        assert.equal(total, 1);
     })
 
 
