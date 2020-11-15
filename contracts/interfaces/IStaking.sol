@@ -21,7 +21,7 @@ interface IStaking {
     function allValsLength() external view returns (uint);
     function delegate(address delAddr, uint256 amount) external;
     function decrementValidatorAmount(uint256 amount) external;
-    // function burn(uint64 amount) external;
+    function burn(uint256 amount) external;
     // function removeDelegation(address delAddr) external;
     // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
     // function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
