@@ -15,12 +15,11 @@ interface IStaking {
         bool[] calldata _signed
     ) external;
     // function doubleSign(address valAddr, uint64 votingPower, uint64 height) external;
-    // function mint() external returns (uint256 fees);
-    // function updateValidatorAmount(uint64 amount) external;
+    function mint() external returns (uint256 fees);
     function totalSupply() external view returns (uint64);
     function totalBonded() external view returns (uint64);
     function allValsLength() external view returns (uint);
-    // function delegate(address delAddr, uint64 amount) external;
+    function delegate(address delAddr, uint256 amount) external;
     // function undelegate(uint64 amount) external;
     // function burn(uint64 amount) external;
     // function removeDelegation(address delAddr) external;
