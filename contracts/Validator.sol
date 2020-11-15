@@ -2,6 +2,8 @@
 pragma solidity =0.5.16;
 import "./EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
+import "./interfaces/IStaking.sol";
+
 import "./Safemath.sol";
 import "./Ownable.sol";
 import "./Initializable.sol";
@@ -180,6 +182,7 @@ contract Validator is IValidator, Ownable, Initializable {
     // delegate for this validator
     function delegate() external payable {
         _delegate(msg.sender, msg.value);
+        IStaking(owner()).delegate(msg.sender, msg.value);
     }
     
     // update Commission rate of the validator

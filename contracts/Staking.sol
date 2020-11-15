@@ -166,7 +166,7 @@ contract Staking is IStaking, Ownable {
         }
     }
 
-    function delegate(address delAddr, uint64 amount) external onlyValidator {
+    function delegate(address delAddr, uint256 amount) external onlyValidator {
         valOfDel[delAddr].add(msg.sender);
         totalBonded += amount;
         _validatorState[msg.sender].tokens += amount;
