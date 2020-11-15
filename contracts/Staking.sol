@@ -8,7 +8,7 @@ import "./Ownable.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
 
-contract Staking is IStaking, Ownable {
+contract Staking is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
@@ -75,10 +75,10 @@ contract Staking is IStaking, Ownable {
     // create new validator
     function createValidator(
         bytes32 name,
-        uint64 commissionRate, 
-        uint64 commissionMaxRate, 
-        uint64 commissionMaxChangeRate, 
-        uint64 minSelfDelegation
+        uint256 commissionRate, 
+        uint256 commissionMaxRate, 
+        uint256 commissionMaxChangeRate, 
+        uint256 minSelfDelegation
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         bytes memory bytecode = type(Validator).creationCode;

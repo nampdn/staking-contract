@@ -35,10 +35,11 @@ contract("Staking", async (accounts) => {
 
     it("should create validator", async () => {
         const instance = await Staking.deployed();
+        const rate = web3.utils.toWei("0.4", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
-        await instance.createValidator("val1", maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
+        await instance.createValidator(web3.utils.fromAscii("val1"), rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
     })
 
 

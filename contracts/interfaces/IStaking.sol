@@ -4,10 +4,10 @@ pragma solidity >=0.5.0;
 interface IStaking {
     function createValidator(
         bytes32 name,
-        uint64 commissionRate, 
-        uint64 commissionMaxRate, 
-        uint64 commissionMaxChangeRate, 
-        uint64 minSelfDelegation
+        uint256 commissionRate, 
+        uint256 commissionMaxRate, 
+        uint256 commissionMaxChangeRate, 
+        uint256 minSelfDelegation
     ) external returns (address val);
     function finalize(address[] calldata vals, uint64[] calldata votingPower, bool[] calldata signed) external;
     function doubleSign(address valAddr, uint64 votingPower, uint64 height) external;
