@@ -47,12 +47,21 @@ contract("Staking", async (accounts) => {
         assert.equal(total, 1);
     })
 
-    it("test finalize commit", async() => {
+    it("finalize", async() => {
         const instance = await Staking.deployed();
         const contractAddr = await instance.allVals(0)
         const validator = await Validator.at(contractAddr)
         await instance.mint({from: accounts[0]});
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
+        await instance.applyAndReturnValidatorSets({from: accounts[0]});
+        await instance.setPreviousProposer(accounts[0]);
+        const validatorSet = await instance.getValidatorSets.call();
+        let signed = validatorSet[0].map(_ =>  true);
+        await instance.finalize(validatorSet[0], validatorSet[1], signed)
+        const commission = await validator.getCommissionRewards.call()
+        assert.equal(commission.toString(), web3.utils.toWei("0.000000007099803431", "ether"))
+        const delegationRewards = await validator.getDelegationRewards.call(accounts[0])
+        assert.equal(delegationRewards.toString(), web3.utils.toWei("0.000000010649705146", "ether"))
     })
 
     

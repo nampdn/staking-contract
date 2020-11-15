@@ -131,6 +131,8 @@ contract Validator is IValidator, Ownable, Initializable {
     SigningInfo private signingInfo; // signing info
     MissedBlock missedBlock; // missed block
 
+    IStaking private _staking;
+
      // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(inforValidator.valAddr == msg.sender, "Ownable: caller is not the validator");
@@ -139,6 +141,7 @@ contract Validator is IValidator, Ownable, Initializable {
 
     constructor() public {
         transferOwnership(msg.sender);
+        _staking = IStaking(msg.sender);
     }
     
 
@@ -182,7 +185,7 @@ contract Validator is IValidator, Ownable, Initializable {
     // delegate for this validator
     function delegate() external payable {
         _delegate(msg.sender, msg.value);
-        IStaking(owner()).delegate(msg.sender, msg.value);
+        _staking.delegate(msg.sender, msg.value);
     }
     
     // update Commission rate of the validator
@@ -262,7 +265,7 @@ contract Validator is IValidator, Ownable, Initializable {
                 amount: amountRemoved
             })
         );
-
+        _staking.decrementValidatorAmount(_amount);
         // emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
     

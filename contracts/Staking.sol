@@ -95,6 +95,10 @@ contract Staking is IStaking, Ownable {
         return allVals.length;
     }
 
+    function setPreviousProposer(address previousProposer) public onlyOwner {
+        _previousProposer = previousProposer;
+    }
+
     function finalize(
         address[] calldata _vals, 
         uint256[] calldata _votingPower, 
@@ -119,9 +123,9 @@ contract Staking is IStaking, Ownable {
 
         _previousProposer = block.coinbase;
 
-        for (uint256 i = 0; i < _votingPower.length; i++) {
-            _validateSignature(_vals[i], _votingPower[i], _signed[i]);
-        }
+        // for (uint256 i = 0; i < _votingPower.length; i++) {
+        //     _validateSignature(_vals[i], _votingPower[i], _signed[i]);
+        // }
     }
 
     function _allocateTokens(
@@ -173,7 +177,7 @@ contract Staking is IStaking, Ownable {
         _addToRank(msg.sender);
     }
 
-    function undelegate(uint64 amount) external onlyValidator{
+    function decrementValidatorAmount(uint256 amount) external onlyValidator{
         totalBonded -= amount;
         _validatorState[msg.sender].tokens -= amount;
         if (_validatorState[msg.sender].tokens == 0) {
@@ -244,7 +248,7 @@ contract Staking is IStaking, Ownable {
         uint256[] memory powers = new uint256[](maxVal);
 
         for (uint256 i = 0; i < maxVal; i++) {
-            valAddrs[i] = _rank[i];
+            valAddrs[i] = valOf[_rank[i]];
             powers[i] = _getValidatorPower(_rank[i]);
         }
         return (valAddrs, powers);
