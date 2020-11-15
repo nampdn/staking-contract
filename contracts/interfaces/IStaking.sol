@@ -20,7 +20,7 @@ interface IStaking {
     function totalBonded() external view returns (uint64);
     function allValsLength() external view returns (uint);
     function delegate(address delAddr, uint256 amount) external;
-    // function undelegate(uint64 amount) external;
+    function decrementValidatorAmount(uint256 amount) external;
     // function burn(uint64 amount) external;
     // function removeDelegation(address delAddr) external;
     // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
