@@ -1,9 +1,8 @@
-pragma solidity ^0.6.0;
+pragma solidity 0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
 import "./EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
-
 
 contract Staking is IStaking, Ownable {
     using SafeMath for uint256;
@@ -93,8 +92,8 @@ contract Staking is IStaking, Ownable {
         uint256 inflationMin;
     }
 
-    mapping(address => Validator) valByAddr;
-    EnumerableSet.AddressSet vals;
+    mapping(address => Validator) _valByAddr;
+    EnumerableSet.AddressSet _vals;
     mapping(address => mapping(address => UBDEntry[])) ubdEntries;
     mapping(address => mapping(address => DelStartingInfo)) delStartingInfo;
     mapping(address => ValCurrentReward) valCurrentRewards;
@@ -115,7 +114,7 @@ contract Staking is IStaking, Ownable {
     bool _needSort;
 
     // supply
-    uint256 public totalSupply = 5000000000 * 10**18;
+    uint256 public totalSupply = 5000000000 * 10**18; // 5B
     uint256 public totalBonded;
     uint256 public inflation;
     uint256 public annualProvision;
@@ -127,20 +126,20 @@ contract Staking is IStaking, Ownable {
 
     constructor() public {
         _params = Params({
-            maxValidators: 100,
-            downtimeJailDuration: 600,
-            baseProposerReward: 1 * 10**16,
-            bonusProposerReward: 4 * 10**16,
-            slashFractionDowntime: 1 * 10**14,
-            unbondingTime: 1814400,
-            slashFractionDoubleSign: 5 * 10**16,
+            maxValidators: 21,
+            downtimeJailDuration: 259200, // 3 days
+            baseProposerReward: 1 * 10**16, // 1%
+            bonusProposerReward: 4 * 10**16, // 4$
+            slashFractionDowntime: 10 * 10**14, // 10%
+            unbondingTime: 86400, // 1 day
+            slashFractionDoubleSign: 50 * 10**16, // 50%
             signedBlockWindow: 100,
             minSignedPerWindow: 5 * 10**16,
-            inflationRateChange: 13 * 10**16,
-            goalBonded: 67 * 10**16,
-            blocksPerYear: 6311520,
-            inflationMax: 20 * 10**16,
-            inflationMin: 7 * 10**16
+            goalBonded: 20 * 10**16, // 20%
+            blocksPerYear: 6307200, // assumption 5s per block
+            inflationMax: 20 * 10**16, // 20%
+            inflationMin: 5 * 10**16 // 5%
+            inflationRateChange: 4 * 10**16, // 4%
         });
     }
 
@@ -344,9 +343,11 @@ contract Staking is IStaking, Ownable {
         _initializeDelegation(valAddr, delAddr);
     }
 
-    function _delegate(address payable delAddr, address valAddr, uint256 amount)
-        private
-    {
+    function _delegate(
+        address payable delAddr,
+        address valAddr,
+        uint256 amount
+    ) private {
         // add delegation if not exists;
         if (!dels[valAddr].contains(delAddr)) {
             dels[valAddr].add(delAddr);
@@ -789,7 +790,15 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
+<<<<<<< Updated upstream
         returns (uint256, uint256, bool, uint256, uint256, uint256)
+=======
+        returns (
+            uint256,
+            uint256,
+            bool
+        )
+>>>>>>> Stashed changes
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
@@ -1106,7 +1115,11 @@ contract Staking is IStaking, Ownable {
     function getValidators()
         public
         view
-        returns (address[] memory, uint256[] memory, uint256[] memory)
+        returns (
+            address[] memory,
+            uint256[] memory,
+            uint256[] memory
+        )
     {
         uint256 total = vals.length();
         address[] memory valAddrs = new address[](total);
@@ -1137,7 +1150,7 @@ contract Staking is IStaking, Ownable {
     // Mint
     //  --------------------------------------------------
 
-    // @dev mints new tokens for the previous block. Returns fee collected
+    // Mints new tokens for the previous block. Returns fee collected
     function mint() public onlyOwner returns (uint256) {
         // recalculate inflation rate
         inflation = nextInflationRate();
@@ -1263,7 +1276,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function _clearValRank() private {
-        for (uint256 i = valRanks.length; i > 300; i --) {
+        for (uint256 i = valRanks.length; i > 300; i--) {
             delete valRankIndexes[valRanks[i - 1]];
             valRanks.pop();
         }
