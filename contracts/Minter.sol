@@ -16,9 +16,11 @@ contract Minter is Ownable {
     uint256 public annualProvision;
     uint256 public feesCollected;
 
+    IStaking private _staking; 
+
     constructor() public {
         transferOwnership(msg.sender);
-        
+        _staking = IStaking(msg.sender);
     }
 
     // @dev mints new tokens for the previous block. Returns fee collected
@@ -37,7 +39,7 @@ contract Minter is Ownable {
     }
 
     function getNextAnnualProvisions() public view returns (uint256) {
-        uint256 totalSupply = IStaking(owner()).totalSupply();
+        uint256 totalSupply = _staking.totalSupply();
         return inflation.mulTrun(totalSupply);
     }
 
@@ -46,31 +48,30 @@ contract Minter is Ownable {
     }
 
     function getNextInflationRate() private view returns (uint256) {
-        IStaking staking = IStaking(owner());
-        uint256 totalBonded = staking.totalBonded();
-        uint256 totalSupply = staking.totalSupply();
+        uint256 totalBonded = _staking.totalBonded();
+        uint256 totalSupply = _staking.totalSupply();
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
         uint256 inflationRateChangePerYear;
-        uint256 infRateChange;
+        uint256 _inflationRateChange;
         uint256 inflationRate;
         if (bondedRatio < goalBonded) {
             inflationRateChangePerYear = _oneDec
                 .sub(bondedRatio.divTrun(goalBonded))
                 .mulTrun(inflationRateChange);
-            infRateChange = inflationRateChangePerYear.div(
+            _inflationRateChange = inflationRateChangePerYear.div(
                 blocksPerYear
             );
-            inflationRate = inflation.add(inflationRateChange);
+            inflationRate = inflation.add(_inflationRateChange);
         } else {
             inflationRateChangePerYear = bondedRatio
                 .divTrun(goalBonded)
                 .sub(_oneDec)
                 .mulTrun(inflationRateChange);
-            infRateChange = inflationRateChangePerYear.div(
+            _inflationRateChange = inflationRateChangePerYear.div(
                 blocksPerYear
             );
-            if (inflation > inflationRateChange) {
-                inflationRate = inflation.sub(inflationRateChange);
+            if (inflation > _inflationRateChange) {
+                inflationRate = inflation.sub(_inflationRateChange);
             } else {
                 inflationRate = 0;
             }

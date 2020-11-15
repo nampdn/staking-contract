@@ -46,7 +46,6 @@ contract Staking is IStaking, Ownable {
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
 
-
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
 
      // Functions with this modifier can only be executed by the validator
