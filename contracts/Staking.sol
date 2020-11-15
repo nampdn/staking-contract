@@ -138,8 +138,8 @@ contract Staking is IStaking, Ownable {
             goalBonded: 20 * 10**16, // 20%
             blocksPerYear: 6307200, // assumption 5s per block
             inflationMax: 20 * 10**16, // 20%
-            inflationMin: 5 * 10**16 // 5%
-            inflationRateChange: 4 * 10**16, // 4%
+            inflationMin: 5 * 10**16, // 5%
+            inflationRateChange: 4 * 10**16 // 4%
         });
     }
 
@@ -799,13 +799,15 @@ contract Staking is IStaking, Ownable {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
         Commission memory commission = val.commission;
-        
-        return (val.tokens, 
-                val.delegationShares,
-                val.jailed,
-                commission.rate,
-                commission.maxRate,
-                commission.maxChangeRate);
+
+        return (
+            val.tokens,
+            val.delegationShares,
+            val.jailed,
+            commission.rate,
+            commission.maxRate,
+            commission.maxChangeRate
+        );
     }
 
     function getDelegationsByValidator(address valAddr)
