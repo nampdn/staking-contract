@@ -1,4 +1,4 @@
-pragma solidity ^0.6.0;
+pragma solidity 0.6.0;
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -15,7 +15,10 @@ pragma solidity ^0.6.0;
 contract Ownable {
     address private _owner;
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     /**
      * @dev Returns the address of the current owner.
@@ -28,7 +31,10 @@ contract Ownable {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        require(_owner == address(0x0) || _owner == msg.sender, "Ownable: caller is not the owner");
+        require(
+            _owner == address(0x0) || _owner == msg.sender,
+            "Ownable: caller is not the owner"
+        );
         _;
     }
 
@@ -49,7 +55,10 @@ contract Ownable {
      * Can only be called by the current owner.
      */
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(
+            newOwner != address(0),
+            "Ownable: new owner is the zero address"
+        );
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }

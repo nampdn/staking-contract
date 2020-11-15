@@ -92,8 +92,8 @@ contract Staking is IStaking, Ownable {
         uint256 inflationMin;
     }
 
-    mapping(address => Validator) _valByAddr;
-    EnumerableSet.AddressSet _vals;
+    mapping(address => Validator) valByAddr;
+    EnumerableSet.AddressSet vals;
     mapping(address => mapping(address => UBDEntry[])) ubdEntries;
     mapping(address => mapping(address => DelStartingInfo)) delStartingInfo;
     mapping(address => ValCurrentReward) valCurrentRewards;
@@ -790,15 +790,11 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
-<<<<<<< Updated upstream
-        returns (uint256, uint256, bool, uint256, uint256, uint256)
-=======
         returns (
             uint256,
             uint256,
             bool
         )
->>>>>>> Stashed changes
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];

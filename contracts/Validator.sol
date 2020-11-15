@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0;
+pragma solidity 0.6.0;
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
 

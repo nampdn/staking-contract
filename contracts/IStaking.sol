@@ -1,9 +1,6 @@
-
-pragma solidity  ^0.6.0;
-
+pragma solidity 0.6.0;
 
 interface IStaking {
-
     // @dev Emitted when validator is created;
     event CreateValidator(
         address payable valAddr,
@@ -15,7 +12,11 @@ interface IStaking {
     );
 
     // @dev Emitted when validator is updated;
-    event UpdateValidator(address valAddr, uint256 commissionRate, uint256 minSelfDelegation);
+    event UpdateValidator(
+        address valAddr,
+        uint256 commissionRate,
+        uint256 minSelfDelegation
+    );
 
     // @dev Emitted when delegation rewards is withdraw
     event WithdrawDelegationRewards(
@@ -25,17 +26,10 @@ interface IStaking {
     );
 
     // @dev Emitted when validater commission is withdraw
-    event WithdrawCommissionReward(
-        address valAddr,
-        uint256 rewards
-    );
+    event WithdrawCommissionReward(address valAddr, uint256 rewards);
 
     // @dev Emitted when
-    event Delegate(
-        address valAddr,
-        address delAddr,
-        uint256 amount
-    );
+    event Delegate(address valAddr, address delAddr, uint256 amount);
 
     event Undelegate(
         address valAddr,
@@ -44,12 +38,7 @@ interface IStaking {
         uint256 completionTime
     );
 
-    event Withdraw(
-        address valAddr,
-        address delAddr,
-        uint256 amount
-    );
-
+    event Withdraw(address valAddr, address delAddr, uint256 amount);
 
     event Minted(uint256 amount);
     event Burn(uint256 amount);
