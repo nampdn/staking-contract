@@ -126,9 +126,9 @@ contract Validator is IValidator, Ownable, Initializable {
     Commission public commission; // validator commission
     CurrentReward private currentRewards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
-    SlashEvent[] private slashEvents; // slash events
+    SlashEvent[] public slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
-    MissedBlock missedBlock; // missed block
+    MissedBlock private missedBlock; // missed block
 
     IStaking private _staking;
 

@@ -68,6 +68,15 @@ contract("Staking", async (accounts) => {
     it("double sign", async () => {
         const instance = await Staking.deployed();
         await instance.doubleSign(accounts[0], 1000, 5);
+        const validatorSet = await instance.getValidatorSets.call();
+        assert.equal(validatorSet[0].length, 0)
+        const contractAddr = await instance.allVals(0)
+        const validator = await Validator.at(contractAddr)
+        const info = await validator.inforValidator()
+        assert.equal(info.jailed, true)
+        assert.equal(info.tokens.toString(), web3.utils.toWei("0.399999995000000000", "ether"))
+        const slashEvent = await validator.slashEvents(0)
+        assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.000000012500000000", "ether"))
     });
     
 
