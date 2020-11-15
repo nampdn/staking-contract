@@ -16,12 +16,6 @@ contract Staking is IStaking, Ownable {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
         uint256 maxValidators;
-        uint256 downtimeJailDuration;
-        uint256 slashFractionDowntime;
-        uint256 unbondingTime;
-        uint256 slashFractionDoubleSign;
-        uint256 signedBlockWindow;
-        uint256 minSignedPerWindow;
     }
 
     struct ValidatorState {
@@ -57,14 +51,8 @@ contract Staking is IStaking, Ownable {
     constructor() public {
         params = Params({
             maxValidators: 100,
-            downtimeJailDuration: 600,
             baseProposerReward: 1 * 10**16,
-            bonusProposerReward: 4 * 10**16,
-            slashFractionDowntime: 1 * 10**14,
-            unbondingTime: 1814400,
-            slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindow: 100,
-            minSignedPerWindow: 5 * 10**16
+            bonusProposerReward: 4 * 10**16
         });
 
         minter = new Minter();
@@ -122,9 +110,9 @@ contract Staking is IStaking, Ownable {
 
         _previousProposer = block.coinbase;
 
-        // for (uint256 i = 0; i < _votingPower.length; i++) {
-        //     _validateSignature(_vals[i], _votingPower[i], _signed[i]);
-        // }
+        for (uint256 i = 0; i < _votingPower.length; i++) {
+            _validateSignature(_vals[i], _votingPower[i], _signed[i]);
+        }
     }
 
     function _allocateTokens(
@@ -160,10 +148,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
-        bool jailed = IValidator(ownerOf[valAddr]).validateSignature(
-            votingPower, signed, params.signedBlockWindow, params.minSignedPerWindow,
-            params.slashFractionDowntime, params.downtimeJailDuration
-        );
+        bool jailed = IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
         if (jailed) {
             _removeValidatorRank(ownerOf[valAddr]);
         }
@@ -188,7 +173,7 @@ contract Staking is IStaking, Ownable {
         valOfDel[delAddr].remove(msg.sender);
     }
 
-    function burn(uint64 amount) external onlyValidator{
+    function burn(uint256 amount) external onlyValidator{
         totalBonded -= amount;
         totalSupply -= amount;
         _validatorState[msg.sender].tokens -= amount;
@@ -200,14 +185,7 @@ contract Staking is IStaking, Ownable {
         uint256 votingPower,
         uint256 distributionHeight
     ) external onlyOwner {
-        IValidator val = IValidator(ownerOf[valAddr]);
-        val.slash(
-            distributionHeight.sub(1),
-            votingPower,
-            params.slashFractionDoubleSign
-        );
-        // // (Dec 31, 9999 - 23:59:59 GMT).
-        val.jail(253402300799, true);
+        IValidator(ownerOf[valAddr]).doubleSign(votingPower, distributionHeight);
         _removeValidatorRank(ownerOf[valAddr]);
     }
 

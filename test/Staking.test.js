@@ -65,6 +65,13 @@ contract("Staking", async (accounts) => {
         assert.equal(delegationRewards.toString(), web3.utils.toWei("23.782343987823439878", "ether"))
     })
 
+    it("should get all validators of the delegator", async () => {
+        const instance = await Staking.deployed();
+        const contractAddr = await instance.allVals(0)
+        const vals = await instance.getValidatorsByDelegator.call(accounts[0])
+        assert.equal(vals[0], contractAddr)
+    })
+
     it("double sign", async () => {
         const instance = await Staking.deployed();
         await instance.doubleSign(accounts[0], 1000, 5);

@@ -115,6 +115,15 @@ contract Validator is IValidator, Ownable, Initializable {
         uint256 ubdEntryCount; // unbonding delegation entries
     }
     
+    struct Params {
+        uint256 downtimeJailDuration;
+        uint256 slashFractionDowntime;
+        uint256 unbondingTime;
+        uint256 slashFractionDoubleSign;
+        uint256 signedBlockWindow;
+        uint256 minSignedPerWindow;
+    }
+
     uint256 constant public UNBONDING_TiME = 604800; // 7 days
     
     EnumerableSet.AddressSet private delegations; // all delegations
@@ -129,7 +138,7 @@ contract Validator is IValidator, Ownable, Initializable {
     SlashEvent[] public slashEvents; // slash events
     SigningInfo private signingInfo; // signing info
     MissedBlock private missedBlock; // missed block
-
+    Params public params;
     IStaking private _staking;
 
      // Functions with this modifier can only be executed by the validator
@@ -141,6 +150,15 @@ contract Validator is IValidator, Ownable, Initializable {
     constructor() public {
         transferOwnership(msg.sender);
         _staking = IStaking(msg.sender);
+
+        params = Params({
+            downtimeJailDuration: 600,
+            slashFractionDowntime: 1 * 10**14,
+            unbondingTime: 1814400,
+            slashFractionDoubleSign: 5 * 10**16,
+            signedBlockWindow: 100,
+            minSignedPerWindow: 5 * 10**16
+        });
     }
     
 
@@ -335,15 +353,12 @@ contract Validator is IValidator, Ownable, Initializable {
     }
     
     // validate validator signature, must be called once per validator per block
-    function validateSignature(uint256 _votingPower,
-        bool _signed,
-        uint256 _signedBlockWindow,
-        uint256 _minSignedPerWindow, 
-        uint256 _slashFractionDowntime,
-        uint256 _downtimeJailDuration)
-        external onlyOwner returns (bool) {
+    function validateSignature(
+        uint256 _votingPower,
+        bool _signed
+    ) external onlyOwner returns (bool) {
         // counts blocks the validator should have signed
-        uint256 index = signingInfo.indexOffset % _signedBlockWindow;
+        uint256 index = signingInfo.indexOffset % params.signedBlockWindow;
         signingInfo.indexOffset++;
         bool previous = missedBlock.items[index];
         bool missed = !_signed;
@@ -355,17 +370,17 @@ contract Validator is IValidator, Ownable, Initializable {
             missedBlock.items[index] = false;
         }
         
-        uint256 minHeight = signingInfo.startHeight + _signedBlockWindow;
-        uint256 minSignedPerWindow = _signedBlockWindow.mulTrun(_minSignedPerWindow);
-        uint256 maxMissed = _signedBlockWindow - minSignedPerWindow;
+        uint256 minHeight = signingInfo.startHeight + params.signedBlockWindow;
+        uint256 minSignedPerWindow = params.signedBlockWindow.mulTrun(params.minSignedPerWindow);
+        uint256 maxMissed = params.signedBlockWindow - minSignedPerWindow;
         
         // if past the minimum height and the validator has missed too many blocks, punish them
         if (block.number > minHeight && signingInfo.missedBlockCounter > maxMissed) {
             if (!inforValidator.jailed) {
-                _slash(block.number - 2, _votingPower, _slashFractionDowntime);
+                _slash(block.number - 2, _votingPower, params.slashFractionDowntime);
                 inforValidator.jailed = true; // jail validator
 
-                signingInfo.jailedUntil = block.timestamp.add(_downtimeJailDuration);
+                signingInfo.jailedUntil = block.timestamp.add(params.downtimeJailDuration);
                 signingInfo.missedBlockCounter = 0;
                 signingInfo.indexOffset = 0;
                 delete missedBlock;
@@ -618,11 +633,25 @@ contract Validator is IValidator, Ownable, Initializable {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
+        _staking.burn(tokensToBurn);
     }
     
     function _jail(uint256 _jailedUntil, bool _tombstoned) private {
         inforValidator.jailed = true;
         signingInfo.jailedUntil = _jailedUntil;
         signingInfo.tombstoned = _tombstoned;
+    }
+
+   function doubleSign(
+        uint256 votingPower,
+        uint256 distributionHeight
+    ) external onlyOwner {
+        _slash(
+            distributionHeight.sub(1),
+            votingPower,
+            params.slashFractionDoubleSign
+        );
+        // // (Dec 31, 9999 - 23:59:59 GMT).
+        _jail(253402300799, true);
     }
 }
