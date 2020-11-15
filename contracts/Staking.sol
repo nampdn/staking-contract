@@ -1,7 +1,7 @@
 pragma solidity ^0.6.0;
 import {SafeMath} from "./Safemath.sol";
 import {IStaking} from "./IStaking.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "./EnumerableSet.sol";
 import {Ownable} from "./Ownable.sol";
 
 
@@ -10,7 +10,7 @@ contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     uint256 oneDec = 1 * 10**18;
-    uint256 powerReduction = 1 * 10**6;
+    uint256 powerReduction = 1 * 10**8;
 
     struct Delegation {
         uint256 shares;
@@ -119,7 +119,7 @@ contract Staking is IStaking, Ownable {
     uint256 public totalBonded;
     uint256 public inflation;
     uint256 public annualProvision;
-    uint256 _feesCollected;
+    uint256 public _feesCollected;
     // mint
 
     Params _params;
@@ -789,11 +789,18 @@ contract Staking is IStaking, Ownable {
     function getValidator(address valAddr)
         public
         view
-        returns (uint256, uint256, bool)
+        returns (uint256, uint256, bool, uint256, uint256, uint256)
     {
         require(vals.contains(valAddr), "validator not found");
         Validator memory val = valByAddr[valAddr];
-        return (val.tokens, val.delegationShares, val.jailed);
+        Commission memory commission = val.commission;
+        
+        return (val.tokens, 
+                val.delegationShares,
+                val.jailed,
+                commission.rate,
+                commission.maxRate,
+                commission.maxChangeRate);
     }
 
     function getDelegationsByValidator(address valAddr)
