@@ -200,14 +200,6 @@ contract Staking is IStaking, Ownable {
         uint256 votingPower,
         uint256 distributionHeight
     ) external onlyOwner {
-        _doubleSign(valAddr, votingPower, distributionHeight);
-    }
-
-    function _doubleSign(
-        address valAddr,
-        uint256 votingPower,
-        uint256 distributionHeight
-    ) private {
         IValidator val = IValidator(ownerOf[valAddr]);
         val.slash(
             distributionHeight.sub(1),

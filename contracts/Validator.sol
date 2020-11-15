@@ -109,7 +109,6 @@ contract Validator is IValidator, Ownable, Initializable {
         address valAddr; // address of the validator
         uint256 tokens; // all token stake
         bool jailed;
-        uint256 slashEventCounter;
         uint256 minSelfDelegation;
         uint256 delegationShares; // delegation shares
         uint256 accumulatedCommission;
@@ -403,12 +402,11 @@ contract Validator is IValidator, Ownable, Initializable {
     function _updateValidatorSlashFraction(uint256 _fraction) private {
         uint256 newPeriod = _incrementValidatorPeriod();
         _incrementReferenceCount(newPeriod);
-        slashEvents[inforValidator.slashEventCounter] = SlashEvent({
+        slashEvents.push(SlashEvent({
             period: newPeriod,
             fraction: _fraction,
             height: block.number
-        });
-        inforValidator.slashEventCounter++;
+        }));
     }
 
     // initialize starting info for a new validator
@@ -490,8 +488,7 @@ contract Validator is IValidator, Ownable, Initializable {
         // fetch starting info for delegation
         Delegation memory delegationInfo = delegationByAddr[_delAddr];
         uint256 rewards = 0;
-        uint256 slashEventCounter = slashEvents.length;
-        for (uint256 i = 0; i < slashEventCounter; i++) {
+        for (uint256 i = 0; i < slashEvents.length; i++) {
             SlashEvent memory slashEvent = slashEvents[i];
             if (
                 slashEvent.height > delegationInfo.height &&
