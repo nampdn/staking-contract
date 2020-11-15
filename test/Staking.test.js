@@ -51,6 +51,7 @@ contract("Staking", async (accounts) => {
         const instance = await Staking.deployed();
         const contractAddr = await instance.allVals(0)
         const validator = await Validator.at(contractAddr)
+        await instance.mint({from: accounts[0]});
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
     })
 

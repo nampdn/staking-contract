@@ -6,11 +6,11 @@ import {SafeMath} from "./Safemath.sol";
 contract Minter is Ownable {
     using SafeMath for uint256;
     uint256 private _oneDec = 1 * 10**18;
-    uint256 public inflationRateChange;
-    uint256 public goalBonded;
-    uint256 public blocksPerYear;
-    uint256 public inflationMax;
-    uint256 public inflationMin;
+    uint256 public inflationRateChange = 5 * 10**16; // 4%
+    uint256 public goalBonded = 20 * 10**16;// 20%;
+    uint256 public blocksPerYear = 6307200; // assumption 5s per block
+    uint256 public inflationMax = 20 * 10**16;// 20%
+    uint256 public inflationMin = 5 * 10**16; // 5%
 
     uint256 public inflation;
     uint256 public annualProvision;
@@ -18,6 +18,7 @@ contract Minter is Ownable {
 
     constructor() public {
         transferOwnership(msg.sender);
+        
     }
 
     // @dev mints new tokens for the previous block. Returns fee collected
@@ -44,9 +45,10 @@ contract Minter is Ownable {
         return annualProvision.div(blocksPerYear);
     }
 
-    function getNextInflationRate() public view returns (uint256) {
-        uint256 totalBonded = IStaking(owner()).totalBonded();
-        uint256 totalSupply = IStaking(owner()).totalSupply();
+    function getNextInflationRate() private view returns (uint256) {
+        IStaking staking = IStaking(owner());
+        uint256 totalBonded = staking.totalBonded();
+        uint256 totalSupply = staking.totalSupply();
         uint256 bondedRatio = totalBonded.divTrun(totalSupply);
         uint256 inflationRateChangePerYear;
         uint256 infRateChange;
