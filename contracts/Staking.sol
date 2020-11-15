@@ -129,16 +129,16 @@ contract Staking is IStaking, Ownable {
             maxValidators: 21,
             downtimeJailDuration: 259200, // 3 days
             baseProposerReward: 1 * 10**16, // 1%
-            bonusProposerReward: 4 * 10**16, // 4$
+            bonusProposerReward: 4 * 10**16, // 4%
             slashFractionDowntime: 10 * 10**14, // 10%
             unbondingTime: 86400, // 1 day
             slashFractionDoubleSign: 50 * 10**16, // 50%
             signedBlockWindow: 100,
             minSignedPerWindow: 5 * 10**16,
-            goalBonded: 20 * 10**16, // 20%
+            goalBonded: 10 * 10**16, // 10%
             blocksPerYear: 6307200, // assumption 5s per block
             inflationMax: 20 * 10**16, // 20%
-            inflationMin: 5 * 10**16, // 5%
+            inflationMin: 2 * 10**16, // 2%
             inflationRateChange: 4 * 10**16 // 4%
         });
     }
