@@ -25,9 +25,6 @@ contract Validator is IValidator, Ownable, Initializable {
         uint256 stake; // share delegator's
         uint256 previousPeriod; // previousPeriod uses calculates reward
         uint256 height; // creation height
-    }
-    
-    struct DelegationShare {
         uint256 shares;
         address owner;
     }
@@ -122,7 +119,6 @@ contract Validator is IValidator, Ownable, Initializable {
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
-    mapping(address => DelegationShare) delShare;
     mapping(address => UBDEntry[]) ubdEntries;
     
     InforValidator public inforValidator;
@@ -217,7 +213,7 @@ contract Validator is IValidator, Ownable, Initializable {
         uint256 jailedUntil = signingInfo.jailedUntil;
 
         require(jailedUntil < block.timestamp, "validator jailed");
-        DelegationShare storage del = delShare[inforValidator.valAddr];
+        Delegation storage del = delegationByAddr[inforValidator.valAddr];
         uint256 tokens = _tokenFromShare(del.shares);
         require(
             tokens > inforValidator.minSelfDelegation,
@@ -238,7 +234,7 @@ contract Validator is IValidator, Ownable, Initializable {
         require(delegations.contains(msg.sender), "delegation not found");
         
         _withdrawRewards(msg.sender);
-        DelegationShare storage del = delShare[msg.sender];
+        Delegation storage del = delegationByAddr[msg.sender];
         uint256 shares = _shareFromToken(_amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
@@ -286,7 +282,7 @@ contract Validator is IValidator, Ownable, Initializable {
     // withdraw token delegator's
     function withdraw() external {
         require(delegations.contains(msg.sender), "delegation not found");
-        DelegationShare memory del = delShare[msg.sender];
+        Delegation memory del = delegationByAddr[msg.sender];
         UBDEntry[] storage entries = ubdEntries[msg.sender];
         uint256 amount = 0;
         uint256 entryCount = 0;
@@ -319,7 +315,7 @@ contract Validator is IValidator, Ownable, Initializable {
     // get rewards from a delegation
     function getDelegationRewards(address _delAddr) external view returns (uint256) {
         require(delegations.contains(_delAddr), "delegation not found");
-        DelegationShare memory del = delShare[_delAddr];
+        Delegation memory del = delegationByAddr[_delAddr];
         uint256 rewards = _calculateDelegationRewards(
             _delAddr,
             currentRewards.period - 1
@@ -380,8 +376,6 @@ contract Validator is IValidator, Ownable, Initializable {
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);
         delete delegationByAddr[_delAddr];
-        delete delegationByAddr[_delAddr];
-        // delVals[delAddr].remove(valAddr);
     }
     
     // remove share delegator's
@@ -422,7 +416,6 @@ contract Validator is IValidator, Ownable, Initializable {
         // add delegation if not exists;
         if (!delegations.contains(_delAddr)) {
             delegations.add(_delAddr);
-            delShare[_delAddr].owner = _delAddr; 
             _beforeDelegationCreated();
         } else {
             _beforeDelegationSharesModified(_delAddr);
@@ -431,10 +424,10 @@ contract Validator is IValidator, Ownable, Initializable {
         uint256 shared = _addTokenFromDel(_amount);
 
         // increment stake amount
-        DelegationShare storage del = delShare[_delAddr];
+        Delegation storage del = delegationByAddr[_delAddr];
         del.shares = del.shares.add(shared);
         _initializeDelegation(_delAddr);
-        // emit Delegate(valAddr, delAddr, amount);
+        //emit Delegate(valAddr, delAddr, _amount);
     }
     
     function _beforeDelegationCreated() private {
@@ -443,20 +436,19 @@ contract Validator is IValidator, Ownable, Initializable {
     
     // increment validator period, returning the period just ended
     function _incrementValidatorPeriod() private returns (uint256) {
-        CurrentReward memory rewards;
-        uint256 previousPeriod = rewards.period.sub(1);
+        uint256 previousPeriod = currentRewards.period.sub(1);
         uint256 current = 0;
-        if (rewards.reward > 0) {
-            current = rewards.reward.divTrun(inforValidator.tokens);
+        if (currentRewards.reward > 0) {
+            current = currentRewards.reward.divTrun(inforValidator.tokens);
         }
         uint256 historical = hRewards[previousPeriod]
             .cumulativeRewardRatio;
         _decrementReferenceCount(previousPeriod);
 
-        hRewards[rewards.period].cumulativeRewardRatio = historical.add(current);
-        hRewards[rewards.period].referenceCount = 1;
-        rewards.period++;
-        rewards.reward = 0;
+        hRewards[currentRewards.period].cumulativeRewardRatio = historical.add(current);
+        hRewards[currentRewards.period].referenceCount = 1;
+        currentRewards.period++;
+        currentRewards.reward = 0;
         return previousPeriod.add(1);
     }
     
@@ -567,7 +559,7 @@ contract Validator is IValidator, Ownable, Initializable {
     
     // initialize starting info for a new delegation
     function _initializeDelegation(address _delAddr) private {
-        DelegationShare storage del = delShare[_delAddr];
+        Delegation storage del = delegationByAddr[_delAddr];
         uint256 previousPeriod = currentRewards.period - 1;
         _incrementReferenceCount(previousPeriod);
         delegationByAddr[_delAddr].height = block.number;

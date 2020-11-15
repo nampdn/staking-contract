@@ -69,7 +69,6 @@ contract Staking is IStaking, Ownable {
         });
 
         minter = new Minter();
-        transferOwnership(address(this));
     }
 
     // create new validator

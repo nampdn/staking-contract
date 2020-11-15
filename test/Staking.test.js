@@ -1,4 +1,6 @@
 const Staking = artifacts.require("Staking");
+const Validator = artifacts.require("Validator");
+
 const utils = require("./utils");
 
 
@@ -32,18 +34,27 @@ async function assertRevert(promise, includeStr = "") {
 // }
 
 contract("Staking", async (accounts) => {
-
+    
     it("should create validator", async () => {
         const instance = await Staking.deployed();
         const rate = web3.utils.toWei("0.4", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
-        await instance.createValidator(web3.utils.fromAscii("val1"), rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
+        const name = web3.utils.fromAscii("val1");
+        await instance.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
         const total = await instance.allValsLength()
         assert.equal(total, 1);
     })
 
+    it("test finalize commit", async() => {
+        const instance = await Staking.deployed();
+        const contractAddr = await instance.allVals(0)
+        const validator = await Validator.at(contractAddr)
+        await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
+    })
+
+    
 
 
     // const powerReduction = Math.pow(10, 6);
