@@ -793,7 +793,10 @@ contract Staking is IStaking, Ownable {
         returns (
             uint256,
             uint256,
-            bool
+            bool,
+            uint256,
+            uint256,
+            uint256
         )
     {
         require(vals.contains(valAddr), "validator not found");
