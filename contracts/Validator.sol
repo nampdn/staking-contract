@@ -161,7 +161,6 @@ contract Validator is IValidator, Ownable, Initializable {
         });
     }
     
-
     // called one by the staking at time of deployment  
     function initialize (
         bytes32 _name, 
