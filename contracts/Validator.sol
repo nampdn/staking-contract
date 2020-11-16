@@ -9,7 +9,7 @@ import "./Ownable.sol";
 import "./Initializable.sol";
 
 
-contract Validator is IValidator, Ownable, Initializable {
+contract Validator is IValidator, Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
@@ -169,7 +169,7 @@ contract Validator is IValidator, Ownable, Initializable {
         uint256 _maxRate, 
         uint256 _maxChangeRate, 
         uint256 _minSelfDelegation
-    ) external initializer {
+    ) external onlyOwner {
             
         require(
             _maxRate <= oneDec,
