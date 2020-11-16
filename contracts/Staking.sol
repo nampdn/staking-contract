@@ -137,9 +137,9 @@ contract Staking is IStaking, Ownable {
             minSignedPerWindow: 5 * 10**16,
             goalBonded: 10 * 10**16, // 10%
             blocksPerYear: 6307200, // assumption 5s per block
-            inflationMax: 20 * 10**16, // 20%
-            inflationMin: 2 * 10**16, // 2%
-            inflationRateChange: 4 * 10**16 // 4%
+            inflationMax: 7 * 10**16, // 20%
+            inflationMin: 189216 * 10**11, // 1,89216%
+            inflationRateChange: 2 * 10**16 // 4%
         });
     }
 
