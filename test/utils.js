@@ -18,3 +18,14 @@ exports.advanceTime =  function advanceTime(time) {
         })
     });
 }
+
+exports.assertRevert = async (promise, includeStr = "") => {
+  return promise.then(() => {
+      throw null;
+  }).catch(e => {
+      assert.isNotNull(e);
+      if (includeStr != "" && e != null) {
+          assert.include(e.message, includeStr);
+      }
+  });
+}

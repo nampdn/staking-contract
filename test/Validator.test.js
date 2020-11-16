@@ -4,18 +4,6 @@ const Staking = artifacts.require("Staking");
 
 const utils = require("./utils");
 
-
-async function assertRevert(promise, includeStr = "") {
-    return promise.then(() => {
-        throw null;
-    }).catch(e => {
-        assert.isNotNull(e);
-        if (includeStr != "" && e != null) {
-            assert.include(e.message, includeStr);
-        }
-    });
-}
-
 contract("Validator", async (accounts) => {
     
     it("should create validator", async () => {
@@ -80,7 +68,7 @@ contract("Validator", async (accounts) => {
         const name = web3.utils.fromAscii("val5");
 
         for(var testCase of testCases) {
-            await assertRevert(instance.initialize(name, accounts[5], testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
+            await utils.assertRevert(instance.initialize(name, accounts[5], testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
                 testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), "Returned error: VM Exception while processing transaction: revert");
         }
     })
@@ -89,7 +77,7 @@ contract("Validator", async (accounts) => {
         const instance = await Validator.deployed();
 
         commissionRate = web3.utils.toWei("2", "ether");
-        await assertRevert(instance.update(commissionRate, {from: accounts[0]}), "Returned error: VM Exception while processing transaction: revert commission cannot be more than the max rate");
+        await utils.assertRevert(instance.update(commissionRate, {from: accounts[0]}), "Returned error: VM Exception while processing transaction: revert commission cannot be more than the max rate");
     })
 
     it ("should update validator", async () => {
