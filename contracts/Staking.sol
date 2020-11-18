@@ -145,6 +145,8 @@ contract Staking is IStaking, Ownable {
 
     function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
         IValidator(ownerOf[valAddr]).allocateToken(rewards);
+        address payable val = address(uint160(ownerOf[valAddr]));
+        val.transfer(rewards);
     }
 
     function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
@@ -297,5 +299,8 @@ contract Staking is IStaking, Ownable {
         }
 
         return addrs;
+    }
+
+    function () external payable {
     }
 }

@@ -25,6 +25,8 @@ contract("Staking", async (accounts) => {
         const validatorSet = await instance.getValidatorSets.call();
         let signed = validatorSet[0].map(_ =>  true);
         // block rewards: 39,63723998
+        await web3.eth.sendTransaction({from: accounts[7], to: instance.address, value: web3.utils.toWei("60", "ether")});
+
         await instance.finalize(validatorSet[0], validatorSet[1], signed)
         const commission = await validator.getCommissionRewards.call()
         assert.equal(commission.toString(), web3.utils.toWei("15.854895991882293251", "ether"))

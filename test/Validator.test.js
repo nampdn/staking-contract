@@ -190,6 +190,7 @@ contract("Validator", async (accounts) => {
 
     it ("should withdraw commission", async () => {
         const staking = await Staking.deployed();
+
         const contractAddr = await staking.allVals(0)
         const validator = await Validator.at(contractAddr)
         await staking.mint({from: accounts[0]});
@@ -198,9 +199,6 @@ contract("Validator", async (accounts) => {
         await staking.setPreviousProposer(accounts[0]);
         const validatorSet = await staking.getValidatorSets.call();
         let signed = validatorSet[0].map(_ =>  true);
-
-        // block rewards: 39,63723998
-        await staking.finalize(validatorSet[0], validatorSet[1], signed)
     })
 
 

@@ -653,4 +653,7 @@ contract Validator is IValidator, Ownable {
         // // (Dec 31, 9999 - 23:59:59 GMT).
         _jail(253402300799, true);
     }
+
+    function () external payable {
+    }
 }
