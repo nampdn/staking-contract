@@ -129,7 +129,7 @@ contract Validator is IValidator, Ownable {
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
-    mapping(address => UBDEntry[]) ubdEntries;
+    mapping(address => UBDEntry[]) public ubdEntries;
     
     InforValidator public inforValidator;
     Commission public commission; // validator commission

@@ -112,9 +112,12 @@ contract("Validator", async (accounts) => {
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
+
         await staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
+
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
+
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
         const delegation = await validator.delegationByAddr(accounts[0])
         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
@@ -124,10 +127,6 @@ contract("Validator", async (accounts) => {
         const valInfo = await validator.inforValidator()
         assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
-
-    })
-
-    it("should not delegate", async () => {
 
     })
 
