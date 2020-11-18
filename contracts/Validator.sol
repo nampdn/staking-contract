@@ -296,7 +296,7 @@ contract Validator is IValidator, Ownable {
     function withdrawCommission() external onlyValidator {
         uint256 _commission = inforValidator.accumulatedCommission;
         require(_commission > 0, "no validator commission to reward");
-        msg.sender.transfer(inforValidator.accumulatedCommission);
+        msg.sender.transfer(_commission);
         inforValidator.accumulatedCommission = 0;
         // emit WithdrawCommissionReward(valAddr, commission);
     }
