@@ -199,6 +199,11 @@ contract("Validator", async (accounts) => {
         await staking.setPreviousProposer(accounts[0]);
         const validatorSet = await staking.getValidatorSets.call();
         let signed = validatorSet[0].map(_ =>  true);
+
+        await web3.eth.sendTransaction({from: accounts[6], to: staking.address, value: web3.utils.toWei("60", "ether")});
+        await staking.finalize(validatorSet[0], validatorSet[1], signed)
+
+        await validator.withdrawCommission({from: accounts[0]})
     })
 
 
