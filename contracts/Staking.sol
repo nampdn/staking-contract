@@ -8,7 +8,7 @@ import "./Ownable.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
 
-contract Staking is IStaking, Ownable {
+contract Staking is IStaking, Ownable, Rank {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
@@ -21,7 +21,6 @@ contract Staking is IStaking, Ownable {
     struct ValidatorState {
         uint256 tokens;
     }
-
     // Private
     uint256 private _oneDec = 1 * 10**18;
     // Previous Proposer
@@ -33,8 +32,6 @@ contract Staking is IStaking, Ownable {
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
     mapping(address => ValidatorState) private _validatorState;
-    address[] private _rank;
-    mapping(address => uint256) private  _valRank;
     bool private _neededSort; 
     Minter public minter;
     uint256 public totalSupply = 5000000000 * 10**18;
@@ -160,15 +157,12 @@ contract Staking is IStaking, Ownable {
         valOfDel[delAddr].add(msg.sender);
         totalBonded += amount;
         _validatorState[msg.sender].tokens += amount;
-        _addToRank(msg.sender);
+        addRank(msg.sender);
     }
 
     function decrementValidatorAmount(uint256 amount) external onlyValidator{
         totalBonded -= amount;
         _validatorState[msg.sender].tokens -= amount;
-        if (_validatorState[msg.sender].tokens == 0) {
-            _removeValidatorRank(msg.sender);
-        }
     }
 
     function removeDelegation(address delAddr) external onlyValidator{
@@ -191,38 +185,19 @@ contract Staking is IStaking, Ownable {
         _removeValidatorRank(ownerOf[valAddr]);
     }
 
-    function _addToRank(address valAddr) private {
-        uint256 idx = _valRank[valAddr];
-        uint256 power = _getValidatorPower(valAddr);
-        if (power == 0) return;
-        if (idx == 0) {
-            _rank.push(valAddr);
-            _valRank[valAddr] = _rank.length;
-        }
-        _neededSort = true;
-    }
-
-    function _getValidatorPower(address valAddr) private view returns (uint256) {
-        return _validatorState[valAddr].tokens.div(_powerReduction);
-    }
-
     function getValidatorSets()
         public
         view
         returns (address[] memory, uint256[] memory)
     {
-        uint256 maxVal = params.maxValidators;
-        if (maxVal > _rank.length) {
-            maxVal = _rank.length;
-        }
-        address[] memory valAddrs = new address[](maxVal);
+        address[] memory addrs = new address[](maxVal);
         uint256[] memory powers = new uint256[](maxVal);
 
-        for (uint256 i = 0; i < maxVal; i++) {
-            valAddrs[i] = valOf[_rank[i]];
-            powers[i] = _getValidatorPower(_rank[i]);
+        for (uint256 i = 0; i < _rank.length; i++) {
+            addrs[i] = _rank[i].addr;
+            powers[i] = _rank[i].amount;
         }
-        return (valAddrs, powers);
+        return (addrs, powers);
     }
 
     function applyAndReturnValidatorSets()
@@ -230,56 +205,10 @@ contract Staking is IStaking, Ownable {
         onlyOwner
         returns (address[] memory, uint256[] memory)
     {
-        if (_neededSort && _rank.length > 0) {
-            _sortValRank(0, int256(_rank.length - 1));
-            for (uint256 i = _rank.length; i > 300; i --) {
-                delete _valRank[_rank[i - 1]];
-                _rank.pop();
-            }
-            _neededSort = false;
-        }
+        sortAndClean()
         return getValidatorSets();
     }
 
-    function _getValPowerByRank(uint256 rank) private view returns (uint256) {
-        return _getValidatorPower(_rank[rank]);
-    }
-
-    function _sortValRank(int256 left, int256 right) internal {
-        int256 i = left;
-        int256 j = right;
-        if (i == j) return;
-        uint256 pivot = _getValPowerByRank(uint256(left + (right - left) / 2));
-        while (i <= j) {
-            while (_getValPowerByRank(uint256(i)) > pivot) i++;
-            while (pivot > _getValPowerByRank(uint256(j))) j--;
-            if (i <= j) {
-                address tmp = _rank[uint256(i)];
-                _rank[uint256(i)] = _rank[uint256(j)];
-                _rank[uint256(j)] = tmp;
-
-                _valRank[tmp] = uint256(j + 1);
-                _valRank[_rank[uint256(i)]] = uint256(i + 1);
-
-                i++;
-                j--;
-            }
-        }
-        if (left < j) _sortValRank(left, j);
-        if (i < right) _sortValRank(i, right);
-    }
-
-    function _removeValidatorRank(address valAddr) private {
-        uint256 todDeleteIndex = _valRank[valAddr];
-        if (todDeleteIndex == 0) return;
-        uint256 lastIndex = _rank.length;
-        address last = _rank[lastIndex - 1];
-        _rank[todDeleteIndex - 1] = last;
-        _valRank[last] = todDeleteIndex;
-        _rank.pop();
-        delete _valRank[valAddr];
-        _neededSort = true;
-    }
 
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
