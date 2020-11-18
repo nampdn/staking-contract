@@ -69,7 +69,8 @@ contract("Validator", async (accounts) => {
 
         for(var testCase of testCases) {
             await utils.assertRevert(instance.initialize(name, accounts[5], testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), "Returned error: VM Exception while processing transaction: revert");
+                testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), 
+                "Returned error: VM Exception while processing transaction: revert");
         }
     })
 
@@ -77,7 +78,8 @@ contract("Validator", async (accounts) => {
         const instance = await Validator.deployed();
 
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(commissionRate, {from: accounts[0]}), "Returned error: VM Exception while processing transaction: revert commission cannot be more than the max rate");
+        await utils.assertRevert(instance.update(commissionRate, {from: accounts[0]}), 
+        "Returned error: VM Exception while processing transaction: revert commission cannot be more than the max rate");
     })
 
     it ("should update validator", async () => {
@@ -165,10 +167,12 @@ contract("Validator", async (accounts) => {
         await validator.undelegate(amount, {from: accounts[1]});
         await validator.undelegate(amount, {from: accounts[1]});
 
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), "Returned error: VM Exception while processing transaction: revert too many unbonding delegation entries");
+        await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), 
+        "Returned error: VM Exception while processing transaction: revert too many unbonding delegation entries");
 
         // not found delgator
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), "Returned error: VM Exception while processing transaction: revert delegation not found");
+        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), 
+        "Returned error: VM Exception while processing transaction: revert delegation not found");
 
     })
 
@@ -185,7 +189,8 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
 
-        await utils.assertRevert(validator.withdraw({from: accounts[4]}), "Returned error: VM Exception while processing transaction: revert delegation not found");
+        await utils.assertRevert(validator.withdraw({from: accounts[4]}), 
+        "Returned error: VM Exception while processing transaction: revert delegation not found");
     })
 
     it ("should withdraw commission", async () => {
@@ -200,23 +205,39 @@ contract("Validator", async (accounts) => {
         const validatorSet = await staking.getValidatorSets.call();
         let signed = validatorSet[0].map(_ =>  true);
 
-        await web3.eth.sendTransaction({from: accounts[6], to: staking.address, value: web3.utils.toWei("60", "ether")});
+        await web3.eth.sendTransaction({from: accounts[6], to: staking.address, value: web3.utils.toWei("80", "ether")});
         await staking.finalize(validatorSet[0], validatorSet[1], signed)
 
         await validator.withdrawCommission({from: accounts[0]})
-    })
 
+    })
 
     it ("should not withdraw commission", async () => {
-        
+        const staking = await Staking.deployed();
+
+        const contractAddr = await staking.allVals(0)
+        const validator = await Validator.at(contractAddr)
+        await utils.assertRevert(validator.withdrawCommission({from: accounts[0]}), 
+        "Returned error: VM Exception while processing transaction: revert no validator commission to reward");
     })
 
-    it("should withdraw delegation rewards", () => {
+    it("should withdraw delegation rewards", async () => {
+        const staking = await Staking.deployed();
 
+        const contractAddr = await staking.allVals(0)
+        const validator = await Validator.at(contractAddr)
+
+        await validator.withdrawRewards({from: accounts[0]})
     })
 
-    it("should not withdraw delegation rewards", () => {
+    it("should not withdraw delegation rewards", async () => {
+        const staking = await Staking.deployed();
 
+        const contractAddr = await staking.allVals(0)
+        const validator = await Validator.at(contractAddr)
+
+        await utils.assertRevert(validator.withdrawRewards({from: accounts[3]}), 
+        "Returned error: VM Exception while processing transaction: revert delegator not found");
     })
 
 
