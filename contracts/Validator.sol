@@ -124,7 +124,7 @@ contract Validator is IValidator, Ownable {
         uint256 minSignedPerWindow;
     }
 
-    uint256 constant public UNBONDING_TiME = 604800; // 7 days
+    uint256 constant public UNBONDING_TiME = 1; // 7 days
     
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
@@ -296,7 +296,7 @@ contract Validator is IValidator, Ownable {
     function withdrawCommission() external onlyValidator {
         uint256 _commission = inforValidator.accumulatedCommission;
         require(_commission > 0, "no validator commission to reward");
-        msg.sender.transfer(_commission);
+        msg.sender.transfer(inforValidator.accumulatedCommission);
         inforValidator.accumulatedCommission = 0;
         // emit WithdrawCommissionReward(valAddr, commission);
     }
