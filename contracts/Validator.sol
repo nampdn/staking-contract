@@ -487,7 +487,7 @@ contract Validator is IValidator, Ownable {
         uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
         
-        delete delegationByAddr[_delAddr];
+        // delete delegationByAddr[_delAddr];
         if (rewards > 0) {
             _delAddr.transfer(rewards);
             // emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
