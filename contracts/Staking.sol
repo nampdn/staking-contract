@@ -7,6 +7,7 @@ import "./Safemath.sol";
 import "./Ownable.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
+import "./Rank.sol";
 
 contract Staking is IStaking, Ownable, Rank {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -18,9 +19,6 @@ contract Staking is IStaking, Ownable, Rank {
         uint256 maxValidators;
     }
 
-    struct ValidatorState {
-        uint256 tokens;
-    }
     // Private
     uint256 private _oneDec = 1 * 10**18;
     // Previous Proposer
@@ -32,12 +30,12 @@ contract Staking is IStaking, Ownable, Rank {
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
     mapping(address => ValidatorState) private _validatorState;
-    bool private _neededSort; 
+    EnumerableSet.AddressSet currentValidatorSets;
     Minter public minter;
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
-
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
+
 
      // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
@@ -65,11 +63,13 @@ contract Staking is IStaking, Ownable, Rank {
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         bytes memory bytecode = type(Validator).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(name, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation, msg.sender));
+        bytes32 salt = keccak256(abi.encodePacked(name, commissionRate, commissionMaxRate, 
+            commissionMaxChangeRate, minSelfDelegation, msg.sender));
         assembly {
             val := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
-        IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation);
+        IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, 
+            commissionMaxChangeRate, minSelfDelegation);
         allVals.push(val);
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
@@ -147,22 +147,25 @@ contract Staking is IStaking, Ownable, Rank {
     }
 
     function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
-        bool jailed = IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
-        if (jailed) {
-            _removeValidatorRank(ownerOf[valAddr]);
-        }
+        IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
     }
 
-    function delegate(address delAddr, uint256 amount) external onlyValidator {
+    function delegate(address delAddr, uint256 amount)  {
         valOfDel[delAddr].add(msg.sender);
-        totalBonded += amount;
-        _validatorState[msg.sender].tokens += amount;
-        addRank(msg.sender);
+        currentValidatorSets.add(msg.sender);
+        totalBonded = totalBonded.add(amount);
+        _validatorState[msg.sender].amount += amount;
     }
 
-    function decrementValidatorAmount(uint256 amount) external onlyValidator{
-        totalBonded -= amount;
-        _validatorState[msg.sender].tokens -= amount;
+    function updateValidatorState(uint256 amount) external onlyValidator{
+        _updateValidatorState(msg.sender, amount);
+    }
+
+    function _updateValidatorState(address valAddr, uint256 amount) private{
+        _validatorState[valAddr].amount = amount;
+        if (amount == 0) {
+            currentValidatorSets.remove(valAddr);
+        }
     }
 
     function removeDelegation(address delAddr) external onlyValidator{
@@ -170,9 +173,9 @@ contract Staking is IStaking, Ownable, Rank {
     }
 
     function burn(uint256 amount) external onlyValidator{
-        totalBonded -= amount;
-        totalSupply -= amount;
-        _validatorState[msg.sender].tokens -= amount;
+        totalBonded = totalBonded.sub(amount);
+        totalSupply = totalSupply.sub(amount);
+        _updateValidatorState(msg.sender, _validatorState[msg.sender].amount.sub(amount));
     }
 
     // slash and jail validator forever
@@ -182,32 +185,9 @@ contract Staking is IStaking, Ownable, Rank {
         uint256 distributionHeight
     ) external onlyOwner {
         IValidator(ownerOf[valAddr]).doubleSign(votingPower, distributionHeight);
-        _removeValidatorRank(ownerOf[valAddr]);
+        currentValidatorSets.remove(ownerOf[valAddr]);
     }
 
-    function getValidatorSets()
-        public
-        view
-        returns (address[] memory, uint256[] memory)
-    {
-        address[] memory addrs = new address[](maxVal);
-        uint256[] memory powers = new uint256[](maxVal);
-
-        for (uint256 i = 0; i < _rank.length; i++) {
-            addrs[i] = _rank[i].addr;
-            powers[i] = _rank[i].amount;
-        }
-        return (addrs, powers);
-    }
-
-    function applyAndReturnValidatorSets()
-        external
-        onlyOwner
-        returns (address[] memory, uint256[] memory)
-    {
-        sortAndClean()
-        return getValidatorSets();
-    }
 
 
     function mint() external onlyOwner returns (uint256) {
@@ -228,6 +208,17 @@ contract Staking is IStaking, Ownable, Rank {
         }
 
         return addrs;
+    }
+
+    function getValidatorSet() external returns (address[]memory addrs, uint256[] powers) {
+        address[] memory addrs = new address[](currentValidatorSets.length());
+        uint256[] memory powers = new uint256[](currentValidatorSets.length());
+
+        for (uint256 i = 0; i < _rank.length; i++) {
+            addrs[i] = currentValidatorSets[i];
+            powers[i] = _validatorState[addrs[i]].amount.div(_powerReduction);
+        }
+        return (addrs, powers);
     }
 
     function () external payable {
