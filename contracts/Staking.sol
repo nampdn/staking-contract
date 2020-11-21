@@ -152,9 +152,13 @@ contract Staking is IStaking, Ownable, Rank {
 
     function delegate(address delAddr, uint256 amount)  {
         valOfDel[delAddr].add(msg.sender);
-        currentValidatorSets.add(msg.sender);
         totalBonded = totalBonded.add(amount);
-        _validatorState[msg.sender].amount += amount;
+        uint256 currentAmount = _validatorState[msg.sender]
+        _validatorState[msg.sender].amount = currentAmount.add(amount);
+        if (currentAmount.div(_powerReduction) > 0) {
+            currentValidatorSets.add(msg.sender);
+        }
+
     }
 
     function updateValidatorState(uint256 amount) external onlyValidator{
@@ -163,7 +167,7 @@ contract Staking is IStaking, Ownable, Rank {
 
     function _updateValidatorState(address valAddr, uint256 amount) private{
         _validatorState[valAddr].amount = amount;
-        if (amount == 0) {
+        if (amount == 0 || amount.div(powerFraction) == 0) {
             currentValidatorSets.remove(valAddr);
         }
     }
@@ -187,8 +191,6 @@ contract Staking is IStaking, Ownable, Rank {
         IValidator(ownerOf[valAddr]).doubleSign(votingPower, distributionHeight);
         currentValidatorSets.remove(ownerOf[valAddr]);
     }
-
-
 
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
