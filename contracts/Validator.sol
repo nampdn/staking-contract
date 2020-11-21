@@ -281,7 +281,7 @@ contract Validator is IValidator, Ownable {
                 amount: amountRemoved
             })
         );
-        _staking.decrementValidatorAmount(_amount);
+        _staking.updateValidatorState(inforValidator.tokens);
         // emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
     

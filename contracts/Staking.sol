@@ -19,23 +19,21 @@ contract Staking is IStaking, Ownable {
 
     // Private
     uint256 private _oneDec = 1 * 10**18;
-    // Previous Proposer
     address private _previousProposer;
     uint256 private _powerReduction = 1 * 10**8;
-    // Staking Params
     Params public  params;
     address[] public allVals;
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
-    mapping(address => ValidatorState) private _validatorState;
+    mapping(address => uint256) public tokens;
     EnumerableSet.AddressSet currentValidatorSets;
-    Minter public minter;
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
+    Minter public minter;
 
 
-     // Functions with this modifier can only be executed by the validator
+    // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
         _;
@@ -72,6 +70,14 @@ contract Staking is IStaking, Ownable {
         valOf[val] = msg.sender;
     }
 
+    // Update signer address
+    function updateSigner(address signerAddr) external onlyValidator {
+        address oldSignerAddr = valOf[msg.sender];
+        valOf[msg.sender] = signerAddr;
+        ownerOf[oldSignerAddr] = address(0x0);
+        ownerOf[signerAddr] = msg.sender;
+    }
+
     function allValsLength() external view returns(uint) {
         return allVals.length;
     }
@@ -81,7 +87,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function finalize(
-        address[] calldata _vals, 
+        address[] calldata _signers, 
         uint256[] calldata _votingPower, 
         bool[] calldata _signed
     ) external onlyOwner{
@@ -94,25 +100,20 @@ contract Staking is IStaking, Ownable {
             }
         }
          if (block.number > 1) {
-            _allocateTokens(
-                sumPreviousPrecommitPower,
-                previousTotalPower,
-                _vals,
-                _votingPower
+            _allocateTokens(sumPreviousPrecommitPower,
+                previousTotalPower, _signers, _votingPower
             );
         }
-
         _previousProposer = block.coinbase;
-
         for (uint256 i = 0; i < _votingPower.length; i++) {
-            _validateSignature(_vals[i], _votingPower[i], _signed[i]);
+            _validateSignature(_signers[i], _votingPower[i], _signed[i]);
         }
     }
 
     function _allocateTokens(
         uint256 sumPreviousPrecommitPower,
         uint256 totalPreviousVotingPower,
-        address[] memory addrs,
+        address[] memory _signers,
         uint256[] memory powers
     ) private {
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(
@@ -128,34 +129,36 @@ contract Staking is IStaking, Ownable {
 
         uint256 voteMultiplier = _oneDec;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
-        for (uint256 i = 0; i < addrs.length; i++) {
+        for (uint256 i = 0; i < _signers.length; i++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
             uint256 rewards = fees.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
-            _allocateTokensToValidator(addrs[i], rewards);
+            _allocateTokensToValidator(_signers[i], rewards);
         }
     }
 
-    function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
-        IValidator(ownerOf[valAddr]).allocateToken(rewards);
-        address payable val = address(uint160(ownerOf[valAddr]));
+    function _allocateTokensToValidator(address signerAddr, uint256 rewards) private{
+        IValidator(ownerOf[signerAddr]).allocateToken(rewards);
+        address payable val = address(uint160(ownerOf[signerAddr]));
         val.transfer(rewards);
     }
 
-    function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
-        IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
+    function _validateSignature( address signerAddr, uint256 votingPower, bool signed) private {
+        IValidator val = IValidator(ownerOf[signerAddr]);
+        if (val.validateSignature(votingPower, signed)) {
+            currentValidatorSets.remove(ownerOf[signerAddr]);
+        }
     }
 
-    function delegate(address delAddr, uint256 amount)  {
+    function delegate(address delAddr, uint256 amount) external onlyValidator {
         valOfDel[delAddr].add(msg.sender);
         totalBonded = totalBonded.add(amount);
-        uint256 currentAmount = _validatorState[msg.sender]
-        _validatorState[msg.sender].amount = currentAmount.add(amount);
+        uint256 currentAmount = tokens[msg.sender].add(amount);
+        tokens[msg.sender] = currentAmount;
         if (currentAmount.div(_powerReduction) > 0) {
             currentValidatorSets.add(msg.sender);
         }
-
     }
 
     function updateValidatorState(uint256 amount) external onlyValidator{
@@ -163,8 +166,8 @@ contract Staking is IStaking, Ownable {
     }
 
     function _updateValidatorState(address valAddr, uint256 amount) private{
-        _validatorState[valAddr].amount = amount;
-        if (amount == 0 || amount.div(powerFraction) == 0) {
+        tokens[valAddr] = amount;
+        if (amount == 0 || amount.div(_powerReduction) == 0) {
             currentValidatorSets.remove(valAddr);
         }
     }
@@ -176,48 +179,49 @@ contract Staking is IStaking, Ownable {
     function burn(uint256 amount) external onlyValidator{
         totalBonded = totalBonded.sub(amount);
         totalSupply = totalSupply.sub(amount);
-        _updateValidatorState(msg.sender, _validatorState[msg.sender].amount.sub(amount));
+        _updateValidatorState(msg.sender, tokens[msg.sender].sub(amount));
     }
 
     // slash and jail validator forever
     function doubleSign(
-        address valAddr,
+        address signerAddr,
         uint256 votingPower,
         uint256 distributionHeight
     ) external onlyOwner {
-        IValidator(ownerOf[valAddr]).doubleSign(votingPower, distributionHeight);
-        currentValidatorSets.remove(ownerOf[valAddr]);
+        IValidator(ownerOf[signerAddr]).doubleSign(votingPower, distributionHeight);
+        currentValidatorSets.remove(ownerOf[signerAddr]);
     }
 
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
-        totalSupply += fees;
+        totalSupply = totalSupply.add(fees);
         return fees;
     }
 
+    // get validators of the delegator
     function getValidatorsByDelegator(address delAddr)
         public
         view
         returns (address[] memory)
     {
         uint256 total = valOfDel[delAddr].length();
-        address[] memory addrs = new address[](total);
+        address[] memory valAddrs = new address[](total);
         for (uint256 i = 0; i < total; i++) {
-            addrs[i] = valOfDel[delAddr].at(i);
+            valAddrs[i] = valOfDel[delAddr].at(i);
         }
-
-        return addrs;
+        return valAddrs;
     }
 
-    function getValidatorSet() external returns (address[]memory addrs, uint256[] powers) {
-        address[] memory addrs = new address[](currentValidatorSets.length());
-        uint256[] memory powers = new uint256[](currentValidatorSets.length());
-
-        for (uint256 i = 0; i < _rank.length; i++) {
-            addrs[i] = currentValidatorSets[i];
-            powers[i] = _validatorState[addrs[i]].amount.div(_powerReduction);
+    // get current validator sets
+    function getValidatorSets() external view returns (address[] memory signers, uint256[] memory powers) {
+        uint256 total = currentValidatorSets.length();
+        address[] memory signerAddrs = new address[](total);
+        uint256[] memory votingPowers = new uint256[](total);
+        for (uint256 i = 0; i < total; i++) {
+            signerAddrs[i] = currentValidatorSets.at(i);
+            votingPowers[i] = tokens[signers[i]].div(_powerReduction);
         }
-        return (addrs, powers);
+        return (signerAddrs, votingPowers);
     }
 
     function () external payable {
