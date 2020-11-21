@@ -200,7 +200,6 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         await staking.mint({from: accounts[0]});
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
-        await staking.applyAndReturnValidatorSets({from: accounts[0]});
         await staking.setPreviousProposer(accounts[0]);
         const validatorSet = await staking.getValidatorSets.call();
         let signed = validatorSet[0].map(_ =>  true);
