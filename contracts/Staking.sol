@@ -15,34 +15,25 @@ contract Staking is IStaking, Ownable {
     struct Params {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
-        uint256 maxValidators;
-    }
-
-    struct ValidatorState {
-        uint256 tokens;
     }
 
     // Private
     uint256 private _oneDec = 1 * 10**18;
-    // Previous Proposer
     address private _previousProposer;
     uint256 private _powerReduction = 1 * 10**8;
-    // Staking Params
     Params public  params;
     address[] public allVals;
     mapping(address => address) public ownerOf;
     mapping(address => address) public valOf;
-    mapping(address => ValidatorState) private _validatorState;
-    address[] private _rank;
-    mapping(address => uint256) private  _valRank;
-    bool private _neededSort; 
-    Minter public minter;
+    mapping(address => uint256) public tokens;
+    EnumerableSet.AddressSet currentValidatorSets;
     uint256 public totalSupply = 5000000000 * 10**18;
     uint256 public totalBonded;
-
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
+    Minter public minter;
 
-     // Functions with this modifier can only be executed by the validator
+
+    // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
         _;
@@ -50,7 +41,6 @@ contract Staking is IStaking, Ownable {
 
     constructor() public {
         params = Params({
-            maxValidators: 100,
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16
         });
@@ -68,14 +58,24 @@ contract Staking is IStaking, Ownable {
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         bytes memory bytecode = type(Validator).creationCode;
-        bytes32 salt = keccak256(abi.encodePacked(name, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation, msg.sender));
+        bytes32 salt = keccak256(abi.encodePacked(name, commissionRate, commissionMaxRate, 
+            commissionMaxChangeRate, minSelfDelegation, msg.sender));
         assembly {
             val := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
-        IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, commissionMaxChangeRate, minSelfDelegation);
+        IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, 
+            commissionMaxChangeRate, minSelfDelegation);
         allVals.push(val);
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
+    }
+
+    // Update signer address
+    function updateSigner(address signerAddr) external onlyValidator {
+        address oldSignerAddr = valOf[msg.sender];
+        valOf[msg.sender] = signerAddr;
+        ownerOf[oldSignerAddr] = address(0x0);
+        ownerOf[signerAddr] = msg.sender;
     }
 
     function allValsLength() external view returns(uint) {
@@ -87,7 +87,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function finalize(
-        address[] calldata _vals, 
+        address[] calldata _signers, 
         uint256[] calldata _votingPower, 
         bool[] calldata _signed
     ) external onlyOwner{
@@ -100,25 +100,20 @@ contract Staking is IStaking, Ownable {
             }
         }
          if (block.number > 1) {
-            _allocateTokens(
-                sumPreviousPrecommitPower,
-                previousTotalPower,
-                _vals,
-                _votingPower
+            _allocateTokens(sumPreviousPrecommitPower,
+                previousTotalPower, _signers, _votingPower
             );
         }
-
         _previousProposer = block.coinbase;
-
         for (uint256 i = 0; i < _votingPower.length; i++) {
-            _validateSignature(_vals[i], _votingPower[i], _signed[i]);
+            _validateSignature(_signers[i], _votingPower[i], _signed[i]);
         }
     }
 
     function _allocateTokens(
         uint256 sumPreviousPrecommitPower,
         uint256 totalPreviousVotingPower,
-        address[] memory addrs,
+        address[] memory _signers,
         uint256[] memory powers
     ) private {
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(
@@ -134,40 +129,46 @@ contract Staking is IStaking, Ownable {
 
         uint256 voteMultiplier = _oneDec;
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
-        for (uint256 i = 0; i < addrs.length; i++) {
+        for (uint256 i = 0; i < _signers.length; i++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
             uint256 rewards = fees.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
-            _allocateTokensToValidator(addrs[i], rewards);
+            _allocateTokensToValidator(_signers[i], rewards);
         }
     }
 
-    function _allocateTokensToValidator(address valAddr, uint256 rewards) private{
-        IValidator(ownerOf[valAddr]).allocateToken(rewards);
-        address payable val = address(uint160(ownerOf[valAddr]));
+    function _allocateTokensToValidator(address signerAddr, uint256 rewards) private{
+        IValidator(ownerOf[signerAddr]).allocateToken(rewards);
+        address payable val = address(uint160(ownerOf[signerAddr]));
         val.transfer(rewards);
     }
 
-    function _validateSignature( address valAddr, uint256 votingPower, bool signed) private {
-        bool jailed = IValidator(ownerOf[valAddr]).validateSignature(votingPower, signed);
-        if (jailed) {
-            _removeValidatorRank(ownerOf[valAddr]);
+    function _validateSignature( address signerAddr, uint256 votingPower, bool signed) private {
+        IValidator val = IValidator(ownerOf[signerAddr]);
+        if (val.validateSignature(votingPower, signed)) {
+            currentValidatorSets.remove(ownerOf[signerAddr]);
         }
     }
 
     function delegate(address delAddr, uint256 amount) external onlyValidator {
         valOfDel[delAddr].add(msg.sender);
-        totalBonded += amount;
-        _validatorState[msg.sender].tokens += amount;
-        _addToRank(msg.sender);
+        totalBonded = totalBonded.add(amount);
+        uint256 currentAmount = tokens[msg.sender].add(amount);
+        tokens[msg.sender] = currentAmount;
+        if (currentAmount.div(_powerReduction) > 0) {
+            currentValidatorSets.add(msg.sender);
+        }
     }
 
-    function decrementValidatorAmount(uint256 amount) external onlyValidator{
-        totalBonded -= amount;
-        _validatorState[msg.sender].tokens -= amount;
-        if (_validatorState[msg.sender].tokens == 0) {
-            _removeValidatorRank(msg.sender);
+    function updateValidatorState(uint256 amount) external onlyValidator{
+        _updateValidatorState(msg.sender, amount);
+    }
+
+    function _updateValidatorState(address valAddr, uint256 amount) private{
+        tokens[valAddr] = amount;
+        if (amount == 0 || amount.div(_powerReduction) == 0) {
+            currentValidatorSets.remove(valAddr);
         }
     }
 
@@ -176,129 +177,52 @@ contract Staking is IStaking, Ownable {
     }
 
     function burn(uint256 amount) external onlyValidator{
-        totalBonded -= amount;
-        totalSupply -= amount;
-        _validatorState[msg.sender].tokens -= amount;
+        totalBonded = totalBonded.sub(amount);
+        totalSupply = totalSupply.sub(amount);
+        _updateValidatorState(msg.sender, tokens[msg.sender].sub(amount));
     }
 
     // slash and jail validator forever
     function doubleSign(
-        address valAddr,
+        address signerAddr,
         uint256 votingPower,
         uint256 distributionHeight
     ) external onlyOwner {
-        IValidator(ownerOf[valAddr]).doubleSign(votingPower, distributionHeight);
-        _removeValidatorRank(ownerOf[valAddr]);
-    }
-
-    function _addToRank(address valAddr) private {
-        uint256 idx = _valRank[valAddr];
-        uint256 power = _getValidatorPower(valAddr);
-        if (power == 0) return;
-        if (idx == 0) {
-            _rank.push(valAddr);
-            _valRank[valAddr] = _rank.length;
-        }
-        _neededSort = true;
-    }
-
-    function _getValidatorPower(address valAddr) private view returns (uint256) {
-        return _validatorState[valAddr].tokens.div(_powerReduction);
-    }
-
-    function getValidatorSets()
-        public
-        view
-        returns (address[] memory, uint256[] memory)
-    {
-        uint256 maxVal = params.maxValidators;
-        if (maxVal > _rank.length) {
-            maxVal = _rank.length;
-        }
-        address[] memory valAddrs = new address[](maxVal);
-        uint256[] memory powers = new uint256[](maxVal);
-
-        for (uint256 i = 0; i < maxVal; i++) {
-            valAddrs[i] = valOf[_rank[i]];
-            powers[i] = _getValidatorPower(_rank[i]);
-        }
-        return (valAddrs, powers);
-    }
-
-    function applyAndReturnValidatorSets()
-        external
-        onlyOwner
-        returns (address[] memory, uint256[] memory)
-    {
-        if (_neededSort && _rank.length > 0) {
-            _sortValRank(0, int256(_rank.length - 1));
-            for (uint256 i = _rank.length; i > 300; i --) {
-                delete _valRank[_rank[i - 1]];
-                _rank.pop();
-            }
-            _neededSort = false;
-        }
-        return getValidatorSets();
-    }
-
-    function _getValPowerByRank(uint256 rank) private view returns (uint256) {
-        return _getValidatorPower(_rank[rank]);
-    }
-
-    function _sortValRank(int256 left, int256 right) internal {
-        int256 i = left;
-        int256 j = right;
-        if (i == j) return;
-        uint256 pivot = _getValPowerByRank(uint256(left + (right - left) / 2));
-        while (i <= j) {
-            while (_getValPowerByRank(uint256(i)) > pivot) i++;
-            while (pivot > _getValPowerByRank(uint256(j))) j--;
-            if (i <= j) {
-                address tmp = _rank[uint256(i)];
-                _rank[uint256(i)] = _rank[uint256(j)];
-                _rank[uint256(j)] = tmp;
-
-                _valRank[tmp] = uint256(j + 1);
-                _valRank[_rank[uint256(i)]] = uint256(i + 1);
-
-                i++;
-                j--;
-            }
-        }
-        if (left < j) _sortValRank(left, j);
-        if (i < right) _sortValRank(i, right);
-    }
-
-    function _removeValidatorRank(address valAddr) private {
-        uint256 todDeleteIndex = _valRank[valAddr];
-        if (todDeleteIndex == 0) return;
-        uint256 lastIndex = _rank.length;
-        address last = _rank[lastIndex - 1];
-        _rank[todDeleteIndex - 1] = last;
-        _valRank[last] = todDeleteIndex;
-        _rank.pop();
-        delete _valRank[valAddr];
-        _neededSort = true;
+        IValidator(ownerOf[signerAddr]).doubleSign(votingPower, distributionHeight);
+        currentValidatorSets.remove(ownerOf[signerAddr]);
     }
 
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
-        totalSupply += fees;
+        totalSupply = totalSupply.add(fees);
         return fees;
     }
 
+    // get validators of the delegator
     function getValidatorsByDelegator(address delAddr)
         public
         view
         returns (address[] memory)
     {
         uint256 total = valOfDel[delAddr].length();
-        address[] memory addrs = new address[](total);
+        address[] memory valAddrs = new address[](total);
         for (uint256 i = 0; i < total; i++) {
-            addrs[i] = valOfDel[delAddr].at(i);
+            valAddrs[i] = valOfDel[delAddr].at(i);
         }
+        return valAddrs;
+    }
 
-        return addrs;
+    // get current validator sets
+    function getValidatorSets() external view returns (address[] memory, uint256[] memory) {
+        uint256 total = currentValidatorSets.length();
+        address[] memory signerAddrs = new address[](total);
+        uint256[] memory votingPowers = new uint256[](total);
+        for (uint256 i = 0; i < total; i++) {
+            address valAddr = currentValidatorSets.at(i);
+            signerAddrs[i] = valOf[valAddr];
+            votingPowers[i] = tokens[valAddr].div(_powerReduction);
+        }
+        return (signerAddrs, votingPowers);
     }
 
     function () external payable {

@@ -10,18 +10,18 @@ interface IStaking {
         uint256 minSelfDelegation
     ) external returns (address val);
     function finalize(
-        address[] calldata _vals, 
+        address[] calldata _signerAdds, 
         uint256[] calldata _votingPower, 
         bool[] calldata _signed
     ) external;
-    function doubleSign(address valAddr, uint256 votingPower, uint256 height) external;
+    function doubleSign(address signerAddr, uint256 votingPower, uint256 height) external;
     function mint() external returns (uint256 fees);
     function totalSupply() external view returns (uint256);
     function totalBonded() external view returns (uint256);
     function allValsLength() external view returns (uint);
     function delegate(address delAddr, uint256 amount) external;
-    function decrementValidatorAmount(uint256 amount) external;
     function burn(uint256 amount) external;
+    function updateValidatorState(uint256 amount) external;
     // function removeDelegation(address delAddr) external;
     // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
     // function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
