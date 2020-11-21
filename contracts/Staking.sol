@@ -7,9 +7,8 @@ import "./Safemath.sol";
 import "./Ownable.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
-import "./Rank.sol";
 
-contract Staking is IStaking, Ownable, Rank {
+contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
