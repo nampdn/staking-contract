@@ -15,7 +15,6 @@ contract Staking is IStaking, Ownable {
     struct Params {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
-        uint256 maxValidators;
     }
 
     // Private
@@ -44,7 +43,6 @@ contract Staking is IStaking, Ownable {
 
     constructor() public {
         params = Params({
-            maxValidators: 100,
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16
         });
