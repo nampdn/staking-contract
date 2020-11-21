@@ -281,7 +281,7 @@ contract Validator is IValidator, Ownable {
                 amount: amountRemoved
             })
         );
-        _staking.updateValidatorState(inforValidator.tokens);
+        _staking.setToken(inforValidator.tokens);
         // emit Undelegate(valAddr, msg.sender, amount, completionTime);
     }
     
@@ -395,6 +395,7 @@ contract Validator is IValidator, Ownable {
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);
         delete delegationByAddr[_delAddr];
+        _staking.removeDelegation(_delAddr);
     }
     
     // remove share delegator's

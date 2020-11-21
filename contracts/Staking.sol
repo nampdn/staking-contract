@@ -159,17 +159,22 @@ contract Staking is IStaking, Ownable {
         _addCurrentValidatorSets(msg.sender);
     }
 
+    function undelegate(uint256 amount) external onlyValidator {
+        totalBonded = totalBonded.sub(amount);
+        _setToken(msg.sender, tokens[msg.sender].sub(amount));
+    } 
+
     function _addCurrentValidatorSets(address valAddr) private {
         if (tokens[valAddr] > 0 && tokens[valAddr].div(_powerReduction) > 0) {
             currentValidatorSets.add(msg.sender);
         }
     }
 
-    function updateValidatorState(uint256 amount) external onlyValidator{
-        _updateValidatorState(msg.sender, amount);
+    function setToken(uint256 amount) external onlyValidator{
+        _setToken(msg.sender, amount);
     }
 
-    function _updateValidatorState(address valAddr, uint256 amount) private{
+    function _setToken(address valAddr, uint256 amount) private{
         tokens[valAddr] = amount;
         if (amount == 0 || amount.div(_powerReduction) == 0) {
             currentValidatorSets.remove(valAddr);
@@ -183,7 +188,7 @@ contract Staking is IStaking, Ownable {
     function burn(uint256 amount) external onlyValidator{
         totalBonded = totalBonded.sub(amount);
         totalSupply = totalSupply.sub(amount);
-        _updateValidatorState(msg.sender, tokens[msg.sender].sub(amount));
+        _setToken(msg.sender, tokens[msg.sender].sub(amount));
     }
 
     // slash and jail validator forever
