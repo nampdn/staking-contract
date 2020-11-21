@@ -146,7 +146,8 @@ contract Staking is IStaking, Ownable {
 
     function _validateSignature( address signerAddr, uint256 votingPower, bool signed) private {
         IValidator val = IValidator(ownerOf[signerAddr]);
-        if (val.validateSignature(votingPower, signed)) {
+        bool jailed = val.validateSignature(votingPower, signed);
+        if (jailed) {
             currentValidatorSets.remove(ownerOf[signerAddr]);
         }
     }
@@ -154,9 +155,12 @@ contract Staking is IStaking, Ownable {
     function delegate(address delAddr, uint256 amount) external onlyValidator {
         valOfDel[delAddr].add(msg.sender);
         totalBonded = totalBonded.add(amount);
-        uint256 currentAmount = tokens[msg.sender].add(amount);
-        tokens[msg.sender] = currentAmount;
-        if (currentAmount.div(_powerReduction) > 0) {
+        tokens[msg.sender] = tokens[msg.sender].add(amount);
+        _addCurrentValidatorSets(msg.sender);
+    }
+
+    function _addCurrentValidatorSets(address valAddr) private {
+        if (tokens[valAddr] > 0 && tokens[valAddr].div(_powerReduction) > 0) {
             currentValidatorSets.add(msg.sender);
         }
     }
