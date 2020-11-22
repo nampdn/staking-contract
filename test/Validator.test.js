@@ -1,10 +1,22 @@
 const Validator = artifacts.require("Validator");
 const Staking = artifacts.require("Staking");
-
-
+const Minter = artifacts.require("Minter");
 const utils = require("./utils");
 
 contract("Validator", async (accounts) => {
+    async function finalize(notSigned) {
+        notSigned = notSigned  || [];
+        let instance = await Staking.deployed();
+        const validatorSet = await instance.getValidatorSets.call();
+        await instance.mint();
+        const minter = await Minter.at(await instance.minter())
+        const blockProvision = await minter.getBlockProvision();
+        await instance.deposit({from: accounts[0], value: blockProvision.toString()})
+        await instance.setPreviousProposer(accounts[0]);
+        let signed = validatorSet[0].map(addr => notSigned.indexOf(addr) === -1);
+        await instance.finalize(validatorSet[0], validatorSet[1], signed)
+    }
+
     
     it("should create validator", async () => {
         const instance = await Validator.deployed();
@@ -195,20 +207,11 @@ contract("Validator", async (accounts) => {
 
     it ("should withdraw commission", async () => {
         const staking = await Staking.deployed();
-
         const contractAddr = await staking.allVals(0)
         const validator = await Validator.at(contractAddr)
-        await staking.mint({from: accounts[0]});
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
-        await staking.setPreviousProposer(accounts[0]);
-        const validatorSet = await staking.getValidatorSets.call();
-        let signed = validatorSet[0].map(_ =>  true);
-
-        await web3.eth.sendTransaction({from: accounts[6], to: staking.address, value: web3.utils.toWei("80", "ether")});
-        await staking.finalize(validatorSet[0], validatorSet[1], signed)
-
+        await finalize([]);
         await validator.withdrawCommission({from: accounts[0]})
-
     })
 
     it ("should not withdraw commission", async () => {

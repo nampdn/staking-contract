@@ -1,7 +1,7 @@
 const Staking = artifacts.require("Staking");
 const Validator = artifacts.require("Validator");
-contract("Staking", async (accounts) => {
-    
+
+contract("Staking", async (accounts) => {    
     it("should create validator", async () => {
         const instance = await Staking.deployed();
         const rate = web3.utils.toWei("0.4", "ether");

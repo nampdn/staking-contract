@@ -113,6 +113,7 @@ contract Validator is IValidator, Ownable {
         uint256 delegationShares; // delegation shares
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
+        uint256 updateTime // last update time
     }
     
     struct Params {
@@ -187,6 +188,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.name = _name;
         inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.valAddr = _owner;
+        inforValidator.updateTime = block.timestamp;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -197,6 +199,11 @@ contract Validator is IValidator, Ownable {
         _initializeValidator();
         signingInfo.startHeight = block.number;
     }
+
+    // update signer address
+    function updateSigner(address signerAddr) external onlyValidator {
+        _staking.updateSigner(signerAddr);
+    }
     
     // delegate for this validator
     function delegate() external payable {
@@ -205,11 +212,38 @@ contract Validator is IValidator, Ownable {
     }
     
     // update Commission rate of the validator
-    function update(uint256 _commissionRate) external onlyValidator {
-        require(_commissionRate >= 0, "commission rate must greater than 0");
-        require(_commissionRate <= oneDec, "commission cannot be more than the max rate");
+    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
+        if (_commissionRate > 0) {
+            require(
+                // solhint-disable-next-line not-rely-on-time
+                block.timestamp.sub(inforValidator.updateTime) >= 86400,
+                "commission cannot be changed more than one in 24h"
+            );
+            require(_commissionRate <= commission.maxRate, "commission cannot be more than the max rate");
+            require(
+                _commissionRate.sub(commission.rate) <=
+                    commission.maxChangeRate,
+                "commission cannot be changed more than max change rate"
+            );
+            commission.rate = _commissionRate;
+            inforValidator.updateTime = block.timestamp;
+        }
+
+        if (_minSelfDelegation > 0) {
+            require(
+                _minSelfDelegation > inforValidator.minSelfDelegation,
+                "minimum self delegation cannot be decrease"
+            );
+            require(
+                _minSelfDelegation <= inforValidator.tokens,
+                "self delegation below minimum"
+            );
+            inforValidator.minSelfDelegation = _minSelfDelegation
+        }
         
-        commission.rate = _commissionRate;
+        if (_name[0] != 0) {
+            inforValidator.name = _name;
+        }
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
