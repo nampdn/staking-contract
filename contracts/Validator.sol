@@ -220,11 +220,13 @@ contract Validator is IValidator, Ownable {
                 "commission cannot be changed more than one in 24h"
             );
             require(_commissionRate <= commission.maxRate, "commission cannot be more than the max rate");
-            require(
-                _commissionRate.sub(commission.rate) <=
-                    commission.maxChangeRate,
-                "commission cannot be changed more than max change rate"
-            );
+            if (_commissionRate > commission.rate) {
+                require(
+                    _commissionRate.sub(commission.rate) <=
+                        commission.maxChangeRate,
+                    "commission cannot be changed more than max change rate"
+                );
+            }
             commission.rate = _commissionRate;
             inforValidator.updateTime = block.timestamp;
         }

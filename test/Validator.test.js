@@ -88,19 +88,19 @@ contract("Validator", async (accounts) => {
 
     it ("should not update validator", async () => {
         const instance = await Validator.deployed();
-
+        const name = web3.utils.fromAscii("");
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(commissionRate, {from: accounts[0]}), 
-        "Returned error: VM Exception while processing transaction: revert commission cannot be more than the max rate");
+        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        "commission cannot be changed more than one in 24h");
     })
 
     it ("should update validator", async () => {
         const instance = await Validator.deployed();
-
-        commissionRate = web3.utils.toWei("0.3", "ether");
-        await instance.update(commissionRate, {from: accounts[0]});
-
-        var commission = await instance.commission({from: accounts[0]});
+        const name = web3.utils.fromAscii("");
+        let commissionRate = web3.utils.toWei("0.3", "ether");
+        await utils.advanceTime(86401);
+        await instance.update(name, commissionRate, 0, {from: accounts[0]});
+        var commission = await instance.commission.call();
         var expectedRate = commission.rate;
         assert.equal(commissionRate, expectedRate.toString());
     })
@@ -172,12 +172,10 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(valAddr)
         
         const amount = web3.utils.toWei("0.01", "ether");
-        await validator.undelegate(amount, {from: accounts[1]});
-        await validator.undelegate(amount, {from: accounts[1]});
-        await validator.undelegate(amount, {from: accounts[1]});
-        await validator.undelegate(amount, {from: accounts[1]});
-        await validator.undelegate(amount, {from: accounts[1]});
-        await validator.undelegate(amount, {from: accounts[1]});
+
+        for (var i =0; i < 6; i ++) {
+            await validator.undelegate(amount, {from: accounts[1]});
+        }
 
         await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), 
         "Returned error: VM Exception while processing transaction: revert too many unbonding delegation entries");
@@ -193,6 +191,7 @@ contract("Validator", async (accounts) => {
 
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
+        await utils.advanceTime(86401 * 8);
         await validator.withdraw({from: accounts[1]})
     })
 
