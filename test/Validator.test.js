@@ -17,6 +17,16 @@ contract("Validator", async (accounts) => {
         await instance.finalize(validatorSet[0], validatorSet[1], signed)
     }
 
+    async function createValidator(from) {
+        const staking = await Staking.deployed()
+        const rate = web3.utils.toWei("0.4", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
+        const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
+        const name = web3.utils.fromAscii("val1");
+        await staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from})
+    }
+
     
     it("should create validator", async () => {
         const instance = await Validator.deployed();
@@ -121,14 +131,7 @@ contract("Validator", async (accounts) => {
 
     it ("should delegate", async () => {
         const staking = await Staking.deployed()
-        const rate = web3.utils.toWei("0.4", "ether");
-        const maxRate = web3.utils.toWei("0.5", "ether");
-        const maxChangeRate = web3.utils.toWei("0.1", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
-        const name = web3.utils.fromAscii("val1");
-
-        await staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
-
+        await createValidator(accounts[0]);
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
 
@@ -242,8 +245,13 @@ contract("Validator", async (accounts) => {
     })
 
 
-    it("should slash", () => {
-
+    it("should slash", async () => {
+        const staking = await Staking.deployed();
+        await createValidator(accounts[5]);
+        const val = await Validator.at(await staking.allVals(1));
+        const amount = web3.utils.toWei("0.01", "ether");
+        await val.delegate({from: accounts[5], value: amount})
+        await finalize([accounts[5]])
     })
 
     it("should unjail", () => {
