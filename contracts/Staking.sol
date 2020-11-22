@@ -31,7 +31,6 @@ contract Staking is IStaking, Ownable {
     uint256 public totalBonded;
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
     Minter public minter;
-    mapping(address => uint256) public rewards;
 
 
     // Functions with this modifier can only be executed by the validator
@@ -141,7 +140,6 @@ contract Staking is IStaking, Ownable {
 
     function _allocateTokensToValidator(address signerAddr, uint256 _rewards) private{
         IValidator(ownerOf[signerAddr]).allocateToken(_rewards);
-        rewards[ownerOf[signerAddr]] = rewards[ownerOf[signerAddr]].add(_rewards);
     }
 
     function _validateSignature( address signerAddr, uint256 votingPower, bool signed) private {
