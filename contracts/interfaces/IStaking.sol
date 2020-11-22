@@ -23,6 +23,8 @@ interface IStaking {
     function burn(uint256 amount) external;
     function setToken(uint256 amount) external;
     function removeDelegation(address delAddr) external;
+    function withdrawRewards(address payable _to, uint256 _amount) external;
+    function updateSigner(address signerAddr) external;
     // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
     // function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
     // function getValidatorsByDelegator() external view returns (address[] memory);

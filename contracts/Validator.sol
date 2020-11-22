@@ -113,7 +113,7 @@ contract Validator is IValidator, Ownable {
         uint256 delegationShares; // delegation shares
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
-        uint256 updateTime // last update time
+        uint256 updateTime; // last update time
     }
     
     struct Params {
@@ -211,7 +211,7 @@ contract Validator is IValidator, Ownable {
         _staking.delegate(msg.sender, msg.value);
     }
     
-    // update Commission rate of the validator
+    // update validate info
     function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
         if (_commissionRate > 0) {
             require(
@@ -238,7 +238,7 @@ contract Validator is IValidator, Ownable {
                 _minSelfDelegation <= inforValidator.tokens,
                 "self delegation below minimum"
             );
-            inforValidator.minSelfDelegation = _minSelfDelegation
+            inforValidator.minSelfDelegation = _minSelfDelegation;
         }
         
         if (_name[0] != 0) {
@@ -330,7 +330,7 @@ contract Validator is IValidator, Ownable {
     function withdrawCommission() external onlyValidator {
         uint256 _commission = inforValidator.accumulatedCommission;
         require(_commission > 0, "no validator commission to reward");
-        msg.sender.transfer(_commission);
+        _staking.withdrawRewards(msg.sender, _commission);
         inforValidator.accumulatedCommission = 0;
         // emit WithdrawCommissionReward(valAddr, commission);
     }
@@ -524,7 +524,7 @@ contract Validator is IValidator, Ownable {
         
         // delete delegationByAddr[_delAddr];
         if (rewards > 0) {
-            _delAddr.transfer(rewards);
+            _staking.withdrawRewards(_delAddr, rewards);
             // emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
         }
     }
@@ -687,8 +687,5 @@ contract Validator is IValidator, Ownable {
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
         _jail(253402300799, true);
-    }
-
-    function () external payable {
     }
 }

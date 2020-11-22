@@ -10,7 +10,7 @@ interface IValidator {
         uint256 _maxChangeRate, 
         uint256 _minSelfDelegation
     ) external;
-    function update(uint256 _commissionRate) external;
+    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external;
     function unjail() external;
     function allocateToken(uint256 _rewards) external;
     function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external;

@@ -31,6 +31,7 @@ contract Staking is IStaking, Ownable {
     uint256 public totalBonded;
     mapping(address => EnumerableSet.AddressSet) private valOfDel;
     Minter public minter;
+    mapping(address => uint256) public rewards;
 
 
     // Functions with this modifier can only be executed by the validator
@@ -131,17 +132,16 @@ contract Staking is IStaking, Ownable {
         voteMultiplier = voteMultiplier.sub(proposerMultiplier);
         for (uint256 i = 0; i < _signers.length; i++) {
             uint256 powerFraction = powers[i].divTrun(totalPreviousVotingPower);
-            uint256 rewards = fees.mulTrun(voteMultiplier).mulTrun(
+            uint256 _rewards = fees.mulTrun(voteMultiplier).mulTrun(
                 powerFraction
             );
-            _allocateTokensToValidator(_signers[i], rewards);
+            _allocateTokensToValidator(_signers[i], _rewards);
         }
     }
 
-    function _allocateTokensToValidator(address signerAddr, uint256 rewards) private{
-        IValidator(ownerOf[signerAddr]).allocateToken(rewards);
-        address payable val = address(uint160(ownerOf[signerAddr]));
-        val.transfer(rewards);
+    function _allocateTokensToValidator(address signerAddr, uint256 _rewards) private{
+        IValidator(ownerOf[signerAddr]).allocateToken(_rewards);
+        rewards[ownerOf[signerAddr]] = rewards[ownerOf[signerAddr]].add(_rewards);
     }
 
     function _validateSignature( address signerAddr, uint256 votingPower, bool signed) private {
@@ -150,6 +150,10 @@ contract Staking is IStaking, Ownable {
         if (jailed) {
             currentValidatorSets.remove(ownerOf[signerAddr]);
         }
+    }
+
+    function withdrawRewards(address payable to, uint256 amount) external onlyValidator {
+        to.transfer(amount);
     }
 
     function delegate(address delAddr, uint256 amount) external onlyValidator {
@@ -234,6 +238,6 @@ contract Staking is IStaking, Ownable {
         return (signerAddrs, votingPowers);
     }
 
-    function () external payable {
+    function deposit() external payable {
     }
 }
