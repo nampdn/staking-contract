@@ -273,7 +273,7 @@ contract("Validator", async (accounts) => {
         // after jail
         var inforValidator1 = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator1.jailed, true)
-        
+
         // unjail
         await val.unjail({from: accounts[5]});
 
@@ -282,8 +282,18 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator3.jailed, false)
     })
 
-    it("double sign", () => {
+    it("double sign", async () => {
+        const staking = await Staking.deployed();
+        const val = await Validator.at(await staking.allVals(1));
 
+        // before jail
+        var inforValidator = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator.jailed, false)
+
+        await staking.doubleSign(accounts[5], 1000, 5, {from: accounts[0]});
+
+        const info = await val.inforValidator()
+        assert.equal(info.jailed, true)
     })
 
     it("validate signature", () => {
