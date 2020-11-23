@@ -249,13 +249,27 @@ contract("Validator", async (accounts) => {
         const staking = await Staking.deployed();
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
+        
         const amount = web3.utils.toWei("0.01", "ether");
         await val.delegate({from: accounts[5], value: amount})
         await finalize([accounts[5]])
     })
 
-    it("should unjail", () => {
+    it("should unjail", async () => {
+        const staking = await Staking.deployed();
+        const val = await Validator.at(await staking.allVals(1));
 
+        // before jail
+        var inforValidator = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator.jailed, false)
+
+        // jail
+        for (var i=0; i< 100; i++) {
+            await staking.mint();
+            await staking.setPreviousProposer(accounts[0]);
+            await staking.finalize([accounts[5]], [1000000000000], [false])
+
+        }
     })
 
     it("double sign", () => {

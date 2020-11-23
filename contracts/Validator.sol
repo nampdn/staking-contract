@@ -153,7 +153,7 @@ contract Validator is IValidator, Ownable {
         _staking = IStaking(msg.sender);
 
         params = Params({
-            downtimeJailDuration: 600,
+            downtimeJailDuration: 1,
             slashFractionDowntime: 1 * 10**14,
             unbondingTime: 1814400,
             slashFractionDoubleSign: 5 * 10**16,
