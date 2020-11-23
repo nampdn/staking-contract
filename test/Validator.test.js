@@ -296,7 +296,8 @@ contract("Validator", async (accounts) => {
         assert.equal(info.jailed, true)
     })
 
-    it("validate signature", () => {
-
+    it("validate signature", async () => {
+        const instance = await Validator.deployed();
+        await instance.validateSignature(accounts[5], 1000, {from: accounts[0]});
     })
 })
