@@ -27,4 +27,29 @@ interface IValidator {
         uint256 votingPower,
         uint256 distributionHeight
     ) external;
+
+    // @dev Emitted when validator is updated;
+    event UpdateValidator(
+        bytes32 _name,
+        uint256 _commissionRate,
+        uint256 _minSelfDelegation
+    );
+
+    // @dev Emitted when validater commission is withdraw
+    event WithdrawCommissionReward(address _valAddr, uint256 _rewards);
+
+    // @dev Emitted when
+    event Delegate(address _valAddr, address _delAddr, uint256 _amount);
+
+    event Undelegate(
+        address _valAddr,
+        address _delAddr,
+        uint256 _amount,
+        uint256 _completionTime
+    );
+
+    event Withdraw(address _valAddr, address _delAddr, uint256 _amount);
+    event Slashed(address _valAddr, uint256 _power, uint256 _reason);
+    event UnJail(address _valAddr);
+    event Liveness(address _valAddr, uint256 _missedBlocks, uint256 _blockHeight);
 }

@@ -246,6 +246,8 @@ contract Validator is IValidator, Ownable {
         if (_name[0] != 0) {
             inforValidator.name = _name;
         }
+
+        emit UpdateValidator(_name, _commissionRate, _minSelfDelegation);
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
@@ -280,6 +282,8 @@ contract Validator is IValidator, Ownable {
 
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
+
+        emit UnJail(msg.sender);
     }
     
     // Validator is slashed when the Validator operation misbehave 
@@ -318,7 +322,7 @@ contract Validator is IValidator, Ownable {
             })
         );
         _staking.setToken(inforValidator.tokens);
-        // emit Undelegate(valAddr, msg.sender, amount, completionTime);
+        emit Undelegate(inforValidator.valAddr, msg.sender, _amount, completionTime);
     }
     
     // withdraw rewards from a delegation
@@ -334,7 +338,7 @@ contract Validator is IValidator, Ownable {
         require(_commission > 0, "no validator commission to reward");
         _staking.withdrawRewards(msg.sender, _commission);
         inforValidator.accumulatedCommission = 0;
-        // emit WithdrawCommissionReward(valAddr, commission);
+        emit WithdrawCommissionReward(inforValidator.valAddr, _commission);
     }
     
     // withdraw token delegator's
@@ -364,6 +368,7 @@ contract Validator is IValidator, Ownable {
         }
 
         inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
+        emit Withdraw(inforValidator.valAddr, msg.sender, amount);
     }
     
     function getCommissionRewards() external view returns(uint256) {
@@ -403,6 +408,10 @@ contract Validator is IValidator, Ownable {
         } else if (previous && !missed) { // value has changed from missed to not missed, decrement counter
             signingInfo.missedBlockCounter--;
             missedBlock.items[index] = false;
+        }
+
+        if (missed) {
+            emit Liveness(inforValidator.valAddr, signingInfo.missedBlockCounter, block.number);
         }
         
         uint256 minHeight = signingInfo.startHeight + params.signedBlockWindow;
@@ -482,7 +491,7 @@ contract Validator is IValidator, Ownable {
         Delegation storage del = delegationByAddr[_delAddr];
         del.shares = del.shares.add(shared);
         _initializeDelegation(_delAddr);
-        //emit Delegate(valAddr, delAddr, _amount);
+        emit Delegate(inforValidator.valAddr, _delAddr, _amount);
     }
     
     function _beforeDelegationCreated() private {
@@ -523,11 +532,10 @@ contract Validator is IValidator, Ownable {
         uint256 endingPeriod = _incrementValidatorPeriod();
         uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
-        
+
         // delete delegationByAddr[_delAddr];
         if (rewards > 0) {
             _staking.withdrawRewards(_delAddr, rewards);
-            // emit WithdrawDelegationRewards(valAddr, delAddr, rewards);
         }
     }
     
@@ -689,5 +697,7 @@ contract Validator is IValidator, Ownable {
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
         _jail(253402300799, true);
+
+        emit Slashed(inforValidator.valAddr, votingPower, 2);
     }
 }

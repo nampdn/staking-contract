@@ -25,6 +25,17 @@ interface IStaking {
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
+
+    // @dev Emitted when validator is created;
+    event CreateValidator(
+        bytes32 _name,
+        address payable _valAddr,
+        uint256 _commissionRate,
+        uint256 _commissionMaxRate,
+        uint256 _commissionMaxChangeRate,
+        uint256 _minSelfDelegation
+    );
+    
     // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
     // function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
     // function getValidatorsByDelegator() external view returns (address[] memory);

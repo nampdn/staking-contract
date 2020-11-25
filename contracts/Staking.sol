@@ -65,6 +65,16 @@ contract Staking is IStaking, Ownable {
         }
         IValidator(val).initialize(name, msg.sender, commissionRate, commissionMaxRate, 
             commissionMaxChangeRate, minSelfDelegation);
+        
+        emit CreateValidator(
+            name,
+            msg.sender,
+            commissionRate,
+            commissionMaxRate,
+            commissionMaxChangeRate,
+            minSelfDelegation
+        );
+
         allVals.push(val);
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
