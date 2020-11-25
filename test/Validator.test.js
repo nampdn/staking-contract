@@ -109,10 +109,14 @@ contract("Validator", async (accounts) => {
         const name = web3.utils.fromAscii("");
         let commissionRate = web3.utils.toWei("0.3", "ether");
         await utils.advanceTime(86401);
-        await instance.update(name, commissionRate, 0, {from: accounts[0]});
+        var update = await instance.update(name, commissionRate, 0, {from: accounts[0]});
         var commission = await instance.commission.call();
         var expectedRate = commission.rate;
         assert.equal(commissionRate, expectedRate.toString());
+
+        // check event
+        assert.equal(commissionRate, update.logs[0].args[1].toString());
+        assert.equal("0", update.logs[0].args[2].toString());
     })
 
     it ("should allocate token", async() => {
@@ -138,13 +142,18 @@ contract("Validator", async (accounts) => {
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
         const delegation = await validator.delegationByAddr(accounts[0])
         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
-        await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
+
+        var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
         const delegation2 = await validator.delegationByAddr(accounts[1])
         assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
         const valInfo = await validator.inforValidator()
         assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
 
+        // check event
+        assert.equal(accounts[0], delegate.logs[0].args[0]) // check validator address
+        assert.equal(accounts[1], delegate.logs[0].args[1]) // check delegator address
+        assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[2]) // check delagate amount
     })
 
     it ("should undelegate", async () => {
@@ -154,7 +163,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(valAddr)
         
         const amount = web3.utils.toWei("0.1", "ether");
-        await validator.undelegate(amount, {from: accounts[1]});
+        var undelegate = await validator.undelegate(amount, {from: accounts[1]});
 
         // check delegation
         const delegation =  await validator.delegationByAddr(accounts[1]);
@@ -166,6 +175,11 @@ contract("Validator", async (accounts) => {
         // check infor undelegate
         var ubdEntries = await validator.ubdEntries(accounts[1], 0, {from: accounts[1]})
         assert.equal(ubdEntries.amount.toString(), amount)
+
+        // check event
+        assert.equal(accounts[0], undelegate.logs[0].args[0])
+        assert.equal(accounts[1], undelegate.logs[0].args[1])
+        assert.equal(amount, undelegate.logs[0].args[2])
     })
 
     it ("should not undelegate", async () => {
@@ -195,7 +209,11 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
         await utils.advanceTime(86401 * 8);
-        await validator.withdraw({from: accounts[1]})
+        var withdraw = await validator.withdraw({from: accounts[1]})
+
+        // check event
+        assert.equal(accounts[0], withdraw.logs[0].args[0])
+        assert.equal(accounts[1], withdraw.logs[0].args[1])
     })
 
     it ("should not withdraw", async () => {
@@ -275,7 +293,10 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator1.jailed, true)
 
         // unjail
-        await val.unjail({from: accounts[5]});
+        var unjail = await val.unjail({from: accounts[5]})
+
+        //check unjail event
+        assert.equal(accounts[5], unjail.logs[0].args[0])
 
         // after unjail
         var inforValidator3 = await val.inforValidator({from: accounts[5]})
@@ -298,6 +319,12 @@ contract("Validator", async (accounts) => {
 
     it("validate signature", async () => {
         const instance = await Validator.deployed();
-        await instance.validateSignature(accounts[5], 1000, {from: accounts[0]});
+    
+        var validateSignature =  await instance.validateSignature(1000, false, {from: accounts[0]});
+        
+        // check event 
+        assert.equal(accounts[0], validateSignature.logs[0].args[0])
+        assert.equal("1", validateSignature.logs[0].args[1].toString()) // number of blocks miss
+        assert.equal("345", validateSignature.logs[0].args[2].toString()) // miss at block
     })
 })
