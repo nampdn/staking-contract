@@ -202,6 +202,7 @@ contract Validator is IValidator, Ownable {
 
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
+        inforValidator.valAddr = signerAddr;
         _staking.updateSigner(signerAddr);
     }
     
