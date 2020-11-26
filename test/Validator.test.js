@@ -186,8 +186,10 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
         
-        const amount = web3.utils.toWei("0.01", "ether");
+        await utils.assertRevert(validator.undelegate(web3.utils.toWei("10", "ether"), {from: accounts[1]}), 
+        "Returned error: VM Exception while processing transaction: revert not enough delegation shares");
 
+        const amount = web3.utils.toWei("0.01", "ether");
         for (var i =0; i < 6; i ++) {
             await validator.undelegate(amount, {from: accounts[1]});
         }
@@ -220,6 +222,9 @@ contract("Validator", async (accounts) => {
 
         await utils.assertRevert(validator.withdraw({from: accounts[4]}), 
         "Returned error: VM Exception while processing transaction: revert delegation not found");
+
+        await utils.assertRevert(validator.withdraw({from: accounts[1]}), 
+        "Returned error: VM Exception while processing transaction: revert no unbonding amount to withdraw");
     })
 
     it ("should withdraw commission", async () => {
@@ -228,6 +233,9 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
         await finalize([]);
+        var commissionRewards = await validator.getCommissionRewards({from: accounts[0]})
+
+        assert.equal("15854895991882293251", commissionRewards)
         await validator.withdrawCommission({from: accounts[0]})
     })
 
@@ -245,7 +253,9 @@ contract("Validator", async (accounts) => {
 
         const contractAddr = await staking.allVals(0)
         const validator = await Validator.at(contractAddr)
+        var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
+        assert.equal("18294110759864184520", delegationRewards.toString())
         await validator.withdrawRewards({from: accounts[0]})
     })
 
@@ -318,6 +328,5 @@ contract("Validator", async (accounts) => {
         
         // check event 
         assert.equal("1", validateSignature.logs[0].args[0].toString()) // number of blocks miss
-        assert.equal("345", validateSignature.logs[0].args[1].toString()) // miss at block
     })
 })
