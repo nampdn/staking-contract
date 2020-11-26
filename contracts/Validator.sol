@@ -208,7 +208,20 @@ contract Validator is IValidator, Ownable {
     // delegate for this validator
     function delegate() external payable {
         _delegate(msg.sender, msg.value);
-        _staking.delegate(msg.sender, msg.value);
+        _staking.delegate(msg.value);
+        _staking.addDelegation(msg.sender);
+        _addToSets();
+    }
+
+    function _addToSets() private {
+        if (_canAddToSets()) {
+            _staking.addToSets();
+        }
+    }
+
+    function _canAddToSets() private {
+        return inforValidator.jailed == false && 
+            inforValidator.tokens.div(powerReduction);
     }
     
     // update validate info
@@ -282,6 +295,7 @@ contract Validator is IValidator, Ownable {
 
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
+        _addToSets();
     }
     
     // Validator is slashed when the Validator operation misbehave 
@@ -289,17 +303,23 @@ contract Validator is IValidator, Ownable {
         _slash(_infrationHeight, _power, _slashFactor);
     }
 
+
     function undelegate(uint256 _amount) external {
-        require(ubdEntries[msg.sender].length < 7, "too many unbonding delegation entries");
-        require(delegations.contains(msg.sender), "delegation not found");
+        _undelegate(msg.sender, _amount);
+        _staking.undelegate(_amount);
+    }
+
+    function _undelegate(address from, uint256 _amount) private {
+        require(ubdEntries[from].length < 7, "too many unbonding delegation entries");
+        require(delegations.contains(from), "delegation not found");
         
-        _withdrawRewards(msg.sender);
-        Delegation storage del = delegationByAddr[msg.sender];
+        _withdrawRewards(from);
+        Delegation storage del = delegationByAddr[from];
         uint256 shares = _shareFromToken(_amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
-        _initializeDelegation(msg.sender);
-        bool isValidatorOperator = inforValidator.valAddr == msg.sender;
+        _initializeDelegation(from);
+        bool isValidatorOperator = inforValidator.valAddr == from;
         if (
             isValidatorOperator &&
             !inforValidator.jailed &&
@@ -312,15 +332,14 @@ contract Validator is IValidator, Ownable {
         inforValidator.ubdEntryCount++;
  
         uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
-        ubdEntries[msg.sender].push(
+        ubdEntries[from].push(
             UBDEntry({
                 completionTime: completionTime,
                 blockHeight: block.number,
                 amount: amountRemoved
             })
         );
-        _staking.setToken(inforValidator.tokens);
-        emit Undelegate(msg.sender, _amount, completionTime);
+        emit Undelegate(from, _amount, completionTime);
     }
     
     // withdraw rewards from a delegation
@@ -359,7 +378,6 @@ contract Validator is IValidator, Ownable {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
-        // totalBonded = totalBonded.sub(amount);
 
         if (del.shares == 0 && entries.length == 0) {
             _removeDelegation(msg.sender);
@@ -530,11 +548,8 @@ contract Validator is IValidator, Ownable {
         uint256 endingPeriod = _incrementValidatorPeriod();
         uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
-
-        // delete delegationByAddr[_delAddr];
-        if (rewards > 0) {
-            _staking.withdrawRewards(_delAddr, rewards);
-        }
+        require(rewards > 0, "no reward to withdraw")
+        _staking.withdrawRewards(_delAddr, rewards);
     }
     
     // calculate the total rewards accrued by a delegation
@@ -682,6 +697,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.jailed = true;
         signingInfo.jailedUntil = _jailedUntil;
         signingInfo.tombstoned = _tombstoned;
+        _staking.removeFromSets();
     }
 
    function doubleSign(
