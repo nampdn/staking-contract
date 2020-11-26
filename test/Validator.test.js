@@ -151,9 +151,8 @@ contract("Validator", async (accounts) => {
         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
 
         // check event
-        assert.equal(accounts[0], delegate.logs[0].args[0]) // check validator address
-        assert.equal(accounts[1], delegate.logs[0].args[1]) // check delegator address
-        assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[2]) // check delagate amount
+        assert.equal(accounts[1], delegate.logs[0].args[0]) // check delegator address
+        assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[1]) // check delagate amount
     })
 
     it ("should undelegate", async () => {
@@ -177,9 +176,8 @@ contract("Validator", async (accounts) => {
         assert.equal(ubdEntries.amount.toString(), amount)
 
         // check event
-        assert.equal(accounts[0], undelegate.logs[0].args[0])
-        assert.equal(accounts[1], undelegate.logs[0].args[1])
-        assert.equal(amount, undelegate.logs[0].args[2])
+        assert.equal(accounts[1], undelegate.logs[0].args[0])
+        assert.equal(amount, undelegate.logs[0].args[1])
     })
 
     it ("should not undelegate", async () => {
@@ -212,8 +210,7 @@ contract("Validator", async (accounts) => {
         var withdraw = await validator.withdraw({from: accounts[1]})
 
         // check event
-        assert.equal(accounts[0], withdraw.logs[0].args[0])
-        assert.equal(accounts[1], withdraw.logs[0].args[1])
+        assert.equal(accounts[1], withdraw.logs[0].args[0])
     })
 
     it ("should not withdraw", async () => {

@@ -282,8 +282,6 @@ contract Validator is IValidator, Ownable {
 
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
-
-        emit UnJail(msg.sender);
     }
     
     // Validator is slashed when the Validator operation misbehave 
@@ -322,7 +320,7 @@ contract Validator is IValidator, Ownable {
             })
         );
         _staking.setToken(inforValidator.tokens);
-        emit Undelegate(inforValidator.valAddr, msg.sender, _amount, completionTime);
+        emit Undelegate(msg.sender, _amount, completionTime);
     }
     
     // withdraw rewards from a delegation
@@ -338,7 +336,7 @@ contract Validator is IValidator, Ownable {
         require(_commission > 0, "no validator commission to reward");
         _staking.withdrawRewards(msg.sender, _commission);
         inforValidator.accumulatedCommission = 0;
-        emit WithdrawCommissionReward(inforValidator.valAddr, _commission);
+        emit WithdrawCommissionReward(_commission);
     }
     
     // withdraw token delegator's
@@ -368,7 +366,7 @@ contract Validator is IValidator, Ownable {
         }
 
         inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
-        emit Withdraw(inforValidator.valAddr, msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
     }
     
     function getCommissionRewards() external view returns(uint256) {
@@ -411,7 +409,7 @@ contract Validator is IValidator, Ownable {
         }
 
         if (missed) {
-            emit Liveness(inforValidator.valAddr, signingInfo.missedBlockCounter, block.number);
+            emit Liveness(signingInfo.missedBlockCounter, block.number);
         }
         
         uint256 minHeight = signingInfo.startHeight + params.signedBlockWindow;
@@ -698,6 +696,6 @@ contract Validator is IValidator, Ownable {
         // // (Dec 31, 9999 - 23:59:59 GMT).
         _jail(253402300799, true);
 
-        emit Slashed(inforValidator.valAddr, votingPower, 2);
+        emit Slashed(votingPower, 2);
     }
 }
