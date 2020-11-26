@@ -48,6 +48,6 @@ interface IValidator {
     );
 
     event Withdraw(address _delAddr, uint256 _amount);
-    event Slashed(address _valAddr, uint256 _power, uint256 _reason);
+    event Slashed(uint256 _power, uint256 _reason);
     event Liveness(uint256 _missedBlocks, uint256 _blockHeight);
 }

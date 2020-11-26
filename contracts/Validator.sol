@@ -489,7 +489,7 @@ contract Validator is IValidator, Ownable {
         Delegation storage del = delegationByAddr[_delAddr];
         del.shares = del.shares.add(shared);
         _initializeDelegation(_delAddr);
-        emit Delegate(inforValidator.valAddr, _delAddr, _amount);
+        emit Delegate(_delAddr, _amount);
     }
     
     function _beforeDelegationCreated() private {

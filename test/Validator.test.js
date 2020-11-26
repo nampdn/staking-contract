@@ -290,10 +290,7 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator1.jailed, true)
 
         // unjail
-        var unjail = await val.unjail({from: accounts[5]})
-
-        //check unjail event
-        assert.equal(accounts[5], unjail.logs[0].args[0])
+        await val.unjail({from: accounts[5]})
 
         // after unjail
         var inforValidator3 = await val.inforValidator({from: accounts[5]})
@@ -320,8 +317,7 @@ contract("Validator", async (accounts) => {
         var validateSignature =  await instance.validateSignature(1000, false, {from: accounts[0]});
         
         // check event 
-        assert.equal(accounts[0], validateSignature.logs[0].args[0])
-        assert.equal("1", validateSignature.logs[0].args[1].toString()) // number of blocks miss
-        assert.equal("345", validateSignature.logs[0].args[2].toString()) // miss at block
+        assert.equal("1", validateSignature.logs[0].args[0].toString()) // number of blocks miss
+        assert.equal("345", validateSignature.logs[0].args[1].toString()) // miss at block
     })
 })
