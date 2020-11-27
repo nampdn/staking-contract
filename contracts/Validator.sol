@@ -425,8 +425,9 @@ contract Validator is IValidator, Ownable {
 
                 signingInfo.jailedUntil = block.timestamp.add(params.downtimeJailDuration);
                 signingInfo.missedBlockCounter = 0;
+                _resetMissedBlock(signingInfo.indexOffset);
                 signingInfo.indexOffset = 0;
-                delete missedBlock;
+                // delete missedBlock;
                 
                 return true;
             }
@@ -434,7 +435,12 @@ contract Validator is IValidator, Ownable {
         return false;
      }
 
-    
+    function _resetMissedBlock(uint256 _indexOffset) private {
+        for (uint i = 0; i < _indexOffset; i++) {
+            missedBlock.items[i] = false;
+        }
+    }
+
     // remove delegation
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);
