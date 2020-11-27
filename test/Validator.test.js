@@ -304,7 +304,9 @@ contract("Validator", async (accounts) => {
 
         // after unjail
         var inforValidator3 = await val.inforValidator({from: accounts[5]})
+        var block = await web3.eth.getBlock("latest")
         assert.equal(inforValidator3.jailed, false)
+        assert.equal(block.number, inforValidator3.startHeight.toString())
     })
 
     it("double sign", async () => {

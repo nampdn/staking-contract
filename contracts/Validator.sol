@@ -137,7 +137,7 @@ contract Validator is IValidator, Ownable {
     CurrentReward private currentRewards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
     SlashEvent[] public slashEvents; // slash events
-    SigningInfo private signingInfo; // signing info
+    SigningInfo public signingInfo; // signing info
     MissedBlock private missedBlock; // missed block
     Params public params;
     IStaking private _staking;
@@ -281,6 +281,7 @@ contract Validator is IValidator, Ownable {
         );
 
         signingInfo.jailedUntil = 0;
+        signingInfo.startHeight = block.number;
         inforValidator.jailed = false;
     }
     
