@@ -117,8 +117,8 @@ contract Validator is IValidator, Ownable {
         uint256 ubdEntryCount; // unbonding delegation entries
         uint256 updateTime; // last update time
         Status status; // validator status
-        uint256 unbondingTime // unbonding time
-        uint256 unbondingHeight // unbonding height
+        uint256 unbondingTime; // unbonding time
+        uint256 unbondingHeight; // unbonding height
     }
     
     struct Params {
@@ -217,20 +217,8 @@ contract Validator is IValidator, Ownable {
         _delegate(msg.sender, msg.value);
         _staking.delegate(msg.value);
         _staking.addDelegation(msg.sender);
-        _addToSets();
     }
 
-    function _addToSets() private {
-        if (_canAddToSets()) {
-            _staking.addToSets();
-        }
-    }
-
-    function _canAddToSets() private {
-        return inforValidator.jailed == false && 
-            inforValidator.tokens.div(powerReduction);
-    }
-    
     // update validate info
     function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
         if (_commissionRate > 0) {
@@ -302,7 +290,6 @@ contract Validator is IValidator, Ownable {
 
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
-        _addToSets();
     }
     
     // Validator is slashed when the Validator operation misbehave 
@@ -316,7 +303,7 @@ contract Validator is IValidator, Ownable {
         _staking.undelegate(_amount);
     }
 
-    function _undelegate(address from, uint256 _amount) private {
+    function _undelegate(address payable from, uint256 _amount) private {
         require(ubdEntries[from].length < 7, "too many unbonding delegation entries");
         require(delegations.contains(from), "delegation not found");
         
@@ -555,8 +542,9 @@ contract Validator is IValidator, Ownable {
         uint256 endingPeriod = _incrementValidatorPeriod();
         uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
-        require(rewards > 0, "no reward to withdraw")
-        _staking.withdrawRewards(_delAddr, rewards);
+        if (rewards > 0) {
+            _staking.withdrawRewards(_delAddr, rewards);
+        }
     }
     
     // calculate the total rewards accrued by a delegation
@@ -724,17 +712,18 @@ contract Validator is IValidator, Ownable {
 
     // start start validator
     function start() external onlyValidator {
-        require(inforValidator.status != Status.Bonded)
-        require(signingInfo.jail === false)
-        _stake.startValidator();
+        require(inforValidator.status != Status.Bonded);
+        require(!inforValidator.jailed);
+        require(inforValidator.tokens.div(powerReduction) > 0);
+        _staking.startValidator();
         inforValidator.status = Status.Bonded;
-        signingInfo.startHeight = block.height;
+        signingInfo.startHeight = block.number;
     }
 
     // stop validator
     function stop() external onlyOwner {
         inforValidator.status = Status.Unbonding;
-        inforValidator.unbondingHeight = block.height;
+        inforValidator.unbondingHeight = block.number;
         inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
     }
 }

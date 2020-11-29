@@ -19,9 +19,11 @@ interface IStaking {
     function totalSupply() external view returns (uint256);
     function totalBonded() external view returns (uint256);
     function allValsLength() external view returns (uint);
-    function delegate(address delAddr, uint256 amount) external;
+    function delegate(uint256 amount) external;
+    function undelegate(uint256 amount) external;
+    function addDelegation(address delAddr) external;
+    function removeFromSets() external;
     function burn(uint256 amount) external;
-    function setToken(uint256 amount) external;
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;

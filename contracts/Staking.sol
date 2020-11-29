@@ -41,7 +41,7 @@ contract Staking is IStaking, Ownable {
         params = Params({
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
-            maxValidator: 21,
+            maxValidator: 21
         });
 
         minter = new Minter();
@@ -232,22 +232,21 @@ contract Staking is IStaking, Ownable {
     }
 
     function startValidator() external onlyValidator {
-        require(balanceOf[msg.sender].div(1 * 10 ** 8) > 0);
         if (valSets.length < params.maxValidator) {
             valSets.push(msg.sender);
             return;
         }
-        uint256 toRemove;
-        uint256 minAmount = balanceOf[valSets[0]]
-        for (i = 0; i < valSets.length; i ++) {
+        uint256 toStop;
+        uint256 minAmount = balanceOf[valSets[0]];
+        for (uint i = 0; i < valSets.length; i ++) {
             require(valSets[i] != msg.sender);
             if (balanceOf[valSets[i]] < minAmount) {
-                toRemove = i;
+                toStop = i;
                 minAmount = balanceOf[valSets[i]];
             }
         }
-        _stopValidator(toRemove);
-        valSets[toRemove] = msg.sender;
+        _stopValidator(toStop);
+        valSets[toStop] = msg.sender;
     }
 
     function _stopValidator(uint setIndex) private {
@@ -265,11 +264,11 @@ contract Staking is IStaking, Ownable {
 
     // get current validator sets
     function getValidatorSets() external view returns (address[] memory, uint256[] memory) {
-        uint256 total = valSets.length();
+        uint256 total = valSets.length;
         address[] memory signerAddrs = new address[](total);
         uint256[] memory votingPowers = new uint256[](total);
-        for (uint256 i = 0; i < total; i++) {
-            address valAddr = valSets.at(i);
+        for (uint i = 0; i < total; i++) {
+            address valAddr = valSets[i];
             signerAddrs[i] = valOf[valAddr];
             votingPowers[i] = balanceOf[valAddr].div(1 * 10**8);
         }
