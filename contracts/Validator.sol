@@ -17,6 +17,8 @@ contract Validator is IValidator, Ownable {
     uint256 oneDec = 1 * 10**18;
     uint256 powerReduction = 1 * 10**8;
 
+    enum Status { Unbonding, Unbonded, Bonded}
+
     /*
      * DelStartingInfo represents the starting info for a delegator reward
      * period. It tracks the previous validator period, the delegation's amount of
@@ -114,6 +116,9 @@ contract Validator is IValidator, Ownable {
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
         uint256 updateTime; // last update time
+        Status status; // validator status
+        uint256 unbondingTime // unbonding time
+        uint256 unbondingHeight // unbonding height
     }
     
     struct Params {
@@ -189,6 +194,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.valAddr = _owner;
         inforValidator.updateTime = block.timestamp;
+        inforValidator.status = Status.Unbonded;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -714,5 +720,21 @@ contract Validator is IValidator, Ownable {
         _jail(253402300799, true);
 
         emit Slashed(votingPower, 2);
+    }
+
+    // start start validator
+    function start() external onlyValidator {
+        require(inforValidator.status != Status.Bonded)
+        require(signingInfo.jail === false)
+        _stake.startValidator();
+        inforValidator.status = Status.Bonded;
+        signingInfo.startHeight = block.height;
+    }
+
+    // stop validator
+    function stop() external onlyOwner {
+        inforValidator.status = Status.Unbonding;
+        inforValidator.unbondingHeight = block.height;
+        inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
     }
 }

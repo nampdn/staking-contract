@@ -254,6 +254,15 @@ contract Staking is IStaking, Ownable {
         IValidator(valSets[setIndex]).stop();
     }
 
+    function removeFromSets() external onlyValidator {
+        for (uint i = 0; i < valSets.length; i ++) {
+            if (valSets[i] == msg.sender) {
+                valSets[i] = valSets[valSets.length - 1];
+                valSets.pop();
+            }
+        }
+    } 
+
     // get current validator sets
     function getValidatorSets() external view returns (address[] memory, uint256[] memory) {
         uint256 total = valSets.length();
