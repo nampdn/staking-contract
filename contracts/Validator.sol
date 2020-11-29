@@ -289,7 +289,6 @@ contract Validator is IValidator, Ownable {
         );
 
         signingInfo.jailedUntil = 0;
-        signingInfo.startHeight = block.number;
         inforValidator.jailed = false;
     }
     
