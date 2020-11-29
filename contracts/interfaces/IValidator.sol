@@ -27,6 +27,8 @@ interface IValidator {
         uint256 votingPower,
         uint256 distributionHeight
     ) external;
+    function start() external;
+    function stop() external;
 
     // @dev Emitted when validator is updated;
     event UpdateValidator(

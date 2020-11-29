@@ -140,6 +140,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(valAddr)
 
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
+        await validator.start();
         const delegation = await validator.delegationByAddr(accounts[0])
         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
 
@@ -277,6 +278,7 @@ contract("Validator", async (accounts) => {
         
         const amount = web3.utils.toWei("5", "ether");
         await val.delegate({from: accounts[5], value: amount})
+        await val.start({from: accounts[5]});
         await finalize([accounts[5]])
     })
 

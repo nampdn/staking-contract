@@ -17,6 +17,8 @@ contract Validator is IValidator, Ownable {
     uint256 oneDec = 1 * 10**18;
     uint256 powerReduction = 1 * 10**8;
 
+    enum Status { Unbonding, Unbonded, Bonded}
+
     /*
      * DelStartingInfo represents the starting info for a delegator reward
      * period. It tracks the previous validator period, the delegation's amount of
@@ -114,6 +116,9 @@ contract Validator is IValidator, Ownable {
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
         uint256 updateTime; // last update time
+        Status status; // validator status
+        uint256 unbondingTime; // unbonding time
+        uint256 unbondingHeight; // unbonding height
     }
     
     struct Params {
@@ -189,6 +194,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.valAddr = _owner;
         inforValidator.updateTime = block.timestamp;
+        inforValidator.status = Status.Unbonded;
         
         commission = Commission({
             maxRate: _maxRate,
@@ -202,15 +208,17 @@ contract Validator is IValidator, Ownable {
 
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
+        inforValidator.valAddr = signerAddr;
         _staking.updateSigner(signerAddr);
     }
     
     // delegate for this validator
     function delegate() external payable {
         _delegate(msg.sender, msg.value);
-        _staking.delegate(msg.sender, msg.value);
+        _staking.delegate(msg.value);
+        _staking.addDelegation(msg.sender);
     }
-    
+
     // update validate info
     function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
         if (_commissionRate > 0) {
@@ -281,7 +289,6 @@ contract Validator is IValidator, Ownable {
         );
 
         signingInfo.jailedUntil = 0;
-        signingInfo.startHeight = block.number;
         inforValidator.jailed = false;
     }
     
@@ -290,17 +297,23 @@ contract Validator is IValidator, Ownable {
         _slash(_infrationHeight, _power, _slashFactor);
     }
 
+
     function undelegate(uint256 _amount) external {
-        require(ubdEntries[msg.sender].length < 7, "too many unbonding delegation entries");
-        require(delegations.contains(msg.sender), "delegation not found");
+        _undelegate(msg.sender, _amount);
+        _staking.undelegate(_amount);
+    }
+
+    function _undelegate(address payable from, uint256 _amount) private {
+        require(ubdEntries[from].length < 7, "too many unbonding delegation entries");
+        require(delegations.contains(from), "delegation not found");
         
-        _withdrawRewards(msg.sender);
-        Delegation storage del = delegationByAddr[msg.sender];
+        _withdrawRewards(from);
+        Delegation storage del = delegationByAddr[from];
         uint256 shares = _shareFromToken(_amount);
         require(del.shares >= shares, "not enough delegation shares");
         del.shares -= shares;
-        _initializeDelegation(msg.sender);
-        bool isValidatorOperator = inforValidator.valAddr == msg.sender;
+        _initializeDelegation(from);
+        bool isValidatorOperator = inforValidator.valAddr == from;
         if (
             isValidatorOperator &&
             !inforValidator.jailed &&
@@ -313,15 +326,14 @@ contract Validator is IValidator, Ownable {
         inforValidator.ubdEntryCount++;
  
         uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
-        ubdEntries[msg.sender].push(
+        ubdEntries[from].push(
             UBDEntry({
                 completionTime: completionTime,
                 blockHeight: block.number,
                 amount: amountRemoved
             })
         );
-        _staking.setToken(inforValidator.tokens);
-        emit Undelegate(msg.sender, _amount, completionTime);
+        emit Undelegate(from, _amount, completionTime);
     }
     
     // withdraw rewards from a delegation
@@ -360,7 +372,6 @@ contract Validator is IValidator, Ownable {
         }
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
-        // totalBonded = totalBonded.sub(amount);
 
         if (del.shares == 0 && entries.length == 0) {
             _removeDelegation(msg.sender);
@@ -537,8 +548,6 @@ contract Validator is IValidator, Ownable {
         uint256 endingPeriod = _incrementValidatorPeriod();
         uint256 rewards = _calculateDelegationRewards(_delAddr, endingPeriod);
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
-
-        // delete delegationByAddr[_delAddr];
         if (rewards > 0) {
             _staking.withdrawRewards(_delAddr, rewards);
         }
@@ -689,6 +698,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.jailed = true;
         signingInfo.jailedUntil = _jailedUntil;
         signingInfo.tombstoned = _tombstoned;
+        _staking.removeFromSets();
     }
 
    function doubleSign(
@@ -704,5 +714,22 @@ contract Validator is IValidator, Ownable {
         _jail(253402300799, true);
 
         emit Slashed(votingPower, 2);
+    }
+
+    // start start validator
+    function start() external onlyValidator {
+        require(inforValidator.status != Status.Bonded);
+        require(!inforValidator.jailed);
+        require(inforValidator.tokens.div(powerReduction) > 0);
+        _staking.startValidator();
+        inforValidator.status = Status.Bonded;
+        signingInfo.startHeight = block.number;
+    }
+
+    // stop validator
+    function stop() external onlyOwner {
+        inforValidator.status = Status.Unbonding;
+        inforValidator.unbondingHeight = block.number;
+        inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
     }
 }
