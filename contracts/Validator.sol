@@ -142,7 +142,7 @@ contract Validator is IValidator, Ownable {
     CurrentReward private currentRewards;// current validator rewards
     HistoricalReward private historicalRewards; // historical rewards
     SlashEvent[] public slashEvents; // slash events
-    SigningInfo private signingInfo; // signing info
+    SigningInfo public signingInfo; // signing info
     MissedBlock private missedBlock; // missed block
     Params public params;
     IStaking private _staking;
@@ -289,6 +289,7 @@ contract Validator is IValidator, Ownable {
         );
 
         signingInfo.jailedUntil = 0;
+        signingInfo.startHeight = block.number;
         inforValidator.jailed = false;
     }
     
@@ -436,8 +437,9 @@ contract Validator is IValidator, Ownable {
 
                 signingInfo.jailedUntil = block.timestamp.add(params.downtimeJailDuration);
                 signingInfo.missedBlockCounter = 0;
+                _resetMissedBlock(signingInfo.indexOffset);
                 signingInfo.indexOffset = 0;
-                delete missedBlock;
+                // delete missedBlock;
                 
                 return true;
             }
@@ -445,7 +447,12 @@ contract Validator is IValidator, Ownable {
         return false;
      }
 
-    
+    function _resetMissedBlock(uint256 _indexOffset) private {
+        for (uint i = 0; i < _indexOffset; i++) {
+            missedBlock.items[i] = false;
+        }
+    }
+
     // remove delegation
     function _removeDelegation(address _delAddr) private {
         delegations.remove(_delAddr);

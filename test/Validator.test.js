@@ -290,8 +290,8 @@ contract("Validator", async (accounts) => {
         var inforValidator = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator.jailed, false)
 
-        // jail
-        for (var i=0; i< 100; i++) {
+        // first jail
+        for (var i=0; i<100; i++) {
             await staking.mint();
             await staking.setPreviousProposer(accounts[0]);
             await staking.finalize([accounts[5]], [1000000000000], [false])
@@ -306,7 +306,31 @@ contract("Validator", async (accounts) => {
 
         // after unjail
         var inforValidator3 = await val.inforValidator({from: accounts[5]})
+        var signingInfor = await val.signingInfo({from: accounts[5]})
+        var block = await web3.eth.getBlock("latest")
         assert.equal(inforValidator3.jailed, false)
+        assert.equal(block.number, signingInfor.startHeight.toString())
+
+        // second jail
+        for (var i=0; i<100; i++) {
+            await staking.mint();
+            await staking.setPreviousProposer(accounts[0]);
+            await staking.finalize([accounts[5]], [1000000000000], [false])
+        }
+
+        // after second jail 
+        var inforValidator2 = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator2.jailed, true)
+
+        // second unjail
+        await val.unjail({from: accounts[5]})
+
+        // after unjail
+        var inforValidator4 = await val.inforValidator({from: accounts[5]})
+        var signingInfo4 = await val.signingInfo({from: accounts[5]})
+        var block1 = await web3.eth.getBlock("latest")
+        assert.equal(inforValidator4.jailed, false)
+        assert.equal(block1.number, signingInfo4.startHeight.toString())
     })
 
     it("double sign", async () => {
