@@ -15,6 +15,7 @@ contract Staking is IStaking, Ownable {
     struct Params {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
+        uint256 maxValidator;
     }
 
     address private _previousProposer; // last proposer address
@@ -25,7 +26,7 @@ contract Staking is IStaking, Ownable {
     mapping(address => uint256) public balanceOf; // Balance of the validator
     uint256 public totalSupply = 5000000000 * 10**18; // Total Supply
     uint256 public totalBonded; // Total bonded
-    EnumerableSet.AddressSet valSets; // current validator sets
+    address[] public valSets;
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
 
@@ -39,7 +40,8 @@ contract Staking is IStaking, Ownable {
     constructor() public {
         params = Params({
             baseProposerReward: 1 * 10**16,
-            bonusProposerReward: 4 * 10**16
+            bonusProposerReward: 4 * 10**16,
+            maxValidator: 21,
         });
 
         minter = new Minter();
@@ -229,12 +231,27 @@ contract Staking is IStaking, Ownable {
         return valAddrs;
     }
 
-    function addToSets() external onlyValidator {
-        valSets.add(msg.sender);
+    function startValidator() external onlyValidator {
+        require(balanceOf[msg.sender].div(1 * 10 ** 8) > 0);
+        if (valSets.length < params.maxValidator) {
+            valSets.push(msg.sender);
+            return;
+        }
+        uint256 toRemove;
+        uint256 minAmount = balanceOf[valSets[0]]
+        for (i = 0; i < valSets.length; i ++) {
+            require(valSets[i] != msg.sender);
+            if (balanceOf[valSets[i]] < minAmount) {
+                toRemove = i;
+                minAmount = balanceOf[valSets[i]];
+            }
+        }
+        _stopValidator(toRemove);
+        valSets[toRemove] = msg.sender;
     }
 
-    function removeFromSets() external onlyValidator {
-        valSets.remove(msg.sender);
+    function _stopValidator(uint setIndex) private {
+        IValidator(valSets[setIndex]).stop();
     }
 
     // get current validator sets

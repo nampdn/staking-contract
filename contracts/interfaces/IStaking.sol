@@ -25,6 +25,7 @@ interface IStaking {
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
+    function startValidator() external;
 
     // @dev Emitted when validator is created;
     event CreateValidator(
