@@ -323,16 +323,24 @@ contract Validator is IValidator, Ownable {
         }
 
         uint256 amountRemoved = _removeDelShares(shares);
-        inforValidator.ubdEntryCount++;
- 
-        uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
-        ubdEntries[from].push(
-            UBDEntry({
-                completionTime: completionTime,
-                blockHeight: block.number,
-                amount: amountRemoved
-            })
-        );
+
+        if (inforValidator.status == Status.Unbonding) {
+            require(inforValidator.unbondingTime < block.timestamp);
+            
+            msg.sender.transfer(amount);
+            emit Withdraw(msg.sender, amountRemoved);
+        } else {
+            inforValidator.ubdEntryCount++;
+            uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
+            ubdEntries[from].push(
+                UBDEntry({
+                    completionTime: completionTime,
+                    blockHeight: block.number,
+                    amount: amountRemoved
+                })
+            );
+        }
+
         emit Undelegate(from, _amount, completionTime);
     }
     
@@ -360,27 +368,17 @@ contract Validator is IValidator, Ownable {
         uint256 amount = 0;
         uint256 entryCount = 0;
 
-        if (inforValidator.status == Status.Unbonding && inforValidator.unbondingTime < block.timestamp) {
-            for (uint256 i = 0; i < entries.length; i++) {
+        for (uint256 i = 0; i < entries.length; i++) {
+            // solhint-disable-next-line not-rely-on-time
+            if (entries[i].completionTime < block.timestamp) {
                 amount = amount.add(entries[i].amount);
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
                 i--;
-                entryCount++;  
-            }
-        } else {
-            for (uint256 i = 0; i < entries.length; i++) {
-                // solhint-disable-next-line not-rely-on-time
-                if (entries[i].completionTime < block.timestamp) {
-                    amount = amount.add(entries[i].amount);
-                    entries[i] = entries[entries.length - 1];
-                    entries.pop();
-                    i--;
-                    entryCount++;
-                }
+                entryCount++;
             }
         }
-        
+    
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
 

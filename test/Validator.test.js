@@ -210,6 +210,7 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
         await utils.advanceTime(86401 * 8);
+        
         var withdraw = await validator.withdraw({from: accounts[1]})
 
         // check event
@@ -306,10 +307,7 @@ contract("Validator", async (accounts) => {
 
         // after unjail
         var inforValidator3 = await val.inforValidator({from: accounts[5]})
-        var signingInfor = await val.signingInfo({from: accounts[5]})
-        var block = await web3.eth.getBlock("latest")
         assert.equal(inforValidator3.jailed, false)
-        assert.equal(block.number, signingInfor.startHeight.toString())
 
         // second jail
         for (var i=0; i<100; i++) {
@@ -327,10 +325,7 @@ contract("Validator", async (accounts) => {
 
         // after unjail
         var inforValidator4 = await val.inforValidator({from: accounts[5]})
-        var signingInfo4 = await val.signingInfo({from: accounts[5]})
-        var block1 = await web3.eth.getBlock("latest")
         assert.equal(inforValidator4.jailed, false)
-        assert.equal(block1.number, signingInfo4.startHeight.toString())
     })
 
     it("double sign", async () => {
