@@ -360,16 +360,27 @@ contract Validator is IValidator, Ownable {
         uint256 amount = 0;
         uint256 entryCount = 0;
 
-        for (uint256 i = 0; i < entries.length; i++) {
-            // solhint-disable-next-line not-rely-on-time
-            if (entries[i].completionTime < block.timestamp) {
+        if (inforValidator.status == Status.Unbonding && inforValidator.unbondingTime < block.timestamp) {
+            for (uint256 i = 0; i < entries.length; i++) {
                 amount = amount.add(entries[i].amount);
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
                 i--;
-                entryCount++;
+                entryCount++;  
+            }
+        } else {
+            for (uint256 i = 0; i < entries.length; i++) {
+                // solhint-disable-next-line not-rely-on-time
+                if (entries[i].completionTime < block.timestamp) {
+                    amount = amount.add(entries[i].amount);
+                    entries[i] = entries[entries.length - 1];
+                    entries.pop();
+                    i--;
+                    entryCount++;
+                }
             }
         }
+        
         require(amount > 0, "no unbonding amount to withdraw");
         msg.sender.transfer(amount);
 
