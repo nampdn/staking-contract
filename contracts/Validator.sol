@@ -326,8 +326,8 @@ contract Validator is IValidator, Ownable {
 
         if (inforValidator.status == Status.Unbonding) {
             require(inforValidator.unbondingTime < block.timestamp);
-            
-            msg.sender.transfer(amount);
+
+            msg.sender.transfer(amountRemoved);
             emit Withdraw(msg.sender, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;
@@ -339,9 +339,9 @@ contract Validator is IValidator, Ownable {
                     amount: amountRemoved
                 })
             );
+            emit Undelegate(from, _amount, completionTime);
         }
 
-        emit Undelegate(from, _amount, completionTime);
     }
     
     // withdraw rewards from a delegation
