@@ -216,6 +216,13 @@ contract("Validator", async (accounts) => {
         await validator.updateSigner(accounts[0], {from: accounts[1]});
     })
 
+    it ("should not update signer", async () => {
+        const staking = await Staking.deployed();
+        const valAddr = await staking.allVals(0);
+        const validator = await Validator.at(valAddr);
+        await utils.assertRevert(validator.updateSigner(accounts[1], {from: accounts[2]}), "Ownable: caller is not the validator");
+    })
+
     it ("should withdraw", async () => {
         const staking = await Staking.deployed();
 
