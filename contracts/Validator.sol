@@ -713,6 +713,7 @@ contract Validator is IValidator, Ownable {
         signingInfo.jailedUntil = _jailedUntil;
         signingInfo.tombstoned = _tombstoned;
         _staking.removeFromSets();
+        _stop();
     }
 
    function doubleSign(
