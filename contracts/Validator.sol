@@ -342,6 +342,12 @@ contract Validator is IValidator, Ownable {
             );
             emit Undelegate(from, _amount, completionTime);
         }
+
+        if (inforValidator.status == Status.Bonded && 
+            inforValidator.token.div(powerReduction) == 0) {
+            _staking.removeFromSets();
+            _stop();
+        }
     }
     
     // withdraw rewards from a delegation
@@ -737,6 +743,10 @@ contract Validator is IValidator, Ownable {
 
     // stop validator
     function stop() external onlyOwner {
+        _stop();
+    }
+
+    function _stop() private {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
         inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
