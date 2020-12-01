@@ -326,6 +326,9 @@ contract Validator is IValidator, Ownable {
 
         if (inforValidator.status == Status.Unbonding && inforValidator.unbondingTime < block.timestamp) {
             msg.sender.transfer(amountRemoved);
+            if (del.shares == 0) {
+                _removeDelegation(msg.sender);
+            }
             emit Withdraw(msg.sender, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;

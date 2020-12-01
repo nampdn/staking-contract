@@ -41,7 +41,7 @@ contract Staking is IStaking, Ownable {
         params = Params({
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
-            maxValidator: 2
+            maxValidator: 21
         });
 
         minter = new Minter();
