@@ -130,7 +130,7 @@ contract Validator is IValidator, Ownable {
         uint256 minSignedPerWindow;
     }
 
-    uint256 constant public UNBONDING_TiME = 1; // 7 days
+    uint256 constant public UNBONDING_TiME = 10; // 7 days
     
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
@@ -324,9 +324,7 @@ contract Validator is IValidator, Ownable {
 
         uint256 amountRemoved = _removeDelShares(shares);
 
-        if (inforValidator.status == Status.Unbonding) {
-            require(inforValidator.unbondingTime < block.timestamp);
-
+        if (inforValidator.status == Status.Unbonding && inforValidator.unbondingTime < block.timestamp) {
             msg.sender.transfer(amountRemoved);
             emit Withdraw(msg.sender, amountRemoved);
         } else {
@@ -341,7 +339,6 @@ contract Validator is IValidator, Ownable {
             );
             emit Undelegate(from, _amount, completionTime);
         }
-
     }
     
     // withdraw rewards from a delegation

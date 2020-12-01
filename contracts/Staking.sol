@@ -41,7 +41,7 @@ contract Staking is IStaking, Ownable {
         params = Params({
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
-            maxValidator: 21
+            maxValidator: 2
         });
 
         minter = new Minter();
@@ -245,6 +245,8 @@ contract Staking is IStaking, Ownable {
                 minAmount = balanceOf[valSets[i]];
             }
         }
+
+        require(balanceOf[msg.sender] > minAmount, "Amount must greater than min amount");
         _stopValidator(toStop);
         valSets[toStop] = msg.sender;
     }

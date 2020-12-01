@@ -350,4 +350,54 @@ contract("Validator", async (accounts) => {
         // check event 
         assert.equal("1", validateSignature.logs[0].args[0].toString()) // number of blocks miss
     })
+
+    it ("should withdraw when validator stop", async () => {
+        const staking = await Staking.deployed();
+        const val0 = await Validator.at(await staking.allVals(0));
+        await createValidator(accounts[4]);
+        const val4 = await Validator.at(await staking.allVals(2));
+        await val4.delegate({from: accounts[4], value: web3.utils.toWei("3", "ether")})
+        await val4.start({from: accounts[4]});
+        
+        const amount = web3.utils.toWei("1", "ether");
+        await val0.delegate({from: accounts[6], value: amount})
+        const val1 = await Validator.at(await staking.allVals(1));
+        await val1.delegate({from: accounts[6], value:  web3.utils.toWei("7", "ether")})
+
+        await createValidator(accounts[6]);
+        const val6 = await Validator.at(await staking.allVals(3));
+        await val6.delegate({from: accounts[6], value:  web3.utils.toWei("0.6", "ether")})
+
+        // reject when the validator is added has an amount smaller than min amount in val set. 
+        await utils.assertRevert(val6.start({from: accounts[6]}), "Amount must greater than min amount");
+
+        // val6 is added to valset and val0 is removed
+        await val6.delegate({from: accounts[6], value:  web3.utils.toWei("8", "ether")})
+        await val6.start({from: accounts[6]});
+
+        // infor validator after the validator is stopped
+        var inforVal2 = await val0.inforValidator({from: accounts[0]})
+        assert.equal("0",inforVal2.status.toString()) // 0 is unbonding status
+
+        var undelegate1 = await val0.undelegate(web3.utils.toWei("0.1", "ether"), {from: accounts[0]})
+
+        assert.equal(undelegate1.logs[0].event, 'Undelegate')
+        assert.equal(undelegate1.logs[0].args[0], accounts[0])
+        assert.equal(undelegate1.logs[0].args[1].toString(), web3.utils.toWei("0.1", "ether"))
+
+        // if wait to pass unbond time
+        await utils.advanceTime(86401 * 10);
+
+        // undelegate and withdraw 
+        var undelegate = await val0.undelegate(web3.utils.toWei("0.6", "ether"), {from: accounts[0]})
+        assert.equal(undelegate.logs[0].event, 'Withdraw')
+        assert.equal(undelegate.logs[0].args[0], accounts[0])
+        assert.equal(undelegate.logs[0].args[1].toString(), web3.utils.toWei("0.6", "ether"))
+
+        // withdraw after undelegate
+        var withdraw = await val0.withdraw({from: accounts[0]})
+        assert.equal(withdraw.logs[0].event, 'Withdraw')
+        assert.equal(withdraw.logs[0].args[0], accounts[0])
+        assert.equal(withdraw.logs[0].args[1].toString(), web3.utils.toWei("0.1", "ether"))
+    })
 })
