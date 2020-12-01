@@ -353,6 +353,7 @@ contract("Validator", async (accounts) => {
 
     it ("should withdraw when validator stop", async () => {
         const staking = await Staking.deployed();
+        await staking.setMaxValidator(2, {from: accounts[0]})
         const val0 = await Validator.at(await staking.allVals(0));
         await createValidator(accounts[4]);
         const val4 = await Validator.at(await staking.allVals(2));

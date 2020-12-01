@@ -99,6 +99,10 @@ contract Staking is IStaking, Ownable {
     function setPreviousProposer(address previousProposer) public onlyOwner {
         _previousProposer = previousProposer;
     }
+    
+    function setMaxValidator(uint256 _maxValidator) public onlyOwner {
+        params.maxValidator = _maxValidator;
+    }
 
     function finalize(
         address[] calldata _signers, 
