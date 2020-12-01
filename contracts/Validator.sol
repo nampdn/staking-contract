@@ -6,7 +6,6 @@ import "./interfaces/IStaking.sol";
 
 import "./Safemath.sol";
 import "./Ownable.sol";
-import "./Initializable.sol";
 
 
 contract Validator is IValidator, Ownable {
@@ -344,7 +343,7 @@ contract Validator is IValidator, Ownable {
         }
 
         if (inforValidator.status == Status.Bonded && 
-            inforValidator.token.div(powerReduction) == 0) {
+            inforValidator.tokens.div(powerReduction) == 0) {
             _staking.removeFromSets();
             _stop();
         }

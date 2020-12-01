@@ -86,6 +86,7 @@ contract Staking is IStaking, Ownable {
 
     // Update signer address
     function updateSigner(address signerAddr) external onlyValidator {
+        require(ownerOf[signerAddr] == address(0x0));
         address oldSignerAddr = valOf[msg.sender];
         valOf[msg.sender] = signerAddr;
         ownerOf[oldSignerAddr] = address(0x0);
