@@ -304,48 +304,46 @@ contract("Validator", async (accounts) => {
 
     it("should unjail", async () => {
         // @todo should optimize
-        // const staking = await Staking.deployed();
-        // const val = await Validator.at(await staking.allVals(1));
+        const staking = await Staking.deployed();
+        const val = await Validator.at(await staking.allVals(1));
 
-        // // before jail
-        // var inforValidator = await val.inforValidator({from: accounts[5]})
-        // assert.equal(inforValidator.jailed, false)
+        // before jail
+        var inforValidator = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator.jailed, false)
 
-        // // first jail
-        // for (var i=0; i<100; i++) {
-        //     await staking.mint();
-        //     await staking.setPreviousProposer(accounts[0]);
-        //     await staking.finalize([accounts[5]], [1000000000000], [false])
-        // }
+        // first jail
+        for (var i=0; i<100; i++) {
+            await staking.setPreviousProposer(accounts[0]);
+            await staking.finalize([accounts[5]], [1000000000000], [false])
+        }
 
-        // // after jail
-        // var inforValidator1 = await val.inforValidator({from: accounts[5]})
-        // assert.equal(inforValidator1.jailed, true)
+        // after jail
+        var inforValidator1 = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator1.jailed, true)
 
-        // // unjail
-        // await val.unjail({from: accounts[5]})
+        // unjail
+        await val.unjail({from: accounts[5]})
 
-        // // after unjail
-        // var inforValidator3 = await val.inforValidator({from: accounts[5]})
-        // assert.equal(inforValidator3.jailed, false)
+        // after unjail
+        var inforValidator3 = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator3.jailed, false)
 
-        // // second jail
-        // for (var i=0; i<100; i++) {
-        //     await staking.mint();
-        //     await staking.setPreviousProposer(accounts[0]);
-        //     await staking.finalize([accounts[5]], [1000000000000], [false])
-        // }
+        // second jail
+        for (var i=0; i<100; i++) {
+            await staking.setPreviousProposer(accounts[0]);
+            await staking.finalize([accounts[5]], [1000000000000], [false])
+        }
 
-        // // after second jail 
-        // var inforValidator2 = await val.inforValidator({from: accounts[5]})
-        // assert.equal(inforValidator2.jailed, true)
+        // after second jail 
+        var inforValidator2 = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator2.jailed, true)
 
-        // // second unjail
-        // await val.unjail({from: accounts[5]})
+        // second unjail
+        await val.unjail({from: accounts[5]})
 
-        // // after unjail
-        // var inforValidator4 = await val.inforValidator({from: accounts[5]})
-        // assert.equal(inforValidator4.jailed, false)
+        // after unjail
+        var inforValidator4 = await val.inforValidator({from: accounts[5]})
+        assert.equal(inforValidator4.jailed, false)
     })
 
     it("double sign", async () => {
