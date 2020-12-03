@@ -150,10 +150,13 @@ contract("Validator", async (accounts) => {
         const valInfo = await validator.inforValidator()
         assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
+        assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
+        assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
 
         // check event
         assert.equal(accounts[1], delegate.logs[0].args[0]) // check delegator address
         assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[1]) // check delagate amount
+        
     })
 
     it ("should undelegate", async () => {
@@ -179,6 +182,12 @@ contract("Validator", async (accounts) => {
         // check event
         assert.equal(accounts[1], undelegate.logs[0].args[0])
         assert.equal(amount, undelegate.logs[0].args[1])
+
+        const valInfo = await validator.inforValidator()
+        assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.7", "ether"))
+        assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
+        assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
+
     })
 
     it ("should not undelegate", async () => {
@@ -348,16 +357,23 @@ contract("Validator", async (accounts) => {
 
     it("double sign", async () => {
         const staking = await Staking.deployed();
-        const val = await Validator.at(await staking.allVals(1));
+        const valAddr = await await staking.allVals(1)
+        const val = await Validator.at(valAddr);
+
+        let valSet = await staking.getValidatorSets()
+        assert.equal(valSet[0][1], await staking.valOf(valAddr))
 
         // before jail
         var inforValidator = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator.jailed, false)
-
-        await staking.doubleSign(accounts[5], 1000, 5, {from: accounts[0]});
+        await staking.doubleSign(accounts[5], valSet[1][1], 5, {from: accounts[0]});
 
         const info = await val.inforValidator()
         assert.equal(info.jailed, true)
+
+        valSet = await staking.getValidatorSets()
+        assert.equal(valSet[0].length, 1)
+        assert.equal(info.tokens.toString(), web3.utils.toWei("4.75", "ether"))
     })
 
     it("validate signature", async () => {
