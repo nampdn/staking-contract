@@ -177,20 +177,6 @@ contract Validator is IValidator, Ownable {
         uint256 _maxChangeRate, 
         uint256 _minSelfDelegation
     ) external onlyOwner {
-            
-        require(
-            _maxRate <= oneDec,
-            "commission max rate cannot be more than 100%"
-        );
-        require(
-            _maxChangeRate <= _maxRate,
-            "commission max change rate can not be more than the max rate"
-        );
-        require(
-            _rate <= _maxRate,
-            "commission rate cannot be more than the max rate"
-        );
-
         inforValidator.name = _name;
         inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.valAddr = _owner;
@@ -204,11 +190,11 @@ contract Validator is IValidator, Ownable {
         });
         
         _initializeValidator();
-        signingInfo.startHeight = block.number;
     }
 
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
+        require(signerAddr != msg.sender);
         inforValidator.valAddr = signerAddr;
         _staking.updateSigner(signerAddr);
     }
@@ -266,11 +252,6 @@ contract Validator is IValidator, Ownable {
         inforValidator.accumulatedCommission += _commission;
         currentRewards.reward += shared;
     }
-    
-    // validator is jailed when the validator operation misbehave
-    function jail(uint256 _jailedUntil, bool _tombstoned) external onlyOwner {
-        _jail(_jailedUntil, _tombstoned);
-    }
 
     // Unjail is used for unjailing a jailed validator, thus returning
     // them into the bonded validator set, so they can begin receiving provisions
@@ -292,11 +273,7 @@ contract Validator is IValidator, Ownable {
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
     }
-    
-    // Validator is slashed when the Validator operation misbehave 
-    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external onlyOwner {
-        _slash(_infrationHeight, _power, _slashFactor);
-    }
+
 
     function undelegate(uint256 _amount) external {
         _undelegate(msg.sender, _amount);
@@ -764,5 +741,21 @@ contract Validator is IValidator, Ownable {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
         inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
+    }
+
+    function getUBDEntries(address delAddr)
+        public
+        view
+        returns (uint256[] memory, uint256[] memory)
+    {
+        uint256 total = ubdEntries[delAddr].length;
+        uint256[] memory balances = new uint256[](total);
+        uint256[] memory completionTime = new uint256[](total);
+
+        for (uint256 i = 0; i < total; i++) {
+            completionTime[i] = ubdEntries[delAddr][i].completionTime;
+            balances[i] = ubdEntries[delAddr][i].amount;
+        }
+        return (balances, completionTime);
     }
 }

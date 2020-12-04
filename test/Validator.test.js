@@ -54,48 +54,6 @@ contract("Validator", async (accounts) => {
         assert.equal(minSelfDelegation, expectedMinselfDelegation.toString());
     })
 
-    it ("should not create validator", async() => {
-        const instance = await Validator.deployed();
-        const bond = web3.utils.toWei("1", "ether")
-        const testCases = [
-            {
-                rate: 0,
-                maxRate: web3.utils.toWei("1.1", "ether"),
-                maxChangeRate: 0,
-                minSelfDelegation: 0,
-                from: accounts[5],
-                value: bond,
-                message: "commission max rate cannot be more than 100%"
-            },
-            {
-                rate: web3.utils.toWei("1", "ether"),
-                maxRate: web3.utils.toWei("0.9", "ether"),
-                maxChangeRate: 0,
-                minSelfDelegation: 0,
-                from: accounts[5],
-                value: bond,
-                message: "commission rate cannot be more than the max rate"
-            },
-            {
-                rate: 0,
-                maxRate: web3.utils.toWei("0.9", "ether"),
-                maxChangeRate: web3.utils.toWei("1", "ether"),
-                minSelfDelegation: 0,
-                from: accounts[5],
-                value: bond,
-                message: "commission max change rate can not be more than the max rate"
-            }
-        ];
-
-        const name = web3.utils.fromAscii("val5");
-
-        for(var testCase of testCases) {
-            await utils.assertRevert(instance.initialize(name, accounts[5], testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                testCase.minSelfDelegation, {from: testCase.from, value: testCase.value}), 
-                "Returned error: VM Exception while processing transaction: revert");
-        }
-    })
-
     it ("should not update validator", async () => {
         const instance = await Validator.deployed();
         const name = web3.utils.fromAscii("");
@@ -306,8 +264,8 @@ contract("Validator", async (accounts) => {
         "Returned error: VM Exception while processing transaction: revert delegator not found");
     })
 
-
-    it("should slash", async () => {
+    it("should unjail", async () => {
+        // @todo should optimize
         const staking = await Staking.deployed();
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
@@ -316,12 +274,6 @@ contract("Validator", async (accounts) => {
         await val.delegate({from: accounts[5], value: amount})
         await val.start({from: accounts[5]});
         await finalize([accounts[5]])
-    })
-
-    it("should unjail", async () => {
-        // @todo should optimize
-        const staking = await Staking.deployed();
-        const val = await Validator.at(await staking.allVals(1));
 
         // before jail
         var inforValidator = await val.inforValidator({from: accounts[5]})
@@ -373,14 +325,18 @@ contract("Validator", async (accounts) => {
         // before jail
         var inforValidator = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator.jailed, false)
-        await staking.doubleSign(accounts[5], valSet[1][1], 5, {from: accounts[0]});
+        await val.undelegate(web3.utils.toWei("1", "ether"), {from: accounts[5]})
+        await staking.doubleSign(accounts[5], valSet[1][1], 1, {from: accounts[0]});
 
         const info = await val.inforValidator()
         assert.equal(info.jailed, true)
 
         valSet = await staking.getValidatorSets()
         assert.equal(valSet[0].length, 1)
-        assert.equal(info.tokens.toString(), web3.utils.toWei("4.731", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei("3.800000000000000000", "ether"))
+
+        const ubdEntries = await val.getUBDEntries.call(accounts[5])
+        assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
     })
 
     it("validate signature", async () => {

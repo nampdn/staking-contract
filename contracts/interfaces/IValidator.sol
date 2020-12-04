@@ -13,8 +13,6 @@ interface IValidator {
     function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external;
     function unjail() external;
     function allocateToken(uint256 _rewards) external;
-    function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external;
-    function jail(uint256 _jailedUntil, bool _tombstoned) external;
     function delegate() external payable;
     function withdrawRewards() external;
     function withdrawCommission()external;

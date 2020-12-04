@@ -47,7 +47,10 @@ contract Staking is IStaking, Ownable {
         minter = new Minter();
     }
 
-    function setParams(uint256 baseProposerReward, uint256 bonusProposerReward) external onlyOwner {
+    function setParams(
+        uint256 baseProposerReward, 
+        uint256 bonusProposerReward
+    ) external onlyOwner {
         params.baseProposerReward = baseProposerReward;
         params.bonusProposerReward = bonusProposerReward;
     }
@@ -61,6 +64,20 @@ contract Staking is IStaking, Ownable {
         uint256 minSelfDelegation
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
+        require(
+            maxRate <= 1 * 10 ** 18,
+            "commission max rate cannot be more than 100%"
+        );
+        require(
+            maxChangeRate <= maxRate,
+            "commission max change rate can not be more than the max rate"
+        );
+        require(
+            rate <= maxRate,
+            "commission rate cannot be more than the max rate"
+        );
+
+
         bytes memory bytecode = type(Validator).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(name, rate, maxRate, 
             maxChangeRate, minSelfDelegation, msg.sender));
@@ -71,12 +88,8 @@ contract Staking is IStaking, Ownable {
             maxChangeRate, minSelfDelegation);
         
         emit CreateValidator(
-            name,
-            msg.sender,
-            rate,
-            maxRate,
-            maxChangeRate,
-            minSelfDelegation
+            name,msg.sender,rate,
+            maxRate,maxChangeRate,minSelfDelegation
         );
 
         allVals.push(val);
