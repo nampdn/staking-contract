@@ -165,16 +165,24 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
         
+        // undelegate with stake remaining greater than the min stake amount
         const amount = web3.utils.toWei("0.1", "ether");
         var undelegate = await validator.undelegate(amount, {from: accounts[1]});
 
         // check delegation
-        const delegation =  await validator.delegationByAddr(accounts[1]);
+        var delegation =  await validator.delegationByAddr(accounts[1]);
 
         // check balance remaining
         assert.equal(delegation.shares.toString(), web3.utils.toWei("0.75", "ether"))
         assert.equal(delegation.stake.toString(), web3.utils.toWei("0.3", "ether"))
-        
+
+        // undelegate all stake amount
+        await validator.undelegate(web3.utils.toWei("0.3", "ether"), {from: accounts[1]});
+        var delegation2 =  await validator.delegationByAddr(accounts[1]);
+        // check balance remaining
+        assert.equal(delegation2.shares.toString(), "0")
+        assert.equal(delegation2.stake.toString(), "0")
+
         // check infor undelegate
         var ubdEntries = await validator.ubdEntries(accounts[1], 0, {from: accounts[1]})
         assert.equal(ubdEntries.amount.toString(), amount)
@@ -184,7 +192,7 @@ contract("Validator", async (accounts) => {
         assert.equal(amount, undelegate.logs[0].args[1])
 
         const valInfo = await validator.inforValidator()
-        assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.7", "ether"))
+        assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.4", "ether"))
         assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
         assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
 
@@ -195,22 +203,21 @@ contract("Validator", async (accounts) => {
 
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
+        await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.7", "ether")});
+
+        await utils.assertRevert(validator.undelegate(web3.utils.toWei("0.6999", "ether"), {from: accounts[1]}), "Undelegate amount invalid");
         
-        await utils.assertRevert(validator.undelegate(web3.utils.toWei("10", "ether"), {from: accounts[1]}), 
-        "Returned error: VM Exception while processing transaction: revert not enough delegation shares");
+        await utils.assertRevert(validator.undelegate(web3.utils.toWei("10", "ether"), {from: accounts[1]}), "SafeMath: subtraction overflow");
 
         const amount = web3.utils.toWei("0.01", "ether");
-        for (var i =0; i < 6; i ++) {
+        for (var i =0; i < 5; i ++) {
             await validator.undelegate(amount, {from: accounts[1]});
         }
 
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), 
-        "Returned error: VM Exception while processing transaction: revert too many unbonding delegation entries");
+        await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), "too many unbonding delegation entries");
 
         // not found delgator
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), 
-        "Returned error: VM Exception while processing transaction: revert delegation not found");
-
+        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), "SafeMath: subtraction overflow"); // 'delegation not found
     })
 
     it ("update signer", async () => {
@@ -285,7 +292,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
-        assert.equal("18294110759864184520", delegationRewards.toString())
+        assert.equal("13121293234661208208", delegationRewards.toString())
         await validator.withdrawRewards({from: accounts[0]})
     })
 
@@ -373,7 +380,7 @@ contract("Validator", async (accounts) => {
 
         valSet = await staking.getValidatorSets()
         assert.equal(valSet[0].length, 1)
-        assert.equal(info.tokens.toString(), web3.utils.toWei("4.75", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei("4.731", "ether"))
     })
 
     it("validate signature", async () => {

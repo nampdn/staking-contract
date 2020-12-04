@@ -164,7 +164,7 @@ contract Validator is IValidator, Ownable {
             slashFractionDoubleSign: 5 * 10**16,
             signedBlockWindow: 100,
             minSignedPerWindow: 5 * 10**16,
-            minStake: 10000 * 10**18
+            minStake: 1 * 10**17 // 10 000 kai
         });
     }
     
@@ -297,7 +297,6 @@ contract Validator is IValidator, Ownable {
     function slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) external onlyOwner {
         _slash(_infrationHeight, _power, _slashFactor);
     }
-
 
     function undelegate(uint256 _amount) external {
         _undelegate(msg.sender, _amount);
