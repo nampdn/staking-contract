@@ -92,17 +92,13 @@ contract Validator is IValidator, Ownable {
         // height at which validator was first a candidate OR was unjailed
         uint256 startHeight;
         // index offset into signed block bit array
-        uint256 indexOffset;
+        uint indexOffset;
         // whether or not a validator has been tombstoned (killed out of validator set)
         bool tombstoned;
         // missed blocks counter 
-        uint256 missedBlockCounter;
+        uint missedBlockCounter;
         // time for which the validator is jailed until.
         uint256 jailedUntil;
-    }
-    
-    struct MissedBlock {
-        mapping(uint256 => bool) items;
     }
     
     struct InforValidator {
@@ -125,7 +121,7 @@ contract Validator is IValidator, Ownable {
         uint256 slashFractionDowntime;
         uint256 unbondingTime;
         uint256 slashFractionDoubleSign;
-        uint256 signedBlockWindow;
+        uint signedBlockWindow;
         uint256 minSignedPerWindow;
         uint256 minStake;
     }
@@ -143,7 +139,7 @@ contract Validator is IValidator, Ownable {
     HistoricalReward private historicalRewards; // historical rewards
     SlashEvent[] public slashEvents; // slash events
     SigningInfo public signingInfo; // signing info
-    MissedBlock private missedBlock; // missed block
+    mapping(uint => bool) private missedBlock; // missed block
     Params public params;
     IStaking private _staking;
 
@@ -158,11 +154,11 @@ contract Validator is IValidator, Ownable {
         _staking = IStaking(msg.sender);
 
         params = Params({
-            downtimeJailDuration: 1,
+            downtimeJailDuration: 600,
             slashFractionDowntime: 1 * 10**14,
             unbondingTime: 1814400,
             slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindow: 100,
+            signedBlockWindow: 5,
             minSignedPerWindow: 5 * 10**16,
             minStake: 1 * 10**17 // 10 000 kai
         });
@@ -289,7 +285,7 @@ contract Validator is IValidator, Ownable {
         Delegation storage del = delegationByAddr[from];
         uint256 shares = _shareFromToken(_amount);
         require(del.shares >= shares, "not enough delegation shares");
-        del.shares -= shares;
+        del.shares = del.shares.sub(shares);
         _initializeDelegation(from);
         bool isValidatorOperator = inforValidator.valAddr == from;
         if (
@@ -412,16 +408,16 @@ contract Validator is IValidator, Ownable {
         bool _signed
     ) external onlyOwner returns (bool) {
         // counts blocks the validator should have signed
-        uint256 index = signingInfo.indexOffset % params.signedBlockWindow;
+        uint index = signingInfo.indexOffset % params.signedBlockWindow;
         signingInfo.indexOffset++;
-        bool previous = missedBlock.items[index];
+        bool previous = missedBlock[index];
         bool missed = !_signed;
         if (!previous && missed) { // value has changed from not missed to missed, increment counter
             signingInfo.missedBlockCounter++;
-            missedBlock.items[index] = true;
+            missedBlock[index] = true;
         } else if (previous && !missed) { // value has changed from missed to not missed, decrement counter
             signingInfo.missedBlockCounter--;
-            missedBlock.items[index] = false;
+            missedBlock[index] = false;
         }
 
         if (missed) {
@@ -442,8 +438,7 @@ contract Validator is IValidator, Ownable {
                 signingInfo.missedBlockCounter = 0;
                 _resetMissedBlock(signingInfo.indexOffset);
                 signingInfo.indexOffset = 0;
-                // delete missedBlock;
-                
+                emit Slashed(_votingPower, 1);       
                 return true;
             }
         }
@@ -452,7 +447,7 @@ contract Validator is IValidator, Ownable {
 
     function _resetMissedBlock(uint256 _indexOffset) private {
         for (uint i = 0; i < _indexOffset; i++) {
-            missedBlock.items[i] = false;
+            missedBlock[i] = false;
         }
     }
 
@@ -641,7 +636,7 @@ contract Validator is IValidator, Ownable {
     // initialize starting info for a new delegation
     function _initializeDelegation(address _delAddr) private {
         Delegation storage del = delegationByAddr[_delAddr];
-        uint256 previousPeriod = currentRewards.period - 1;
+        uint256 previousPeriod = currentRewards.period.sub(1);
         _incrementReferenceCount(previousPeriod);
         delegationByAddr[_delAddr].height = block.number;
         delegationByAddr[_delAddr].previousPeriod = previousPeriod;
@@ -757,5 +752,18 @@ contract Validator is IValidator, Ownable {
             balances[i] = ubdEntries[delAddr][i].amount;
         }
         return (balances, completionTime);
+    }
+
+    function getMissedBlock()
+        public
+        view
+        returns (bool[] memory)
+    {
+        bool[] memory _missedBlock = new bool[](params.signedBlockWindow);
+        for (uint i = 0; i < params.signedBlockWindow; i++) {
+            _missedBlock[i] = missedBlock[i];
+        }
+
+        return _missedBlock;
     }
 }

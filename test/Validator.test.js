@@ -280,16 +280,17 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator.jailed, false)
 
         // first jail
-        for (var i=0; i<100; i++) {
-            await staking.setPreviousProposer(accounts[0]);
-            await staking.finalize([accounts[5]], [1000000000000], [false])
+        for (var i=0; i<5; i++) {
+            await finalize([accounts[5]]);
         }
 
         // after jail
         var inforValidator1 = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator1.jailed, true)
+        assert.equal(inforValidator.tokens.toString(), web3.utils.toWei("4.8", "ether"))
 
         // unjail
+        await utils.advanceTime(601);
         await val.unjail({from: accounts[5]})
 
         // after unjail
@@ -297,9 +298,8 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator3.jailed, false)
 
         // second jail
-        for (var i=0; i<100; i++) {
-            await staking.setPreviousProposer(accounts[0]);
-            await staking.finalize([accounts[5]], [1000000000000], [false])
+        for (var i=0; i<5; i++) {
+            await finalize([accounts[5]]);
         }
 
         // after second jail 
@@ -307,6 +307,7 @@ contract("Validator", async (accounts) => {
         assert.equal(inforValidator2.jailed, true)
 
         // second unjail
+        await utils.advanceTime(601);
         await val.unjail({from: accounts[5]})
 
         // after unjail
@@ -333,7 +334,7 @@ contract("Validator", async (accounts) => {
 
         valSet = await staking.getValidatorSets()
         assert.equal(valSet[0].length, 1)
-        assert.equal(info.tokens.toString(), web3.utils.toWei("3.800000000000000000", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei("3.7990500475", "ether"))
 
         const ubdEntries = await val.getUBDEntries.call(accounts[5])
         assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
