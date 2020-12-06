@@ -103,6 +103,7 @@ contract("Validator", async (accounts) => {
         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
 
         var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
+        assert.equal(delegate.receipt.gasUsed, 293970)
         const delegation2 = await validator.delegationByAddr(accounts[1])
         assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
         const valInfo = await validator.inforValidator()
@@ -161,7 +162,8 @@ contract("Validator", async (accounts) => {
 
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
-        await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.7", "ether")});
+        let tx = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.7", "ether")});
+        assert.equal(tx.receipt.gasUsed, 152083);
 
         await utils.assertRevert(validator.undelegate(web3.utils.toWei("0.6999", "ether"), {from: accounts[1]}), "Undelegate amount invalid");
         

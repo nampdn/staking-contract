@@ -280,7 +280,6 @@ contract Validator is IValidator, Ownable {
         inforValidator.jailed = false;
     }
 
-
     function undelegate(uint256 _amount) external onlyDelegator{
         _undelegate(msg.sender, _amount);
         _staking.undelegate(_amount);
@@ -444,7 +443,7 @@ contract Validator is IValidator, Ownable {
                 emit Slashed(_votingPower, 1);       
             }
         }
-     }
+    }
 
     function _resetMissedBlock(uint256 _indexOffset) private {
         for (uint i = 0; i < _indexOffset; i++) {
@@ -703,14 +702,12 @@ contract Validator is IValidator, Ownable {
         _stop();
     }
 
-
     function _stopIfZeroPowerOrJailed() private {
         if (!_isBonded()) return;
         if (inforValidator.jailed || _isZeroPower()) {
             _stop();
         }
     }
-
 
     function _isZeroPower() private view returns (bool) {
         return inforValidator.tokens.div(powerReduction) == 0;
