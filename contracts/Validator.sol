@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.5.16;
+pragma solidity >=0.5.0;
 import "./EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IStaking.sol";
@@ -161,8 +161,8 @@ contract Validator is IValidator, Ownable {
             slashFractionDowntime: 1 * 10**14,
             unbondingTime: 1814400, 
             slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindow: 2,
-            minSignedPerWindow: 50 * 10**16,
+            signedBlockWindow: 10000,
+            minSignedPerWindow: 5 * 10**16,
             minStake: 1 * 10**17 // 10 000 kai
         });
     }
@@ -194,6 +194,7 @@ contract Validator is IValidator, Ownable {
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
         require(signerAddr != msg.sender);
+        emit UpdatedSigner(inforValidator.signer, signerAddr);
         inforValidator.signer = signerAddr;
         _staking.updateSigner(signerAddr);
     }
@@ -750,7 +751,7 @@ contract Validator is IValidator, Ownable {
     }
 
     function getUBDEntries(address delAddr)
-        public
+        external
         view
         returns (uint256[] memory, uint256[] memory)
     {

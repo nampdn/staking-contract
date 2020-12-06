@@ -1,5 +1,5 @@
-const Staking = artifacts.require("Staking");
-const Validator = artifacts.require("Validator");
+const Staking = artifacts.require("StakingTest");
+const Validator = artifacts.require("ValidatorTest");
 const utils = require("./utils");
 
 contract("Staking", async (accounts) => {    

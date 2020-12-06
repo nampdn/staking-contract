@@ -1,5 +1,5 @@
-const Validator = artifacts.require("Validator");
-const Staking = artifacts.require("Staking");
+const Validator = artifacts.require("ValidatorTest");
+const Staking = artifacts.require("StakingTest");
 const Minter = artifacts.require("Minter");
 const utils = require("./utils");
 
@@ -24,7 +24,10 @@ contract("Validator", async (accounts) => {
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
-        await staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from})
+        await staking.createValidatorTest(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from});
+        const val = await Validator.at(await staking.ownerOf(from));
+        await val.setParamsTest();
+        return val;
     }
 
     
@@ -103,7 +106,6 @@ contract("Validator", async (accounts) => {
         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
 
         var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
-        assert.equal(delegate.receipt.gasUsed, 293970)
         const delegation2 = await validator.delegationByAddr(accounts[1])
         assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
         const valInfo = await validator.inforValidator()
@@ -163,7 +165,6 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
         let tx = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.7", "ether")});
-        assert.equal(tx.receipt.gasUsed, 152083);
 
         await utils.assertRevert(validator.undelegate(web3.utils.toWei("0.6999", "ether"), {from: accounts[1]}), "Undelegate amount invalid");
         
@@ -249,7 +250,6 @@ contract("Validator", async (accounts) => {
 
         assert.equal("13121293234661208208", delegationRewards.toString())
         const tx = await validator.withdrawRewards({from: accounts[0]})
-        assert.equal(tx.receipt.gasUsed, "95961")
     })
 
     it("should not withdraw delegation rewards", async () => {
@@ -265,7 +265,6 @@ contract("Validator", async (accounts) => {
         const staking = await Staking.deployed();
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
-        
         const amount = web3.utils.toWei("5", "ether");
         await val.delegate({from: accounts[5], value: amount})
         await val.start({from: accounts[5]});

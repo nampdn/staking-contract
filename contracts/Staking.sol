@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.5.16;
+pragma solidity >=0.5.0;
 import "./interfaces/IStaking.sol";
 import "./interfaces/IValidator.sol";
 import "./Minter.sol";
@@ -18,7 +18,7 @@ contract Staking is IStaking, Ownable {
         uint256 maxValidator;
     }
 
-    address private _previousProposer; // last proposer address
+    address internal _previousProposer; // last proposer address
     Params public  params; // staking params
     address[] public allVals; // list all validators
     mapping(address => address) public ownerOf; // Owner of the validator
@@ -45,14 +45,6 @@ contract Staking is IStaking, Ownable {
         });
 
         minter = new Minter();
-    }
-
-    function setParams(
-        uint256 baseProposerReward, 
-        uint256 bonusProposerReward
-    ) external onlyOwner {
-        params.baseProposerReward = baseProposerReward;
-        params.bonusProposerReward = bonusProposerReward;
     }
 
     // create new validator
@@ -109,15 +101,7 @@ contract Staking is IStaking, Ownable {
     function allValsLength() external view returns(uint) {
         return allVals.length;
     }
-
-    function setPreviousProposer(address previousProposer) public onlyOwner {
-        _previousProposer = previousProposer;
-    }
     
-    function setMaxValidator(uint256 _maxValidator) public onlyOwner {
-        params.maxValidator = _maxValidator;
-    }
-
     function finalize(
         address[] calldata _signers, 
         uint256[] calldata _votingPower, 

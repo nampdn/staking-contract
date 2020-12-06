@@ -50,4 +50,5 @@ interface IValidator {
     event Withdraw(address _delAddr, uint256 _amount);
     event Slashed(uint256 _power, uint256 _reason);
     event Liveness(uint256 _missedBlocks, uint256 _blockHeight);
+    event UpdatedSigner(address previousSigner, address newSigner);
 }
