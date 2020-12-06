@@ -1,6 +1,6 @@
 const { assertRevert } = require("./utils");
 
-const Staking = artifacts.require("Staking");
+const Staking = artifacts.require("StakingTest");
 const Minter = artifacts.require("Minter");
 
 
@@ -8,6 +8,7 @@ contract("Minter", async (accounts) => {
 
     it("mint", async () => {
         const staking = await Staking.deployed();
+        await staking.createMinterTest();
         const minter = await Minter.at(await staking.minter())
         await staking.mint();
         const inflation = await minter.inflation()
@@ -15,7 +16,7 @@ contract("Minter", async (accounts) => {
         const annualProvision = await minter.annualProvision();
         assert.equal(annualProvision.toString(), web3.utils.toWei("250000000", "ether"))
         const feesCollected = await minter.feesCollected();
-        assert.equal(feesCollected.toString(), web3.utils.toWei("39.637239979705733130", "ether"))
+        assert.equal(feesCollected.toString(), web3.utils.toWei("50000000.000000000000000000", "ether"))
     })
 
     it("not mint", async () => {
