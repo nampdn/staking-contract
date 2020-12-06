@@ -175,7 +175,7 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), "too many unbonding delegation entries");
 
         // not found delgator
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), "SafeMath: subtraction overflow"); // 'delegation not found
+        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), "delegation not found"); // 'delegation not found
     })
 
     it ("update signer", async () => {
@@ -202,7 +202,7 @@ contract("Validator", async (accounts) => {
 
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
-        await utils.advanceTime(1814400);
+        await utils.advanceTime(1814401);
         var withdraw = await validator.withdraw({from: accounts[1]})
 
         // check event
@@ -213,12 +213,8 @@ contract("Validator", async (accounts) => {
         const staking = await Staking.deployed();
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
-
-        await utils.assertRevert(validator.withdraw({from: accounts[4]}), 
-        "Returned error: VM Exception while processing transaction: revert delegation not found");
-
-        await utils.assertRevert(validator.withdraw({from: accounts[1]}), 
-        "Returned error: VM Exception while processing transaction: revert no unbonding amount to withdraw");
+        await utils.assertRevert(validator.withdraw({from: accounts[4]}), "delegation not found");
+        await utils.assertRevert(validator.withdraw({from: accounts[1]}),"no unbonding amount to withdraw");
     })
 
     it ("should withdraw commission", async () => {
@@ -259,8 +255,7 @@ contract("Validator", async (accounts) => {
         const contractAddr = await staking.allVals(0)
         const validator = await Validator.at(contractAddr)
 
-        await utils.assertRevert(validator.withdrawRewards({from: accounts[3]}), 
-        "Returned error: VM Exception while processing transaction: revert delegator not found");
+        await utils.assertRevert(validator.withdrawRewards({from: accounts[3]}), "delegation not found");
     })
 
     it("should unjail", async () => {

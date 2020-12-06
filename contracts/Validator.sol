@@ -103,7 +103,7 @@ contract Validator is IValidator, Ownable {
     
     struct InforValidator {
         bytes32 name;  // validator name
-        address valAddr; // address of the validator
+        address signer; // address of the validator
         uint256 tokens; // all token stake
         bool jailed;
         uint256 minSelfDelegation;
@@ -143,7 +143,12 @@ contract Validator is IValidator, Ownable {
 
      // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
-        require(inforValidator.valAddr == msg.sender, "Ownable: caller is not the validator");
+        require(inforValidator.signer == msg.sender, "Ownable: caller is not the validator");
+        _;
+    }
+
+    modifier onlyDelegator() {
+        require(delegations.contains(msg.sender), "delegation not found");
         _;
     }
 
@@ -165,7 +170,7 @@ contract Validator is IValidator, Ownable {
     // called one by the staking at time of deployment  
     function initialize (
         bytes32 _name, 
-        address _owner,
+        address _signer,
         uint256 _rate, 
         uint256 _maxRate, 
         uint256 _maxChangeRate, 
@@ -173,7 +178,7 @@ contract Validator is IValidator, Ownable {
     ) external onlyOwner {
         inforValidator.name = _name;
         inforValidator.minSelfDelegation = _minSelfDelegation;
-        inforValidator.valAddr = _owner;
+        inforValidator.signer = _signer;
         inforValidator.updateTime = block.timestamp;
         inforValidator.status = Status.Unbonded;
         
@@ -189,7 +194,7 @@ contract Validator is IValidator, Ownable {
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
         require(signerAddr != msg.sender);
-        inforValidator.valAddr = signerAddr;
+        inforValidator.signer = signerAddr;
         _staking.updateSigner(signerAddr);
     }
     
@@ -200,8 +205,27 @@ contract Validator is IValidator, Ownable {
         _staking.addDelegation(msg.sender);
     }
 
-    // update validate info
-    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
+    function _updateName(bytes32 _name) private {
+        if (_name[0] != 0) {
+            inforValidator.name = _name;
+        }
+    }
+
+    function _updateMinSelfDelegation(uint256 _minSelfDelegation) private {
+        if (_minSelfDelegation > 0) {
+            require(
+                _minSelfDelegation > inforValidator.minSelfDelegation,
+                "minimum self delegation cannot be decrease"
+            );
+            require(
+                _minSelfDelegation <= inforValidator.tokens,
+                "self delegation below minimum"
+            );
+            inforValidator.minSelfDelegation = _minSelfDelegation;
+        }
+    }
+
+    function _updateCommissionRate(uint256 _commissionRate) private {
         if (_commissionRate > 0) {
             require(
                 // solhint-disable-next-line not-rely-on-time
@@ -219,23 +243,13 @@ contract Validator is IValidator, Ownable {
             commission.rate = _commissionRate;
             inforValidator.updateTime = block.timestamp;
         }
+    }
 
-        if (_minSelfDelegation > 0) {
-            require(
-                _minSelfDelegation > inforValidator.minSelfDelegation,
-                "minimum self delegation cannot be decrease"
-            );
-            require(
-                _minSelfDelegation <= inforValidator.tokens,
-                "self delegation below minimum"
-            );
-            inforValidator.minSelfDelegation = _minSelfDelegation;
-        }
-        
-        if (_name[0] != 0) {
-            inforValidator.name = _name;
-        }
-
+    // update validate info
+    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
+        _updateCommissionRate(_commissionRate);
+        _updateMinSelfDelegation(_minSelfDelegation);
+        _updateName(_name);
         emit UpdateValidator(_name, _commissionRate, _minSelfDelegation);
     }
     
@@ -254,10 +268,8 @@ contract Validator is IValidator, Ownable {
         require(inforValidator.jailed, "validator not jailed");
         // cannot be unjailed if tombstoned
         require(signingInfo.tombstoned == false, "validator jailed");
-        uint256 jailedUntil = signingInfo.jailedUntil;
-
-        require(jailedUntil < block.timestamp, "validator jailed");
-        Delegation storage del = delegationByAddr[inforValidator.valAddr];
+        require(signingInfo.jailedUntil < block.timestamp, "validator jailed");
+        Delegation storage del = delegationByAddr[inforValidator.signer];
         uint256 tokens = _tokenFromShare(del.shares);
         require(
             tokens > inforValidator.minSelfDelegation,
@@ -269,7 +281,7 @@ contract Validator is IValidator, Ownable {
     }
 
 
-    function undelegate(uint256 _amount) external {
+    function undelegate(uint256 _amount) external onlyDelegator{
         _undelegate(msg.sender, _amount);
         _staking.undelegate(_amount);
     }
@@ -277,7 +289,6 @@ contract Validator is IValidator, Ownable {
     function _undelegate(address payable from, uint256 _amount) private {
         require(_checkUndelegateAmount(from, _amount) == true, "Undelegate amount invalid");
         require(ubdEntries[from].length < 7, "too many unbonding delegation entries");
-        require(delegations.contains(from), "delegation not found");
         
         _withdrawRewards(from);
         Delegation storage del = delegationByAddr[from];
@@ -285,7 +296,7 @@ contract Validator is IValidator, Ownable {
         require(del.shares >= shares, "not enough delegation shares");
         del.shares = del.shares.sub(shares);
         _initializeDelegation(from);
-        bool isValidatorOperator = inforValidator.valAddr == from;
+        bool isValidatorOperator = inforValidator.signer == from;
         if (
             isValidatorOperator &&
             !inforValidator.jailed &&
@@ -296,15 +307,14 @@ contract Validator is IValidator, Ownable {
 
         uint256 amountRemoved = _removeDelShares(shares);
 
-        if (inforValidator.status == Status.Unbonding && inforValidator.unbondingTime < block.timestamp) {
-            msg.sender.transfer(amountRemoved);
-            if (del.shares == 0) {
-                _removeDelegation(msg.sender);
-            }
-            emit Withdraw(msg.sender, amountRemoved);
+        if (_isUnbonding() && _isUnbondingComplete()) {
+            _withdraw(msg.sender, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;
             uint256 completionTime = block.timestamp.add(params.unbondingTime);
+            if (_isUnbonding()) {
+                completionTime = inforValidator.unbondingTime;
+            }
             ubdEntries[from].push(
                 UBDEntry({
                     completionTime: completionTime,
@@ -315,6 +325,18 @@ contract Validator is IValidator, Ownable {
             emit Undelegate(from, _amount, completionTime);
         }
         _stopIfZeroPowerOrJailed();
+    }
+
+    function _isUnbonding() private view returns (bool) {
+        return inforValidator.status == Status.Unbonding;
+    }
+
+    function _isUnbondingComplete() private view returns (bool) {
+        return inforValidator.unbondingTime < block.timestamp;
+    }
+
+    function _isBonded() private view returns (bool) {
+        return inforValidator.status == Status.Bonded;
     }
 
     function _checkUndelegateAmount(address _delAddr, uint256 _amount) private view returns (bool) {
@@ -329,8 +351,7 @@ contract Validator is IValidator, Ownable {
     }
     
     // withdraw rewards from a delegation
-    function withdrawRewards() external {
-        require(delegations.contains(msg.sender), "delegator not found");
+    function withdrawRewards() external onlyDelegator {
         _withdrawRewards(msg.sender);
         _initializeDelegation(msg.sender);
     }
@@ -345,13 +366,9 @@ contract Validator is IValidator, Ownable {
     }
     
     // withdraw token delegator's
-    function withdraw() external {
-        require(delegations.contains(msg.sender), "delegation not found");
-        Delegation memory del = delegationByAddr[msg.sender];
+    function withdraw() external onlyDelegator {
         UBDEntry[] storage entries = ubdEntries[msg.sender];
         uint256 amount = 0;
-        uint256 entryCount = 0;
-
         for (uint256 i = 0; i < entries.length; i++) {
             // solhint-disable-next-line not-rely-on-time
             if (entries[i].completionTime < block.timestamp) {
@@ -359,19 +376,19 @@ contract Validator is IValidator, Ownable {
                 entries[i] = entries[entries.length - 1];
                 entries.pop();
                 i--;
-                entryCount++;
+                inforValidator.ubdEntryCount--;
             }
         }
-    
+        _withdraw(msg.sender, amount);
+    }
+
+    function _withdraw(address payable to, uint256 amount) private {
         require(amount > 0, "no unbonding amount to withdraw");
-        msg.sender.transfer(amount);
-
-        if (del.shares == 0 && entries.length == 0) {
-            _removeDelegation(msg.sender);
+        to.transfer(amount);
+        if (delegationByAddr[to].shares == 0 && ubdEntries[to].length == 0) {
+            _removeDelegation(to);
         }
-
-        inforValidator.ubdEntryCount = inforValidator.ubdEntryCount.sub(entryCount);
-        emit Withdraw(msg.sender, amount);
+        emit Withdraw(to, amount);
     }
     
     function getCommissionRewards() external view returns(uint256) {
@@ -638,8 +655,6 @@ contract Validator is IValidator, Ownable {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
     
-    event DD(uint256 d);
-
     function _slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) private {
         require(_infrationHeight <= block.number, "cannot slash infrations in the future");
         
@@ -690,15 +705,16 @@ contract Validator is IValidator, Ownable {
 
 
     function _stopIfZeroPowerOrJailed() private {
-        if (inforValidator.status != Status.Bonded) {
-            return;
-        }
-
-        if (inforValidator.jailed || inforValidator.tokens.div(powerReduction) == 0) {
+        if (!_isBonded()) return;
+        if (inforValidator.jailed || _isZeroPower()) {
             _stop();
         }
     }
 
+
+    function _isZeroPower() private view returns (bool) {
+        return inforValidator.tokens.div(powerReduction) == 0;
+    }
 
    function doubleSign(
         uint256 votingPower,
