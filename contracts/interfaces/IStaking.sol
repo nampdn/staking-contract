@@ -30,7 +30,7 @@ interface IStaking {
     function startValidator() external;
 
     // @dev Emitted when validator is created;
-    event CreateValidator(
+    event CreatedValidator(
         bytes32 _name,
         address payable _valAddr,
         uint256 _commissionRate,
@@ -38,8 +38,7 @@ interface IStaking {
         uint256 _commissionMaxChangeRate,
         uint256 _minSelfDelegation
     );
-    
-    // function getValidatorsByDelegator(address delAddr)  external view returns (address[] memory);
-    // function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory);
-    // function getValidatorsByDelegator() external view returns (address[] memory);
+
+    event Burn(address from, uint256 amount);
+    event Mint(uint256 amount);
 }

@@ -87,7 +87,7 @@ contract Staking is IStaking, Ownable {
         IValidator(val).initialize(name, msg.sender, rate, maxRate, 
             maxChangeRate, minSelfDelegation);
         
-        emit CreateValidator(
+        emit CreatedValidator(
             name,msg.sender,rate,
             maxRate,maxChangeRate,minSelfDelegation
         );
@@ -218,6 +218,7 @@ contract Staking is IStaking, Ownable {
         totalBonded = totalBonded.sub(amount);
         totalSupply = totalSupply.sub(amount);
         balanceOf[from] = balanceOf[from].sub(amount);
+        emit Burn(from, amount);
     }
 
     // slash and jail validator forever
@@ -232,6 +233,7 @@ contract Staking is IStaking, Ownable {
     function mint() external onlyOwner returns (uint256) {
         uint256 fees =  minter.mint(); 
         totalSupply = totalSupply.add(fees);
+        emit Mint(fees);
         return fees;
     }
 

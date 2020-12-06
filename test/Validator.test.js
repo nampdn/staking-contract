@@ -248,7 +248,8 @@ contract("Validator", async (accounts) => {
         var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
         assert.equal("13121293234661208208", delegationRewards.toString())
-        await validator.withdrawRewards({from: accounts[0]})
+        const tx = await validator.withdrawRewards({from: accounts[0]})
+        assert.equal(tx.receipt.gasUsed, "95961")
     })
 
     it("should not withdraw delegation rewards", async () => {
