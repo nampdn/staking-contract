@@ -13,8 +13,8 @@ contract Validator is IValidator, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
-    uint256 oneDec = 1 * 10**18;
-    uint256 powerReduction = 1 * 10**8;
+    uint256 oneDec = 1 * 10 ** 18;
+    uint256 powerReduction = 1 * 10 ** 8;
 
     enum Status { Unbonding, Unbonded, Bonded}
 
@@ -125,8 +125,6 @@ contract Validator is IValidator, Ownable {
         uint256 minSignedPerWindow;
         uint256 minStake;
     }
-
-    uint256 constant public UNBONDING_TiME = 10; // 7 days
     
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
@@ -156,10 +154,10 @@ contract Validator is IValidator, Ownable {
         params = Params({
             downtimeJailDuration: 600,
             slashFractionDowntime: 1 * 10**14,
-            unbondingTime: 1814400,
+            unbondingTime: 1814400, 
             slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindow: 5,
-            minSignedPerWindow: 5 * 10**16,
+            signedBlockWindow: 2,
+            minSignedPerWindow: 50 * 10**16,
             minStake: 1 * 10**17 // 10 000 kai
         });
     }
@@ -306,7 +304,7 @@ contract Validator is IValidator, Ownable {
             emit Withdraw(msg.sender, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;
-            uint256 completionTime = block.timestamp.add(UNBONDING_TiME);
+            uint256 completionTime = block.timestamp.add(params.unbondingTime);
             ubdEntries[from].push(
                 UBDEntry({
                     completionTime: completionTime,
@@ -406,7 +404,7 @@ contract Validator is IValidator, Ownable {
     function validateSignature(
         uint256 _votingPower,
         bool _signed
-    ) external onlyOwner returns (bool) {
+    ) external onlyOwner{
         // counts blocks the validator should have signed
         uint index = signingInfo.indexOffset % params.signedBlockWindow;
         signingInfo.indexOffset++;
@@ -420,29 +418,20 @@ contract Validator is IValidator, Ownable {
             missedBlock[index] = false;
         }
 
-        if (missed) {
-            emit Liveness(signingInfo.missedBlockCounter, block.number);
-        }
-        
-        uint256 minHeight = signingInfo.startHeight + params.signedBlockWindow;
-        uint256 minSignedPerWindow = params.signedBlockWindow.mulTrun(params.minSignedPerWindow);
-        uint256 maxMissed = params.signedBlockWindow - minSignedPerWindow;
-        
+        uint256 minHeight = signingInfo.startHeight.add(params.signedBlockWindow);
+        uint minSignedPerWindow = params.signedBlockWindow.mulTrun(params.minSignedPerWindow);
+        uint maxMissed = params.signedBlockWindow.sub(minSignedPerWindow);
         // if past the minimum height and the validator has missed too many blocks, punish them
         if (block.number > minHeight && signingInfo.missedBlockCounter > maxMissed) {
             if (!inforValidator.jailed) {
-                _slash(block.number - 2, _votingPower, params.slashFractionDowntime);
-                inforValidator.jailed = true; // jail validator
-
-                signingInfo.jailedUntil = block.timestamp.add(params.downtimeJailDuration);
+                _slash(block.number.sub(2), _votingPower, params.slashFractionDowntime);
+                _jail(block.timestamp.add(params.downtimeJailDuration), false);
                 signingInfo.missedBlockCounter = 0;
                 _resetMissedBlock(signingInfo.indexOffset);
                 signingInfo.indexOffset = 0;
                 emit Slashed(_votingPower, 1);       
-                return true;
             }
         }
-        return false;
      }
 
     function _resetMissedBlock(uint256 _indexOffset) private {
@@ -654,6 +643,8 @@ contract Validator is IValidator, Ownable {
         return _shares.mul(inforValidator.tokens).div(inforValidator.delegationShares);
     }
     
+    event DD(uint256 d);
+
     function _slash(uint256 _infrationHeight, uint256 _power, uint256 _slashFactor) private {
         require(_infrationHeight <= block.number, "cannot slash infrations in the future");
         
@@ -719,9 +710,9 @@ contract Validator is IValidator, Ownable {
 
     // start start validator
     function start() external onlyValidator {
-        require(inforValidator.status != Status.Bonded);
-        require(!inforValidator.jailed);
-        require(inforValidator.tokens.div(powerReduction) > 0);
+        require(inforValidator.status != Status.Bonded, "validator bonded");
+        require(!inforValidator.jailed, "validator jailed");
+        require(inforValidator.tokens.div(powerReduction) > 0, "zero voting power");
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
         signingInfo.startHeight = block.number;
@@ -735,7 +726,7 @@ contract Validator is IValidator, Ownable {
     function _stop() private {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
-        inforValidator.unbondingTime = block.timestamp.add(UNBONDING_TiME);
+        inforValidator.unbondingTime = block.timestamp.add(params.unbondingTime);
     }
 
     function getUBDEntries(address delAddr)

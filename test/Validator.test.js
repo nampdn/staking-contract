@@ -202,8 +202,7 @@ contract("Validator", async (accounts) => {
 
         const valAddr = await staking.allVals(0)
         const validator = await Validator.at(valAddr)
-        await utils.advanceTime(86401 * 8);
-        
+        await utils.advanceTime(1814400);
         var withdraw = await validator.withdraw({from: accounts[1]})
 
         // check event
@@ -265,7 +264,6 @@ contract("Validator", async (accounts) => {
     })
 
     it("should unjail", async () => {
-        // @todo should optimize
         const staking = await Staking.deployed();
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
@@ -273,46 +271,30 @@ contract("Validator", async (accounts) => {
         const amount = web3.utils.toWei("5", "ether");
         await val.delegate({from: accounts[5], value: amount})
         await val.start({from: accounts[5]});
-        await finalize([accounts[5]])
 
         // before jail
-        var inforValidator = await val.inforValidator({from: accounts[5]})
-        assert.equal(inforValidator.jailed, false)
+        info = await val.inforValidator.call();
+        assert.equal(info.jailed, false)
 
         // first jail
-        for (var i=0; i<5; i++) {
+        for (var i=0; i<2; i++) {
             await finalize([accounts[5]]);
         }
 
         // after jail
-        var inforValidator1 = await val.inforValidator({from: accounts[5]})
-        assert.equal(inforValidator1.jailed, true)
-        assert.equal(inforValidator.tokens.toString(), web3.utils.toWei("4.8", "ether"))
-
+        info = await val.inforValidator.call();
+        assert.equal(info.jailed, true)
+        // downtime slashed: 5 - 5 * 0,01% = 4.9995
+        assert.equal(info.tokens.toString(), web3.utils.toWei("4.9995", "ether"))
+        
         // unjail
         await utils.advanceTime(601);
-        await val.unjail({from: accounts[5]})
+        await val.unjail({from: accounts[5]});
+        await val.start({from: accounts[5]});
 
         // after unjail
-        var inforValidator3 = await val.inforValidator({from: accounts[5]})
-        assert.equal(inforValidator3.jailed, false)
-
-        // second jail
-        for (var i=0; i<5; i++) {
-            await finalize([accounts[5]]);
-        }
-
-        // after second jail 
-        var inforValidator2 = await val.inforValidator({from: accounts[5]})
-        assert.equal(inforValidator2.jailed, true)
-
-        // second unjail
-        await utils.advanceTime(601);
-        await val.unjail({from: accounts[5]})
-
-        // after unjail
-        var inforValidator4 = await val.inforValidator({from: accounts[5]})
-        assert.equal(inforValidator4.jailed, false)
+        info = await val.inforValidator.call();
+        assert.equal(info.jailed, false)
     })
 
     it("double sign", async () => {
@@ -333,20 +315,11 @@ contract("Validator", async (accounts) => {
         assert.equal(info.jailed, true)
 
         valSet = await staking.getValidatorSets()
-        assert.equal(valSet[0].length, 1)
-        assert.equal(info.tokens.toString(), web3.utils.toWei("3.7990500475", "ether"))
+        assert.equal(valSet[0].length, 1);
+        assert.equal(info.tokens.toString(), web3.utils.toWei("3.799525000000000000", "ether"))
 
         const ubdEntries = await val.getUBDEntries.call(accounts[5])
         assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
-    })
-
-    it("validate signature", async () => {
-        const instance = await Validator.deployed();
-    
-        var validateSignature =  await instance.validateSignature(1000, false, {from: accounts[0]});
-        
-        // check event 
-        assert.equal("1", validateSignature.logs[0].args[0].toString()) // number of blocks miss
     })
 
     it ("should withdraw when validator stop", async () => {
@@ -385,7 +358,7 @@ contract("Validator", async (accounts) => {
         assert.equal(undelegate1.logs[0].args[1].toString(), web3.utils.toWei("0.1", "ether"))
 
         // if wait to pass unbond time
-        await utils.advanceTime(86401 * 10);
+        await utils.advanceTime(1814402);
 
         // undelegate and withdraw 
         var undelegate = await val0.undelegate(web3.utils.toWei("0.6", "ether"), {from: accounts[0]})
@@ -399,4 +372,7 @@ contract("Validator", async (accounts) => {
         assert.equal(withdraw.logs[0].args[0], accounts[0])
         assert.equal(withdraw.logs[0].args[1].toString(), web3.utils.toWei("0.1", "ether"))
     })
+
+    
+
 })

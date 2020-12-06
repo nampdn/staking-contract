@@ -290,7 +290,7 @@ contract Staking is IStaking, Ownable {
         for (uint i = 0; i < total; i++) {
             address valAddr = valSets[i];
             signerAddrs[i] = valOf[valAddr];
-            votingPowers[i] = balanceOf[valAddr].div(1 * 10**8);
+            votingPowers[i] = balanceOf[valAddr].div(1 * 10 ** 8);
         }
         return (signerAddrs, votingPowers);
     }
