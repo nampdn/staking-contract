@@ -314,12 +314,7 @@ contract Validator is IValidator, Ownable {
             );
             emit Undelegate(from, _amount, completionTime);
         }
-
-        if (inforValidator.status == Status.Bonded && 
-            inforValidator.tokens.div(powerReduction) == 0) {
-            _staking.removeFromSets();
-            _stop();
-        }
+        _stopIfZeroPowerOrJailed();
     }
 
     function _checkUndelegateAmount(address _delAddr, uint256 _amount) private view returns (bool) {
@@ -692,6 +687,18 @@ contract Validator is IValidator, Ownable {
         _staking.removeFromSets();
         _stop();
     }
+
+
+    function _stopIfZeroPowerOrJailed() private {
+        if (inforValidator.status != Status.Bonded) {
+            return;
+        }
+
+        if (inforValidator.jailed || inforValidator.tokens.div(powerReduction) == 0) {
+            _stop();
+        }
+    }
+
 
    function doubleSign(
         uint256 votingPower,
