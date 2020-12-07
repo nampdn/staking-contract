@@ -17,7 +17,8 @@ interface IValidator {
     function withdrawRewards() external;
     function withdrawCommission()external;
     function withdraw() external;
-    function undelegate(uint256 _amount) external;
+    function undelegate() external;
+    function undelegateWithAmount(uint256 _amount) external;
     function getCommissionRewards() external view returns (uint256);
     function getDelegationRewards(address _delAddr) external view returns (uint256);
     function validateSignature(uint256 _votingPower, bool _signed) external;

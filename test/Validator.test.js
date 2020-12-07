@@ -127,7 +127,7 @@ contract("Validator", async (accounts) => {
         
         // undelegate with stake remaining greater than the min stake amount
         const amount = web3.utils.toWei("0.1", "ether");
-        var undelegate = await validator.undelegate(amount, {from: accounts[1]});
+        var undelegate = await validator.undelegateWithAmount(amount, {from: accounts[1]});
 
         // check delegation
         var delegation =  await validator.delegationByAddr(accounts[1]);
@@ -137,7 +137,7 @@ contract("Validator", async (accounts) => {
         assert.equal(delegation.stake.toString(), web3.utils.toWei("0.3", "ether"))
 
         // undelegate all stake amount
-        await validator.undelegate(web3.utils.toWei("0.3", "ether"), {from: accounts[1]});
+        await validator.undelegateWithAmount(web3.utils.toWei("0.3", "ether"), {from: accounts[1]});
         var delegation2 =  await validator.delegationByAddr(accounts[1]);
         // check balance remaining
         assert.equal(delegation2.shares.toString(), "0")
@@ -165,19 +165,19 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(valAddr)
         let tx = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.7", "ether")});
 
-        await utils.assertRevert(validator.undelegate(web3.utils.toWei("0.6999", "ether"), {from: accounts[1]}), "Undelegate amount invalid");
+        await utils.assertRevert(validator.undelegateWithAmount(web3.utils.toWei("0.6999", "ether"), {from: accounts[1]}), "Undelegate amount invalid");
         
-        await utils.assertRevert(validator.undelegate(web3.utils.toWei("10", "ether"), {from: accounts[1]}), "SafeMath: subtraction overflow");
+        await utils.assertRevert(validator.undelegateWithAmount(web3.utils.toWei("10", "ether"), {from: accounts[1]}), "SafeMath: subtraction overflow");
 
         const amount = web3.utils.toWei("0.01", "ether");
         for (var i =0; i < 5; i ++) {
-            await validator.undelegate(amount, {from: accounts[1]});
+            await validator.undelegateWithAmount(amount, {from: accounts[1]});
         }
 
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[1]}), "too many unbonding delegation entries");
+        await utils.assertRevert(validator.undelegateWithAmount(amount, {from: accounts[1]}), "too many unbonding delegation entries");
 
         // not found delgator
-        await utils.assertRevert(validator.undelegate(amount, {from: accounts[5]}), "delegation not found"); // 'delegation not found
+        await utils.assertRevert(validator.undelegateWithAmount(amount, {from: accounts[5]}), "delegation not found"); // 'delegation not found
     })
 
     it ("update signer", async () => {
@@ -304,7 +304,7 @@ contract("Validator", async (accounts) => {
         // before jail
         var inforValidator = await val.inforValidator({from: accounts[5]})
         assert.equal(inforValidator.jailed, false)
-        await val.undelegate(web3.utils.toWei("1", "ether"), {from: accounts[5]})
+        await val.undelegateWithAmount(web3.utils.toWei("1", "ether"), {from: accounts[5]})
         await staking.doubleSign(accounts[5], valSet[1][1], 1, {from: accounts[0]});
 
         const info = await val.inforValidator()
@@ -347,7 +347,7 @@ contract("Validator", async (accounts) => {
         var inforVal2 = await val0.inforValidator({from: accounts[0]})
         assert.equal("0",inforVal2.status.toString()) // 0 is unbonding status
 
-        var undelegate1 = await val0.undelegate(web3.utils.toWei("0.1", "ether"), {from: accounts[0]})
+        var undelegate1 = await val0.undelegateWithAmount(web3.utils.toWei("0.1", "ether"), {from: accounts[0]})
 
         assert.equal(undelegate1.logs[0].event, 'Undelegate')
         assert.equal(undelegate1.logs[0].args[0], accounts[0])
@@ -357,7 +357,7 @@ contract("Validator", async (accounts) => {
         await utils.advanceTime(1814402);
 
         // undelegate and withdraw 
-        var undelegate = await val0.undelegate(web3.utils.toWei("0.6", "ether"), {from: accounts[0]})
+        var undelegate = await val0.undelegateWithAmount(web3.utils.toWei("0.6", "ether"), {from: accounts[0]})
         assert.equal(undelegate.logs[0].event, 'Withdraw')
         assert.equal(undelegate.logs[0].args[0], accounts[0])
         assert.equal(undelegate.logs[0].args[1].toString(), web3.utils.toWei("0.6", "ether"))
@@ -369,6 +369,31 @@ contract("Validator", async (accounts) => {
         assert.equal(withdraw.logs[0].args[1].toString(), web3.utils.toWei("0.1", "ether"))
     })
 
-    
+    it ("should undelegate all stake", async () => {
+        const staking = await Staking.deployed();
+
+        const val = await Validator.at(await staking.allVals(1));
+        await val.delegate({from: accounts[4], value: web3.utils.toWei("3.000000000000000003", "ether")})
+
+        // check infor delegate 
+        var delegation =  await val.delegationByAddr(accounts[4]);
+        assert.equal(web3.utils.toWei("2.999999999999999999", "ether"), delegation.stake.toString())
+     
+        var undelegate = await val.undelegate({from: accounts[4]});
+        assert.equal(undelegate.logs[0].event, 'Withdraw')
+        assert.equal(undelegate.logs[0].args[0], accounts[4])
+
+        // make sure delegator is deleted 
+        await utils.assertRevert(val.undelegate({from: accounts[4]}), "delegation not found")
+
+        // undelegate 
+        await val.delegate({from: accounts[7], value: web3.utils.toWei("10", "ether")})
+        var delegation1 =  await val.delegationByAddr(accounts[7]);
+        var stakeAmount = await delegation1.stake.toString()
+        await val.undelegateWithAmount(stakeAmount, {from: accounts[7]})
+
+        // make sure delegator is deleted 
+        await utils.assertRevert(val.undelegate({from: accounts[7]}), "delegation not found")
+    })
 
 })

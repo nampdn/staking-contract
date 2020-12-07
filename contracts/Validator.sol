@@ -281,15 +281,21 @@ contract Validator is IValidator, Ownable {
         inforValidator.jailed = false;
     }
 
-    function undelegate(uint256 _amount) external onlyDelegator{
+    function undelegate() external onlyDelegator{
+        Delegation storage del = delegationByAddr[msg.sender];
+        uint256 amount = del.stake;
+        _undelegate(msg.sender, amount);
+        _staking.undelegate(amount);
+    }
+
+    function undelegateWithAmount(uint256 _amount) external onlyDelegator{
+        require(_checkUndelegateAmount(msg.sender, _amount) == true, "Undelegate amount invalid");
+        require(ubdEntries[msg.sender].length < 7, "too many unbonding delegation entries");
         _undelegate(msg.sender, _amount);
         _staking.undelegate(_amount);
     }
 
     function _undelegate(address payable from, uint256 _amount) private {
-        require(_checkUndelegateAmount(from, _amount) == true, "Undelegate amount invalid");
-        require(ubdEntries[from].length < 7, "too many unbonding delegation entries");
-        
         _withdrawRewards(from);
         Delegation storage del = delegationByAddr[from];
         uint256 shares = _shareFromToken(_amount);
@@ -382,10 +388,10 @@ contract Validator is IValidator, Ownable {
         _withdraw(msg.sender, amount);
     }
 
+    uint256 public duy;
     function _withdraw(address payable to, uint256 amount) private {
         require(amount > 0, "no unbonding amount to withdraw");
-        to.transfer(amount);
-        if (delegationByAddr[to].shares == 0 && ubdEntries[to].length == 0) {
+        if (delegationByAddr[to].shares <= 1000 && ubdEntries[to].length == 0) {
             _removeDelegation(to);
         }
         emit Withdraw(to, amount);
@@ -724,7 +730,7 @@ contract Validator is IValidator, Ownable {
             params.slashFractionDoubleSign
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
-        _jail(253402300799, true);
+        _jail(253402300799, false);
 
         emit Slashed(votingPower, 2);
     }
