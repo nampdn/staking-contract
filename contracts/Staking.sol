@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0;
+pragma solidity ^0.5.0;
 import "./interfaces/IStaking.sol";
 import "./interfaces/IValidator.sol";
 import "./Minter.sol";

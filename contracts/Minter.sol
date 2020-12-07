@@ -1,4 +1,4 @@
-pragma solidity >=0.5.0;
+pragma solidity ^0.5.0;
 import {Ownable} from "./Ownable.sol";
 import {IStaking} from "./interfaces/IStaking.sol";
 import {SafeMath} from "./Safemath.sol";

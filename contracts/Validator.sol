@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.5.0;
+pragma solidity ^0.5.0;
 import "./EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IStaking.sol";
@@ -390,7 +390,7 @@ contract Validator is IValidator, Ownable {
 
     function _withdraw(address payable to, uint256 amount) private {
         require(amount > 0, "no unbonding amount to withdraw");
-        if (delegationByAddr[to].shares <= 1000 && ubdEntries[to].length == 0) {
+        if (delegationByAddr[to].shares <= 5 && ubdEntries[to].length == 0) {
             _removeDelegation(to);
         }
         emit Withdraw(to, amount);
