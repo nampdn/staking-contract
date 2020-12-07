@@ -388,7 +388,6 @@ contract Validator is IValidator, Ownable {
         _withdraw(msg.sender, amount);
     }
 
-    uint256 public duy;
     function _withdraw(address payable to, uint256 amount) private {
         require(amount > 0, "no unbonding amount to withdraw");
         if (delegationByAddr[to].shares <= 1000 && ubdEntries[to].length == 0) {
