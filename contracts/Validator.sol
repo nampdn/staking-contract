@@ -299,7 +299,9 @@ contract Validator is IValidator, Ownable {
         _withdrawRewards(from);
         Delegation storage del = delegationByAddr[from];
         uint256 shares = _shareFromToken(_amount);
-        require(del.shares >= shares, "not enough delegation shares");
+        if (shares > del.shares) {
+            shares = del.shares;
+        }
         del.shares = del.shares.sub(shares);
         _initializeDelegation(from);
         bool isValidatorOperator = inforValidator.signer == from;
@@ -328,7 +330,7 @@ contract Validator is IValidator, Ownable {
                     amount: amountRemoved
                 })
             );
-            emit Undelegate(from, _amount, completionTime);
+            emit Undelegate(from, amountRemoved, completionTime);
         }
         _stopIfZeroPowerOrJailed();
     }
@@ -390,7 +392,7 @@ contract Validator is IValidator, Ownable {
 
     function _withdraw(address payable to, uint256 amount) private {
         require(amount > 0, "no unbonding amount to withdraw");
-        if (delegationByAddr[to].shares <= 5 && ubdEntries[to].length == 0) {
+        if (delegationByAddr[to].shares <= 100 && ubdEntries[to].length == 0) {
             _removeDelegation(to);
         }
         emit Withdraw(to, amount);
@@ -506,16 +508,14 @@ contract Validator is IValidator, Ownable {
         } else {
             _beforeDelegationSharesModified(_delAddr);
         }
-
         uint256 shared = _addTokenFromDel(_amount);
-
         // increment stake amount
         Delegation storage del = delegationByAddr[_delAddr];
         del.shares = del.shares.add(shared);
         _initializeDelegation(_delAddr);
         emit Delegate(_delAddr, _amount);
     }
-    
+
     function _beforeDelegationCreated() private {
         _incrementValidatorPeriod();
     }
@@ -729,7 +729,7 @@ contract Validator is IValidator, Ownable {
             params.slashFractionDoubleSign
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
-        _jail(253402300799, false);
+        _jail(253402300799, true);
 
         emit Slashed(votingPower, 2);
     }
