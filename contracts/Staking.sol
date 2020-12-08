@@ -31,9 +31,6 @@ contract Staking is IStaking, Ownable {
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
 
-    uint256 public duy1;
-    uint256 public duy2;
-
     // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
@@ -72,8 +69,6 @@ contract Staking is IStaking, Ownable {
             rate <= maxRate,
             "commission rate cannot be more than the max rate"
         );
-        duy1 = address(uint160(msg.sender)).balance;
-        duy2 = params.minValidatorBalance;
         require(
             address(uint160(msg.sender)).balance >= params.minValidatorBalance,
             "Address balance must greater or equal minimum validator balance"
