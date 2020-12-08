@@ -420,9 +420,9 @@ contract("Validator", async (accounts) => {
         assert.equal(inforVal1.status.toString(), "0") // unbonding
 
         await val9.undelegate({from: accounts[9]})
-        await utils.advanceTime(1814402);
-        var withdraw = await val9.withdraw({from: accounts[9]})
-        assert.equal(web3.utils.toWei("0.014999999999999999", "ether"), withdraw.logs[0].args[1].toString())
+        // await utils.advanceTime(1814402);
+        // var withdraw = await val9.withdraw({from: accounts[9]})
+        // assert.equal(web3.utils.toWei("0.014999999999999999", "ether"), withdraw.logs[0].args[1].toString())
 
         // make sure delegator is deleted 
         await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")

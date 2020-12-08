@@ -334,7 +334,7 @@ contract Validator is IValidator, Ownable {
             );
             emit Undelegate(from, amountRemoved, completionTime);
         }
-        _stopIfZeroPowerOrJailed();
+        _stopIfNeeded();
     }
 
     function _isUnbonding() private view returns (bool) {
@@ -491,9 +491,6 @@ contract Validator is IValidator, Ownable {
         } else {
             issuedTokens = _tokenFromShare(_shares);
             inforValidator.tokens = inforValidator.tokens.sub(issuedTokens);
-            if (inforValidator.tokens < params.minValidatorBalance) {
-                _stop();
-            }
         }
         inforValidator.delegationShares = remainingShares;
         return issuedTokens;
@@ -725,16 +722,14 @@ contract Validator is IValidator, Ownable {
         _stop();
     }
 
-    function _stopIfZeroPowerOrJailed() private {
+    function _stopIfNeeded() private {
         if (!_isBonded()) return;
-        if (inforValidator.jailed || _isZeroPower()) {
+        if (inforValidator.jailed || 
+            inforValidator.tokens < params.minValidatorBalance) {
             _stop();
         }
     }
 
-    function _isZeroPower() private view returns (bool) {
-        return inforValidator.tokens.div(powerReduction) == 0;
-    }
 
    function doubleSign(
         uint256 votingPower,
