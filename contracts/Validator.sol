@@ -420,6 +420,18 @@ contract Validator is IValidator, Ownable {
         }
         return rewards;
     }
+
+    function getDelegations() public view returns (address[] memory, uint256[] memory) {
+        uint256 total = delegations.length();
+        address[] memory delAddrs = new address[](total);
+        uint256[] memory shares = new uint256[](total);
+        for (uint256 i = 0; i < total; i++) {
+            address delAddr = delegations.at(i);
+            delAddrs[i] = delAddr;
+            shares[i] = delegationByAddr[delAddr].shares;
+        }
+        return (delAddrs, shares);
+    }
     
     // validate validator signature, must be called once per validator per block
     function validateSignature(

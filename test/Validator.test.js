@@ -427,4 +427,13 @@ contract("Validator", async (accounts) => {
         // make sure delegator is deleted 
         await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
     })
+
+    it ("should get delegation", async () => {
+        const staking = await Staking.deployed();
+
+        const val = await Validator.at(await staking.allVals(1));
+
+        var delegation = await val.getDelegations({from: accounts[5]})
+        assert.equal("2", delegation[0].length)
+    })
 })
