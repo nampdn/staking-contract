@@ -53,4 +53,7 @@ interface IValidator {
     event Slashed(uint256 _power, uint256 _reason);
     event Liveness(uint256 _missedBlocks, uint256 _blockHeight);
     event UpdatedSigner(address previousSigner, address newSigner);
+
+    event Started();
+    event Stopped();
 }

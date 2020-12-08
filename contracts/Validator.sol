@@ -756,6 +756,7 @@ contract Validator is IValidator, Ownable {
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
         signingInfo.startHeight = block.number;
+        emit Started();
     }
 
     // stop validator
@@ -767,6 +768,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
         inforValidator.unbondingTime = block.timestamp.add(params.unbondingTime);
+        emit Stopped();
     }
 
     function getUBDEntries(address delAddr)
