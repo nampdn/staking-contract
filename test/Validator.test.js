@@ -397,17 +397,34 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(val.undelegate({from: accounts[7]}), "delegation not found")
     })
 
-    it ("should not create validator with balance smaller than min validator balance", async () => {
-        const staking = await Staking2.deployed();
+    it ("should not start validator with balance smaller than min validator balance", async () => {
+        const staking = await Staking.deployed();
+        await createValidator(accounts[9]);
+        const val9 = await Validator.at(await staking.allVals(4));
+        await val9.delegate({from: accounts[9], value:  web3.utils.toWei("0.015", "ether")})
 
-        await web3.eth.sendTransaction({ from: accounts[9], to: accounts[0], value: web3.utils.toWei("999999", "ether")})
-        const rate = web3.utils.toWei("0.4", "ether");
-        const maxRate = web3.utils.toWei("0.5", "ether");
-        const maxChangeRate = web3.utils.toWei("0.1", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
-        const name = web3.utils.fromAscii("val9");
+        await utils.assertRevert(val9.start({from: accounts[9]}), "Address balance must greater or equal minimum validator balance")
 
-        await utils.assertRevert(staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[9]}),
-         "Address balance must greater or equal minimum validator balance")
+        await val9.delegate({from: accounts[9], value:  web3.utils.toWei("10", "ether")})
+        await val9.start({from: accounts[9]})
+
+        // before undelegate
+        var inforVal = await val9.inforValidator({from: accounts[9]})
+        assert.equal(inforVal.status.toString(), "2") // bonded
+        await val9.undelegateWithAmount(web3.utils.toWei("10", "ether"), {from: accounts[9]})
+        await utils.advanceTime(1814402);
+
+        await val9.withdraw({from: accounts[9]})
+        // after undelegate
+        var inforVal1 = await val9.inforValidator({from: accounts[9]})
+        assert.equal(inforVal1.status.toString(), "0") // unbonding
+
+        await val9.undelegate({from: accounts[9]})
+        await utils.advanceTime(1814402);
+        var withdraw = await val9.withdraw({from: accounts[9]})
+        assert.equal(web3.utils.toWei("0.014999999999999999", "ether"), withdraw.logs[0].args[1].toString())
+
+        // make sure delegator is deleted 
+        await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
     })
 })

@@ -16,7 +16,6 @@ contract Staking is IStaking, Ownable {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
         uint256 maxValidator;
-        uint256 minValidatorBalance;
     }
 
     address internal _previousProposer; // last proposer address
@@ -41,8 +40,7 @@ contract Staking is IStaking, Ownable {
         params = Params({
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
-            maxValidator: 21,
-            minValidatorBalance: 100000 * 10**18
+            maxValidator: 21
         });
 
         minter = new Minter();
@@ -69,11 +67,6 @@ contract Staking is IStaking, Ownable {
             rate <= maxRate,
             "commission rate cannot be more than the max rate"
         );
-        require(
-            address(uint160(msg.sender)).balance >= params.minValidatorBalance,
-            "Address balance must greater or equal minimum validator balance"
-        );
-
         bytes memory bytecode = type(Validator).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(name, rate, maxRate, 
             maxChangeRate, minSelfDelegation, msg.sender));

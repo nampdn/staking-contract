@@ -124,6 +124,7 @@ contract Validator is IValidator, Ownable {
         uint signedBlockWindow;
         uint256 minSignedPerWindow;
         uint256 minStake;
+        uint256 minValidatorBalance;
     }
     
     EnumerableSet.AddressSet private delegations; // all delegations
@@ -163,7 +164,8 @@ contract Validator is IValidator, Ownable {
             slashFractionDoubleSign: 5 * 10**16,
             signedBlockWindow: 10000,
             minSignedPerWindow: 5 * 10**16,
-            minStake: 1 * 10**17 // 10 000 kai
+            minStake: 1 * 10**16, // 10 000 kai
+            minValidatorBalance: 1 * 10**17
         });
     }
     
@@ -477,6 +479,9 @@ contract Validator is IValidator, Ownable {
         } else {
             issuedTokens = _tokenFromShare(_shares);
             inforValidator.tokens = inforValidator.tokens.sub(issuedTokens);
+            if (inforValidator.tokens < params.minValidatorBalance) {
+                _stop();
+            }
         }
         inforValidator.delegationShares = remainingShares;
         return issuedTokens;
@@ -739,6 +744,8 @@ contract Validator is IValidator, Ownable {
         require(inforValidator.status != Status.Bonded, "validator bonded");
         require(!inforValidator.jailed, "validator jailed");
         require(inforValidator.tokens.div(powerReduction) > 0, "zero voting power");
+        require(inforValidator.tokens >= params.minValidatorBalance, "Address balance must greater or equal minimum validator balance");
+
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
         signingInfo.startHeight = block.number;
