@@ -1,5 +1,6 @@
 const Validator = artifacts.require("ValidatorTest");
 const Staking = artifacts.require("StakingTest");
+const Staking2 = artifacts.require("Staking");
 const Minter = artifacts.require("Minter");
 const utils = require("./utils");
 
@@ -396,4 +397,17 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(val.undelegate({from: accounts[7]}), "delegation not found")
     })
 
+    it ("should not create validator with balance smaller than min validator balance", async () => {
+        const staking = await Staking2.deployed();
+
+        await web3.eth.sendTransaction({ from: accounts[9], to: accounts[0], value: web3.utils.toWei("999999", "ether")})
+        const rate = web3.utils.toWei("0.4", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
+        const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
+        const name = web3.utils.fromAscii("val9");
+
+        await utils.assertRevert(staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[9]}),
+         "Address balance must greater or equal minimum validator balance")
+    })
 })
