@@ -432,7 +432,6 @@ contract Validator is IValidator, Ownable {
         }
         return (delAddrs, shares);
     }
-    
     // validate validator signature, must be called once per validator per block
     function validateSignature(
         uint256 _votingPower,
@@ -621,18 +620,6 @@ contract Validator is IValidator, Ownable {
             starting.cumulativeRewardRatio
         );
         return _stake.mulTrun(difference); // return staking * (ending - starting)
-    }
-    
-    function _addToken(uint256 _amount) private returns(uint256) {
-        uint256 issuedShares = 0;
-        if (inforValidator.tokens == 0) {
-            issuedShares = oneDec;
-        } else {
-            issuedShares = _shareFromToken(_amount);
-        }
-        inforValidator.tokens = inforValidator.tokens.add(_amount);
-        inforValidator.delegationShares = inforValidator.delegationShares.add(issuedShares);
-        return inforValidator.delegationShares;
     }
     
     function _shareFromToken(uint256 _amount) private view returns(uint256) {

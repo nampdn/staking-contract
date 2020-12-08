@@ -35,9 +35,9 @@ contract("Validator", async (accounts) => {
     it("should create validator", async () => {
         const instance = await Validator.deployed();
 
-        const rate = web3.utils.toWei("0.4", "ether");
+        const rate = web3.utils.toWei("0.1", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
-        const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const maxChangeRate = web3.utils.toWei("0.2", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
         await instance.initialize(name, accounts[0], rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]});
@@ -64,11 +64,30 @@ contract("Validator", async (accounts) => {
         commissionRate = web3.utils.toWei("2", "ether");
         await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
         "commission cannot be changed more than one in 24h");
+
+        await utils.advanceTime(86400);
+
+        commissionRate = web3.utils.toWei("0.4", "ether");
+        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        "commission cannot be changed more than max change rate");
+
+        commissionRate = web3.utils.toWei("2", "ether");
+        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        "commission cannot be more than the max rate");
+
+        minSelfDelegation = web3.utils.toWei("0.2", "ether");
+        await utils.assertRevert(instance.update(name, 0, minSelfDelegation, {from: accounts[0]}), 
+        "minimum self delegation cannot be decrease");
+
+        minSelfDelegation = web3.utils.toWei("0.55", "ether");
+        await utils.assertRevert(instance.update(name, 0, minSelfDelegation, {from: accounts[0]}), 
+        "self delegation below minimum");
+
     })
 
     it ("should update validator", async () => {
         const instance = await Validator.deployed();
-        const name = web3.utils.fromAscii("");
+        const name = web3.utils.fromAscii("12131");
         let commissionRate = web3.utils.toWei("0.3", "ether");
         await utils.advanceTime(86401);
         var update = await instance.update(name, commissionRate, 0, {from: accounts[0]});
@@ -274,10 +293,12 @@ contract("Validator", async (accounts) => {
         assert.equal(info.jailed, false)
 
         // first jail
-        for (var i=0; i<2; i++) {
-            await finalize([accounts[5]]);
-        }
-
+        await finalize([accounts[5]]);
+        let missedBlock = await val.getMissedBlock.call();
+        assert.equal(missedBlock[0], true);
+        await finalize([accounts[5]]);
+        missedBlock = await val.getMissedBlock.call();
+        assert.equal(missedBlock[0], false);
         // after jail
         info = await val.inforValidator.call();
         assert.equal(info.jailed, true)
