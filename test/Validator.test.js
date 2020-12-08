@@ -227,7 +227,7 @@ contract("Validator", async (accounts) => {
         await finalize([]);
         var commissionRewards = await validator.getCommissionRewards({from: accounts[0]})
 
-        assert.equal("15854895991882293251", commissionRewards)
+        assert.equal("6341958396752917299", commissionRewards.toString())
         await validator.withdrawCommission({from: accounts[0]})
     })
 
@@ -247,7 +247,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
-        assert.equal("13121293234661208208", delegationRewards.toString())
+        assert.equal("5248517293864483283", delegationRewards.toString())
         const tx = await validator.withdrawRewards({from: accounts[0]})
     })
 
