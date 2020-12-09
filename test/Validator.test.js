@@ -280,7 +280,7 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(validator.withdrawRewards({from: accounts[3]}), "delegation not found");
     })
 
-    it("should unjail", async () => {
+    it ("missed block", async () => {
         const staking = await Staking.deployed();
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
@@ -288,18 +288,29 @@ contract("Validator", async (accounts) => {
         await val.delegate({from: accounts[5], value: amount})
         await val.start({from: accounts[5]});
 
-        // before jail
         info = await val.inforValidator.call();
         assert.equal(info.jailed, false)
 
-        // first jail
         await finalize([accounts[5]]);
         let missedBlock = await val.getMissedBlock.call();
         assert.equal(missedBlock[0], true);
         await finalize([accounts[5]]);
+        await finalize([]);
+        await finalize([]);
         missedBlock = await val.getMissedBlock.call();
         assert.equal(missedBlock[0], false);
-        // after jail
+
+        
+    })
+
+    it("should unjail", async () => {
+        const staking = await Staking.deployed();
+        const val = await Validator.at(await staking.allVals(1));
+
+        for (var i =0 ; i < 3; i ++) {
+            await finalize([accounts[5]]);
+        }
+
         info = await val.inforValidator.call();
         assert.equal(info.jailed, true)
         // downtime slashed: 5 - 5 * 0,01% = 4.9995
@@ -317,7 +328,7 @@ contract("Validator", async (accounts) => {
 
     it("double sign", async () => {
         const staking = await Staking.deployed();
-        const valAddr = await await staking.allVals(1)
+        const valAddr = await staking.allVals(1)
         const val = await Validator.at(valAddr);
 
         let valSet = await staking.getValidatorSets()

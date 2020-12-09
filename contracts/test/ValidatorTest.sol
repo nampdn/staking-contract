@@ -5,7 +5,7 @@ import "../Validator.sol";
 
 contract ValidatorTest is Validator {
     function setParamsTest() public {
-        params.signedBlockWindow = 2;
+        params.signedBlockWindow = 3;
         params.minSignedPerWindow = 50 * 10**16;
     }
 }
