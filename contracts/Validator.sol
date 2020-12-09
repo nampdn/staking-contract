@@ -711,7 +711,8 @@ contract Validator is IValidator, Ownable {
 
     function _stopIfNeeded() private {
         if (!_isBonded()) return;
-        if (inforValidator.jailed) {
+        if (inforValidator.jailed || 
+            inforValidator.tokens < params.minValidatorBalance) {
             _stop();
         }
     }
