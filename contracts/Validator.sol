@@ -738,7 +738,7 @@ contract Validator is IValidator, Ownable {
         require(inforValidator.status != Status.Bonded, "validator bonded");
         require(!inforValidator.jailed, "validator jailed");
         require(inforValidator.tokens.div(powerReduction) > 0, "zero voting power");
-        require(delegationByAddr[msg.sender].stake >= params.minValidatorBalance, "Address balance must greater or equal minimum validator balance");
+        require(inforValidator.tokens >= params.minValidatorBalance, "Address balance must greater or equal minimum validator balance");
 
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
