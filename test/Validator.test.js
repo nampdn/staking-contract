@@ -458,4 +458,5 @@ contract("Validator", async (accounts) => {
         var delegation = await val.getDelegations({from: accounts[5]})
         assert.equal("2", delegation[0].length)
     })
+    
 })
