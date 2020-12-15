@@ -18,6 +18,7 @@ interface IValidator {
     function withdrawCommission()external;
     function withdraw() external;
     function undelegate() external;
+    function setParams(address _params) external;
     function undelegateWithAmount(uint256 _amount) external;
     function getCommissionRewards() external view returns (uint256);
     function getDelegationRewards(address _delAddr) external view returns (uint256);

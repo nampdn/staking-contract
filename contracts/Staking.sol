@@ -5,6 +5,7 @@ import "./interfaces/IValidator.sol";
 import "./Minter.sol";
 import "./Safemath.sol";
 import "./Ownable.sol";
+import "./Params.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
 
@@ -12,14 +13,7 @@ contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
 
-    struct Params {
-        uint256 baseProposerReward;
-        uint256 bonusProposerReward;
-        uint256 maxValidator;
-    }
-
     address internal _previousProposer; // last proposer address
-    Params public  params; // staking params
     address[] public allVals; // list all validators
     mapping(address => address) public ownerOf; // Owner of the validator
     mapping(address => address) public valOf; // Validator of the owner
@@ -29,6 +23,7 @@ contract Staking is IStaking, Ownable {
     address[] public valSets;
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
+    address public params;
 
     // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
@@ -37,13 +32,9 @@ contract Staking is IStaking, Ownable {
     }
 
     constructor() public {
-        params = Params({
-            baseProposerReward: 1 * 10**16,
-            bonusProposerReward: 4 * 10**16,
-            maxValidator: 21
-        });
-
-        minter = new Minter();
+        params = address(new Params());
+        minter = new Minter(params);
+       
     }
 
     // create new validator
@@ -84,6 +75,11 @@ contract Staking is IStaking, Ownable {
         allVals.push(val);
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
+        IValidator(val).setParams(params);
+    }
+
+    function setParams(address _params) external onlyOwner {
+        params = _params;
     }
 
     // Update signer address
@@ -132,8 +128,8 @@ contract Staking is IStaking, Ownable {
         uint256 previousFractionVotes = sumPreviousPrecommitPower.divTrun(
             totalPreviousVotingPower
         );
-        uint256 proposerMultiplier = params.baseProposerReward.add(
-            params.bonusProposerReward.mulTrun(previousFractionVotes)
+        uint256 proposerMultiplier = IParams(params).getBaseProposerReward().add(
+            IParams(params).getBonusProposerReward().mulTrun(previousFractionVotes)
         );
 
         uint256 fees = minter.feesCollected();
@@ -233,7 +229,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function startValidator() external onlyValidator {
-        if (valSets.length < params.maxValidator) {
+        if (valSets.length < IParams(params).getMaxValidators()) {
             valSets.push(msg.sender);
             return;
         }
@@ -276,6 +272,46 @@ contract Staking is IStaking, Ownable {
             votingPowers[i] = balanceOf[valAddr].div(1 * 10 ** 8);
         }
         return (signerAddrs, votingPowers);
+    }
+
+    function setMaxValidators(uint256 _maxValidators) external onlyOwner {
+        IParams(params).updateMaxValidator(_maxValidators);
+    }
+    
+    function setPreviousProposer(address previousProposer) external onlyOwner {
+        _previousProposer = previousProposer;
+    }
+
+    function setMintParams(
+        uint256 _inflationRateChange,
+        uint256 _goalBonded,
+        uint256 _blocksPerYear,
+        uint256 _inflationMax,
+        uint256 _inflationMin
+    ) external onlyOwner {
+        IParams(params).updateMintParams(_inflationRateChange, _goalBonded, _blocksPerYear, _inflationMax, _inflationMin);
+    }
+
+    function setValidatorParams(
+        uint256 _downtimeJailDuration,
+        uint256 _slashFractionDowntime,
+        uint256 _unbondingTime,
+        uint256 _slashFractionDoubleSign,
+        uint256 _signedBlockWindow,
+        uint256 _minSignedPerWindow,
+        uint256 _minStake,
+        uint256 _minValidatorBalance
+    ) external onlyOwner {
+        IParams(params).updateValidatorParams(
+            _downtimeJailDuration,
+            _slashFractionDowntime,
+            _unbondingTime,
+            _slashFractionDoubleSign,
+            _signedBlockWindow,
+            _minSignedPerWindow,
+            _minStake,
+            _minValidatorBalance
+        );
     }
 
     function deposit() external payable {

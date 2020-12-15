@@ -3,6 +3,8 @@ pragma solidity ^0.5.0;
 import "./EnumerableSet.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IStaking.sol";
+import {IParams} from "./interfaces/IParams.sol";
+
 
 import "./Safemath.sol";
 import "./Ownable.sol";
@@ -116,17 +118,6 @@ contract Validator is IValidator, Ownable {
         uint256 unbondingHeight; // unbonding height
     }
     
-    struct Params {
-        uint256 downtimeJailDuration;
-        uint256 slashFractionDowntime;
-        uint256 unbondingTime;
-        uint256 slashFractionDoubleSign;
-        uint signedBlockWindow;
-        uint256 minSignedPerWindow;
-        uint256 minStake;
-        uint256 minValidatorBalance;
-    }
-    
     EnumerableSet.AddressSet private delegations; // all delegations
     mapping(address => Delegation) public delegationByAddr; // delegation by address
     mapping(uint256 => HistoricalReward) hRewards;
@@ -139,7 +130,7 @@ contract Validator is IValidator, Ownable {
     SlashEvent[] public slashEvents; // slash events
     SigningInfo public signingInfo; // signing info
     mapping(uint => bool) private missedBlock; // missed block
-    Params public params;
+    address public params;
     IStaking private _staking;
 
      // Functions with this modifier can only be executed by the validator
@@ -156,17 +147,6 @@ contract Validator is IValidator, Ownable {
     constructor() public {
         transferOwnership(msg.sender);
         _staking = IStaking(msg.sender);
-
-        params = Params({
-            downtimeJailDuration: 600,
-            slashFractionDowntime: 1 * 10**14,
-            unbondingTime: 1814400, 
-            slashFractionDoubleSign: 5 * 10**16,
-            signedBlockWindow: 10000,
-            minSignedPerWindow: 5 * 10**16,
-            minStake: 1 * 10**16, // 10 000 kai
-            minValidatorBalance: 1 * 10**17
-        });
     }
     
     // called one by the staking at time of deployment  
@@ -183,6 +163,8 @@ contract Validator is IValidator, Ownable {
         inforValidator.signer = _signer;
         inforValidator.updateTime = block.timestamp;
         inforValidator.status = Status.Unbonded;
+        // params = _params;
+
         
         commission = Commission({
             maxRate: _maxRate,
@@ -193,6 +175,10 @@ contract Validator is IValidator, Ownable {
         _initializeValidator();
     }
 
+    function setParams(address _params) external {
+        params = _params;
+    }
+    
     // update signer address
     function updateSigner(address signerAddr) external onlyValidator {
         require(signerAddr != msg.sender);
@@ -321,7 +307,7 @@ contract Validator is IValidator, Ownable {
             _withdraw(msg.sender, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;
-            uint256 completionTime = block.timestamp.add(params.unbondingTime);
+            uint256 completionTime = block.timestamp.add(IParams(params).getUnbondingTime());
             if (_isUnbonding()) {
                 completionTime = inforValidator.unbondingTime;
             }
@@ -354,7 +340,7 @@ contract Validator is IValidator, Ownable {
          if (del.stake.sub(_amount) == 0) {
              return true;
          }
-        if (del.stake.sub(_amount) >= params.minStake) {
+        if (del.stake.sub(_amount) >= IParams(params).getMinStake()) {
             return true;
         }
         return false;
@@ -438,7 +424,7 @@ contract Validator is IValidator, Ownable {
         bool _signed
     ) external onlyOwner{
         // counts blocks the validator should have signed
-        uint index = signingInfo.indexOffset % params.signedBlockWindow;
+        uint index = signingInfo.indexOffset % IParams(params).getSignedBlockWindow();
         signingInfo.indexOffset++;
         bool previous = missedBlock[index];
         bool missed = !_signed;
@@ -450,14 +436,14 @@ contract Validator is IValidator, Ownable {
             missedBlock[index] = false;
         }
 
-        uint256 minHeight = signingInfo.startHeight.add(params.signedBlockWindow);
-        uint minSignedPerWindow = params.signedBlockWindow.mulTrun(params.minSignedPerWindow);
-        uint maxMissed = params.signedBlockWindow.sub(minSignedPerWindow);
+        uint256 minHeight = signingInfo.startHeight.add(IParams(params).getSignedBlockWindow());
+        uint minSignedPerWindow = IParams(params).getSignedBlockWindow().mulTrun(IParams(params).getMinSignedPerWindow());
+        uint maxMissed = IParams(params).getSignedBlockWindow().sub(minSignedPerWindow);
         // if past the minimum height and the validator has missed too many blocks, punish them
         if (block.number > minHeight && signingInfo.missedBlockCounter > maxMissed) {
             if (!inforValidator.jailed) {
-                _slash(block.number.sub(2), _votingPower, params.slashFractionDowntime);
-                _jail(block.timestamp.add(params.downtimeJailDuration), false);
+                _slash(block.number.sub(2), _votingPower, IParams(params).getSlashFractionDowntime());
+                _jail(block.timestamp.add(IParams(params).getDowntimeJailDuration()), false);
                 signingInfo.missedBlockCounter = 0;
                 _resetMissedBlock(signingInfo.indexOffset);
                 signingInfo.indexOffset = 0;
@@ -513,7 +499,7 @@ contract Validator is IValidator, Ownable {
     }
     
     function _delegate(address payable _delAddr, uint256 _amount) private {
-        require(_amount >= params.minStake, "Amount must greater than min stake amount");
+        require(_amount >= IParams(params).getMinStake(), "Amount must greater than min stake amount");
         // add delegation if not exists;
         if (!delegations.contains(_delAddr)) {
             delegations.add(_delAddr);
@@ -712,7 +698,7 @@ contract Validator is IValidator, Ownable {
     function _stopIfNeeded() private {
         if (!_isBonded()) return;
         if (inforValidator.jailed || 
-            inforValidator.tokens < params.minValidatorBalance) {
+            inforValidator.tokens < IParams(params).getMinValidatorBalance()) {
             _stop();
         }
     }
@@ -725,7 +711,7 @@ contract Validator is IValidator, Ownable {
         _slash(
             distributionHeight.sub(1),
             votingPower,
-            params.slashFractionDoubleSign
+            IParams(params).getSlashFractionDoubleSign()
         );
         // // (Dec 31, 9999 - 23:59:59 GMT).
         _jail(253402300799, true);
@@ -738,7 +724,7 @@ contract Validator is IValidator, Ownable {
         require(inforValidator.status != Status.Bonded, "validator bonded");
         require(!inforValidator.jailed, "validator jailed");
         require(inforValidator.tokens.div(powerReduction) > 0, "zero voting power");
-        require(inforValidator.tokens >= params.minValidatorBalance, "Address balance must greater or equal minimum validator balance");
+        require(inforValidator.tokens >= IParams(params).getMinValidatorBalance(), "Address balance must greater or equal minimum validator balance");
 
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
@@ -754,7 +740,7 @@ contract Validator is IValidator, Ownable {
     function _stop() private {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
-        inforValidator.unbondingTime = block.timestamp.add(params.unbondingTime);
+        inforValidator.unbondingTime = block.timestamp.add(IParams(params).getUnbondingTime());
         emit Stopped();
     }
 
@@ -779,8 +765,8 @@ contract Validator is IValidator, Ownable {
         view
         returns (bool[] memory)
     {
-        bool[] memory _missedBlock = new bool[](params.signedBlockWindow);
-        for (uint i = 0; i < params.signedBlockWindow; i++) {
+        bool[] memory _missedBlock = new bool[](IParams(params).getSignedBlockWindow());
+        for (uint i = 0; i < IParams(params).getSignedBlockWindow(); i++) {
             _missedBlock[i] = missedBlock[i];
         }
 

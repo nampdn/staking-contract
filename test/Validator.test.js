@@ -1,6 +1,5 @@
-const Validator = artifacts.require("ValidatorTest");
-const Staking = artifacts.require("StakingTest");
-const Staking2 = artifacts.require("Staking");
+const Validator = artifacts.require("Validator");
+const Staking = artifacts.require("Staking");
 const Minter = artifacts.require("Minter");
 const utils = require("./utils");
 
@@ -25,9 +24,8 @@ contract("Validator", async (accounts) => {
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
-        await staking.createValidatorTest(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from});
+        await staking.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from});
         const val = await Validator.at(await staking.ownerOf(from));
-        await val.setParamsTest();
         return val;
     }
 
@@ -282,6 +280,10 @@ contract("Validator", async (accounts) => {
 
     it("should unjail", async () => {
         const staking = await Staking.deployed();
+        await staking.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 
+        1814400, web3.utils.toWei("0.05", "ether"), 2,  web3.utils.toWei("0.5", "ether"), 
+        web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"));
+
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
         const amount = web3.utils.toWei("5", "ether");
@@ -342,7 +344,7 @@ contract("Validator", async (accounts) => {
 
     it ("should withdraw when validator stop", async () => {
         const staking = await Staking.deployed();
-        await staking.setMaxValidator(2, {from: accounts[0]})
+        await staking.setMaxValidators(2, {from: accounts[0]})
         const val0 = await Validator.at(await staking.allVals(0));
         await createValidator(accounts[4]);
         const val4 = await Validator.at(await staking.allVals(2));

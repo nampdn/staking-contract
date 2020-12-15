@@ -1,7 +1,9 @@
 const { assertRevert } = require("./utils");
 
 const Staking = artifacts.require("StakingTest");
-const Minter = artifacts.require("Minter");
+const Minter = artifacts.require("MinterTest");
+const Params = artifacts.require("Params");
+
 
 
 contract("Minter", async (accounts) => {
@@ -16,8 +18,12 @@ contract("Minter", async (accounts) => {
     it("mint", async () => {
         const staking = await Staking.deployed();
         await staking.createMinterTest();
+        await staking.setMintParams(web3.utils.toWei("0.05", "ether"), web3.utils.toWei("0.35", "ether"), 5, web3.utils.toWei("0.07", "ether"), web3.utils.toWei("0.02", "ether"), {from: accounts[0]});
+
         const minter = await Minter.at(await staking.minter())
-        
+        var paramsAddr = await staking.params()
+        await minter.setParams(paramsAddr)
+
         const totalSupply = web3.utils.toWei("1000", "ether");
         const totalBonded = web3.utils.toWei("1", "ether");
         await staking.setTotalSupply(totalSupply);
@@ -61,7 +67,6 @@ contract("Minter", async (accounts) => {
         await staking.setTotalBonded(newTotalSupply.toString());
 
         await mint(5); // 1 year
-
 
         // inflation min : 2%
         inflation = await minter.inflation.call();
