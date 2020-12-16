@@ -108,7 +108,6 @@ contract Validator is IValidator, Ownable {
         address signer; // address of the validator
         uint256 tokens; // all token stake
         bool jailed;
-        uint256 minSelfDelegation;
         uint256 delegationShares; // delegation shares
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
@@ -155,17 +154,13 @@ contract Validator is IValidator, Ownable {
         address _signer,
         uint256 _rate, 
         uint256 _maxRate, 
-        uint256 _maxChangeRate, 
-        uint256 _minSelfDelegation
+        uint256 _maxChangeRate
     ) external onlyOwner {
         inforValidator.name = _name;
-        inforValidator.minSelfDelegation = _minSelfDelegation;
         inforValidator.signer = _signer;
         inforValidator.updateTime = block.timestamp;
         inforValidator.status = Status.Unbonded;
-        // params = _params;
-
-        
+                
         commission = Commission({
             maxRate: _maxRate,
             maxChangeRate: _maxChangeRate,
@@ -200,20 +195,6 @@ contract Validator is IValidator, Ownable {
         }
     }
 
-    function _updateMinSelfDelegation(uint256 _minSelfDelegation) private {
-        if (_minSelfDelegation > 0) {
-            require(
-                _minSelfDelegation > inforValidator.minSelfDelegation,
-                "minimum self delegation cannot be decrease"
-            );
-            require(
-                _minSelfDelegation <= inforValidator.tokens,
-                "self delegation below minimum"
-            );
-            inforValidator.minSelfDelegation = _minSelfDelegation;
-        }
-    }
-
     function _updateCommissionRate(uint256 _commissionRate) private {
         if (_commissionRate > 0) {
             require(
@@ -235,11 +216,10 @@ contract Validator is IValidator, Ownable {
     }
 
     // update validate info
-    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external onlyValidator {
+    function update(bytes32 _name, uint256 _commissionRate) external onlyValidator {
         _updateCommissionRate(_commissionRate);
-        _updateMinSelfDelegation(_minSelfDelegation);
         _updateName(_name);
-        emit UpdateValidator(_name, _commissionRate, _minSelfDelegation);
+        emit UpdateValidator(_name, _commissionRate);
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
@@ -261,7 +241,7 @@ contract Validator is IValidator, Ownable {
         Delegation storage del = delegationByAddr[inforValidator.signer];
         uint256 tokens = _tokenFromShare(del.shares);
         require(
-            tokens > inforValidator.minSelfDelegation,
+            tokens > 0,
             "self delegation too low to unjail"
         );
 
@@ -292,14 +272,6 @@ contract Validator is IValidator, Ownable {
         }
         del.shares = del.shares.sub(shares);
         _initializeDelegation(from);
-        bool isValidatorOperator = inforValidator.signer == from;
-        if (
-            isValidatorOperator &&
-            !inforValidator.jailed &&
-            _tokenFromShare(del.shares) < inforValidator.minSelfDelegation
-        ) {
-            inforValidator.jailed = true; // jail validator
-        }
 
         uint256 amountRemoved = _removeDelShares(shares);
 
@@ -383,6 +355,7 @@ contract Validator is IValidator, Ownable {
         if (delegationByAddr[to].shares <= 100 && ubdEntries[to].length == 0) {
             _removeDelegation(to);
         }
+        to.transfer(amount);
         emit Withdraw(to, amount);
     }
     

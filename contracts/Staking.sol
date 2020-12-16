@@ -45,8 +45,7 @@ contract Staking is IStaking, Ownable {
         bytes32 name,
         uint256 rate, 
         uint256 maxRate, 
-        uint256 maxChangeRate, 
-        uint256 minSelfDelegation
+        uint256 maxChangeRate 
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         require(
@@ -63,16 +62,16 @@ contract Staking is IStaking, Ownable {
         );
         bytes memory bytecode = type(Validator).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(name, rate, maxRate, 
-            maxChangeRate, minSelfDelegation, msg.sender));
+            maxChangeRate, msg.sender));
         assembly {
             val := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
         IValidator(val).initialize(name, msg.sender, rate, maxRate, 
-            maxChangeRate, minSelfDelegation);
+            maxChangeRate);
         
         emit CreatedValidator(
             name,msg.sender,rate,
-            maxRate,maxChangeRate,minSelfDelegation
+            maxRate,maxChangeRate
         );
 
         allVals.push(val);

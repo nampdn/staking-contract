@@ -8,10 +8,9 @@ contract("Staking", async (accounts) => {
         const rate = web3.utils.toWei("0.4", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
-        await instance.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]})
-        await utils.assertRevert(instance.createValidator(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]}), "Valdiator owner exists") 
+        await instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0]})
+        await utils.assertRevert(instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0]}), "Valdiator owner exists") 
         await instance.transferOwnership(accounts[0])
         assert.equal(await instance.allValsLength(), 1);
     })
@@ -24,7 +23,6 @@ contract("Staking", async (accounts) => {
                 rate: 0,
                 maxRate: web3.utils.toWei("1.1", "ether"),
                 maxChangeRate: 0,
-                minSelfDelegation: 0,
                 from: accounts[5],
                 value: bond,
                 message: "commission max rate cannot be more than 100%"
@@ -33,7 +31,6 @@ contract("Staking", async (accounts) => {
                 rate: web3.utils.toWei("1", "ether"),
                 maxRate: web3.utils.toWei("0.9", "ether"),
                 maxChangeRate: 0,
-                minSelfDelegation: 0,
                 from: accounts[5],
                 value: bond,
                 message: "commission rate cannot be more than the max rate"
@@ -42,7 +39,6 @@ contract("Staking", async (accounts) => {
                 rate: 0,
                 maxRate: web3.utils.toWei("0.9", "ether"),
                 maxChangeRate: web3.utils.toWei("1", "ether"),
-                minSelfDelegation: 0,
                 from: accounts[5],
                 value: bond,
                 message: "commission max change rate can not be more than the max rate"
@@ -52,8 +48,7 @@ contract("Staking", async (accounts) => {
         const name = web3.utils.fromAscii("val5");
 
         for(var testCase of testCases) {
-            await utils.assertRevert(instance.createValidator(name, testCase.rate, testCase.maxRate, testCase.maxChangeRate ,
-                testCase.minSelfDelegation, {from: testCase.from}), 
+            await utils.assertRevert(instance.createValidator(name, testCase.rate, testCase.maxRate, testCase.maxChangeRate, {from: testCase.from}), 
                 "Returned error: VM Exception while processing transaction: revert");
         }
     })
@@ -104,6 +99,4 @@ contract("Staking", async (accounts) => {
         const slashEvent = await validator.slashEvents(0)
         assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.000000012500000000", "ether"))
     });
-
-
 })

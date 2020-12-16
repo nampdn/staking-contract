@@ -6,8 +6,7 @@ interface IStaking {
         bytes32 name,
         uint256 commissionRate, 
         uint256 commissionMaxRate, 
-        uint256 commissionMaxChangeRate, 
-        uint256 minSelfDelegation
+        uint256 commissionMaxChangeRate
     ) external returns (address val);
     function finalize(
         address[] calldata _signerAdds, 
@@ -39,8 +38,7 @@ interface IStaking {
         address payable _valAddr,
         uint256 _commissionRate,
         uint256 _commissionMaxRate,
-        uint256 _commissionMaxChangeRate,
-        uint256 _minSelfDelegation
+        uint256 _commissionMaxChangeRate
     );
 
     event Burn(address from, uint256 amount);
