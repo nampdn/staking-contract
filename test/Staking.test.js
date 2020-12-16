@@ -104,4 +104,6 @@ contract("Staking", async (accounts) => {
         const slashEvent = await validator.slashEvents(0)
         assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.000000012500000000", "ether"))
     });
+
+
 })

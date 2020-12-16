@@ -1,6 +1,7 @@
 const Validator = artifacts.require("Validator");
 const Staking = artifacts.require("Staking");
 const Minter = artifacts.require("Minter");
+const Params = artifacts.require("Params");
 const utils = require("./utils");
 
 contract("Validator", async (accounts) => {
@@ -342,12 +343,46 @@ contract("Validator", async (accounts) => {
         assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
     })
 
+    it ("Should not update max validator", async () => {
+        const staking = await Staking.deployed();
+
+        await createValidator(accounts[8]);
+        const val8 = await Validator.at(await staking.allVals(2));
+        const amount8 = web3.utils.toWei("0.1", "ether");
+        await val8.delegate({from: accounts[8], value: amount8})
+        await val8.start({from: accounts[8]});
+
+        // proposal max validator
+        await staking.proposalMaxValidators(2, {from: accounts[0]})
+        var proposal = await staking.proposal() 
+        assert.equal(proposal.toString(), 2)
+        await utils.assertRevert(staking.addVote({from: accounts[3]}), "Not the proposer");
+        await staking.addVote({from: accounts[8]})
+        await utils.assertRevert(staking.addVote({from: accounts[8]}), "Vote only once");
+        await utils.assertRevert(staking.setMaxValidators(2, {from: accounts[0]}), "Insufficient voting power");
+    })
+
+    it ("Should update max validator", async () => {
+        const staking = await Staking.deployed();
+
+        // befor update
+        const params = await Params.at(await staking.params())
+        var maxValidator = await params.getMaxValidators()
+        assert.equal(maxValidator.toString(), "21")
+        await staking.addVote({from: accounts[0]})
+        await staking.setMaxValidators(2, {from: accounts[0]})
+        // after update
+        var maxValidator1 = await params.getMaxValidators()
+        assert.equal(maxValidator1.toString(), "2")
+    })
+
     it ("should withdraw when validator stop", async () => {
         const staking = await Staking.deployed();
-        await staking.setMaxValidators(2, {from: accounts[0]})
+        // await staking.setMaxValidators(2, {from: accounts[0]})
         const val0 = await Validator.at(await staking.allVals(0));
+
         await createValidator(accounts[4]);
-        const val4 = await Validator.at(await staking.allVals(2));
+        const val4 = await Validator.at(await staking.allVals(3));
         await val4.delegate({from: accounts[4], value: web3.utils.toWei("3", "ether")})
         await val4.start({from: accounts[4]});
         
@@ -357,7 +392,7 @@ contract("Validator", async (accounts) => {
         await val1.delegate({from: accounts[6], value:  web3.utils.toWei("7", "ether")})
 
         await createValidator(accounts[6]);
-        const val6 = await Validator.at(await staking.allVals(3));
+        const val6 = await Validator.at(await staking.allVals(4));
         await val6.delegate({from: accounts[6], value:  web3.utils.toWei("0.6", "ether")})
 
         // reject when the validator is added has an amount smaller than min amount in val set. 
@@ -423,7 +458,7 @@ contract("Validator", async (accounts) => {
     it ("should not start validator with balance smaller than min validator balance", async () => {
         const staking = await Staking.deployed();
         await createValidator(accounts[9]);
-        const val9 = await Validator.at(await staking.allVals(4));
+        const val9 = await Validator.at(await staking.allVals(5));
         await val9.delegate({from: accounts[9], value:  web3.utils.toWei("0.015", "ether")})
 
         await utils.assertRevert(val9.start({from: accounts[9]}), "Address balance must greater or equal minimum validator balance")
@@ -445,7 +480,7 @@ contract("Validator", async (accounts) => {
 
     it ("should delete delegation", async () => {
         const staking = await Staking.deployed();
-        const val9 = await Validator.at(await staking.allVals(4));
+        const val9 = await Validator.at(await staking.allVals(5));
         await val9.undelegate({from: accounts[9]})
         await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
     })
@@ -457,6 +492,5 @@ contract("Validator", async (accounts) => {
 
         var delegation = await val.getDelegations({from: accounts[5]})
         assert.equal("2", delegation[0].length)
-    })
-    
+    })  
 })

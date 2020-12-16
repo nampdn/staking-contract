@@ -18,8 +18,11 @@ contract Staking is IStaking, Ownable {
     mapping(address => address) public ownerOf; // Owner of the validator
     mapping(address => address) public valOf; // Validator of the owner
     mapping(address => uint256) public balanceOf; // Balance of the validator
+    mapping(address => bool) public vote;
     uint256 public totalSupply = 5000000000 * 10**18; // Total Supply
     uint256 public totalBonded; // Total bonded
+    uint256 public proposal;
+    uint256 public totalVoted;
     address[] public valSets;
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
@@ -252,6 +255,15 @@ contract Staking is IStaking, Ownable {
         IValidator(valSets[setIndex]).stop();
     }
 
+    function _isProposer(address _valAddr) private view returns (bool) {
+        for (uint i = 0; i < valSets.length; i++) {
+            if (valOf[valSets[i]] == _valAddr) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function removeFromSets() external onlyValidator {
         for (uint i = 0; i < valSets.length; i ++) {
             if (valSets[i] == msg.sender) {
@@ -275,7 +287,40 @@ contract Staking is IStaking, Ownable {
     }
 
     function setMaxValidators(uint256 _maxValidators) external onlyOwner {
+        require(totalVoted >= ((2*sumVotingPowerProposer())/3), "Insufficient voting power");
         IParams(params).updateMaxValidator(_maxValidators);
+        _resetVote();
+    }
+
+    function proposalMaxValidators(uint256 _maxValidators) external onlyOwner {
+        proposal = _maxValidators;
+    }
+
+    function setProposalFail() external onlyOwner {
+        _resetVote();
+    }
+
+    // resetVote performs after set max validator success or proposal fail
+    function _resetVote() private {
+        for (uint i = 0; i <  valSets.length; i++) {
+            vote[valSets[i]] = false;
+        }
+        totalVoted = 0;
+    }
+
+    function addVote() external {
+        require(_isProposer(msg.sender) == true, "Not the proposer");
+        require(vote[msg.sender] == false, "Vote only once");
+        totalVoted +=  balanceOf[ownerOf[msg.sender]].div(1 * 10 ** 8);  
+        vote[msg.sender] = true;
+    }
+
+    function sumVotingPowerProposer() public returns (uint256) {
+        uint256 sumVotingPower;
+        for (uint i = 0; i <  valSets.length; i++) {
+            sumVotingPower += balanceOf[valSets[i]].div(1 * 10 ** 8);
+        }
+        return sumVotingPower;
     }
     
     function setPreviousProposer(address previousProposer) external onlyOwner {

@@ -28,6 +28,10 @@ interface IStaking {
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
     function startValidator() external;
+    function proposalMaxValidators(uint256 _maxValidators) external;
+    function setProposalFail() external;
+    function addVote() external;
+    function sumVotingPowerProposer() external returns (uint256);
 
     // @dev Emitted when validator is created;
     event CreatedValidator(
