@@ -303,7 +303,7 @@ contract Staking is IStaking, Ownable {
     // resetVote performs after set max validator success or proposal fail
     function _resetVote() private {
         for (uint i = 0; i <  valSets.length; i++) {
-            vote[valSets[i]] = false;
+            vote[valOf[valSets[i]]] = false;
         }
         totalVoted = 0;
     }

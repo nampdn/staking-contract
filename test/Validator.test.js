@@ -370,10 +370,20 @@ contract("Validator", async (accounts) => {
         var maxValidator = await params.getMaxValidators()
         assert.equal(maxValidator.toString(), "21")
         await staking.addVote({from: accounts[0]})
+        var voted = await staking.vote(accounts[0])
+        assert.equal(voted, true)
         await staking.setMaxValidators(2, {from: accounts[0]})
         // after update
         var maxValidator1 = await params.getMaxValidators()
         assert.equal(maxValidator1.toString(), "2")
+
+        // make sure reset
+        var voted1 = await staking.vote(accounts[0])
+        assert.equal(voted1, false)
+        var vote2 = await staking.vote(accounts[8])
+        assert.equal(vote2, false)
+        var totalVote = await staking.totalVoted()
+        assert.equal(totalVote.toString(), "0")
     })
 
     it ("should withdraw when validator stop", async () => {
