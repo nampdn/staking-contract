@@ -1,15 +1,8 @@
 pragma solidity >=0.4.25 <0.7.0;
 
+import "./interfaces/IParams.sol";
 
-contract Params {
-    enum ParamKey {
-        VotingPeriod,
-        MaxValidator,
-        Deposit,
-        // add staking param key here
-        // add validator params key here
-    }
-
+contract Params is IParams {
     struct Proposal {
         address proposer;
         ParamKey key;
