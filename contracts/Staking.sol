@@ -310,14 +310,16 @@ contract Staking is IStaking, Ownable {
 
     function addVote() external {
         require(_isProposer(msg.sender) == true, "Not the proposer");
-        require(vote[msg.sender] == false, "Vote only once");
-        totalVoted +=  balanceOf[ownerOf[msg.sender]].div(1 * 10 ** 8);  
+        require(vote[msg.sender] == false, "Vote only once");  
         vote[msg.sender] = true;
     }
 
     function sumVotingPowerProposer() public returns (uint256) {
         uint256 sumVotingPower;
         for (uint i = 0; i <  valSets.length; i++) {
+            if (vote[valOf[valSets[i]]] == true) {
+                totalVoted +=  balanceOf[valSets[i]].div(1 * 10 ** 8);
+            }
             sumVotingPower += balanceOf[valSets[i]].div(1 * 10 ** 8);
         }
         return sumVotingPower;
