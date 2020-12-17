@@ -69,9 +69,9 @@ contract("Staking", async (accounts) => {
         await instance.deposit({accounts: accounts[7], value: web3.utils.toWei("60", "ether")})
         await instance.finalize(validatorSet[0], validatorSet[1], signed)
         const commission = await validator.getCommissionRewards.call()
-        assert.equal(commission.toString(), web3.utils.toWei("6.341958396752917299", "ether"))
+        assert.equal(commission.toString(), web3.utils.toWei("3.170979198376458649", "ether"))
         const delegationRewards = await validator.getDelegationRewards.call(accounts[0])
-        assert.equal(delegationRewards.toString(), web3.utils.toWei("9.512937595129375952", "ether"))
+        assert.equal(delegationRewards.toString(), web3.utils.toWei("4.756468797564687976", "ether"))
     })
 
     it("should get all validators of the delegator", async () => {
@@ -95,8 +95,8 @@ contract("Staking", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         const info = await validator.inforValidator()
         assert.equal(info.jailed, true)
-        assert.equal(info.tokens.toString(), web3.utils.toWei("0.399999995000000000", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei("0.399999500000000000", "ether"))
         const slashEvent = await validator.slashEvents(0)
-        assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.000000012500000000", "ether"))
+        assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.00000125", "ether"))
     });
 })

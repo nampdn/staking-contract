@@ -231,7 +231,7 @@ contract("Validator", async (accounts) => {
         await finalize([]);
         var commissionRewards = await validator.getCommissionRewards({from: accounts[0]})
 
-        assert.equal("6341958396752917299", commissionRewards.toString())
+        assert.equal("3170979198376458649", commissionRewards.toString())
         await validator.withdrawCommission({from: accounts[0]})
     })
 
@@ -251,7 +251,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
-        assert.equal("5248517293864483283", delegationRewards.toString())
+        assert.equal("2624258646932241641", delegationRewards.toString())
         const tx = await validator.withdrawRewards({from: accounts[0]})
     })
 
@@ -322,7 +322,7 @@ contract("Validator", async (accounts) => {
 
         valSet = await staking.getValidatorSets()
         assert.equal(valSet[0].length, 1);
-        assert.equal(info.tokens.toString(), web3.utils.toWei("3.799525000000000000", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei('3.799525000000000000', "ether"))
 
         const ubdEntries = await val.getUBDEntries.call(accounts[5])
         assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
@@ -338,13 +338,13 @@ contract("Validator", async (accounts) => {
         await val8.start({from: accounts[8]});
 
         // proposal max validator
-        await staking.proposalMaxValidators(2, {from: accounts[0]})
+        await staking.proposalMaxProposers(2, {from: accounts[0]})
         var proposal = await staking.proposal() 
         assert.equal(proposal.toString(), 2)
         await utils.assertRevert(staking.addVote({from: accounts[3]}), "Not the proposer");
         await staking.addVote({from: accounts[8]})
         await utils.assertRevert(staking.addVote({from: accounts[8]}), "Vote only once");
-        await utils.assertRevert(staking.setMaxValidators(2, {from: accounts[0]}), "Insufficient voting power");
+        await utils.assertRevert(staking.setMaxProposers(2, {from: accounts[0]}), "Insufficient voting power");
     })
 
     it ("Should update max validator", async () => {
@@ -352,15 +352,15 @@ contract("Validator", async (accounts) => {
 
         // befor update
         const params = await Params.at(await staking.params())
-        var maxValidator = await params.getMaxValidators()
-        assert.equal(maxValidator.toString(), "21")
+        var maxValidator = await params.getMaxProposers()
+        assert.equal(maxValidator.toString(), "20")
         await staking.addVote({from: accounts[0]})
         var voted = await staking.vote(accounts[0])
         assert.equal(voted, true)
-        await staking.setMaxValidators(2, {from: accounts[0]})
+        await staking.setMaxProposers(2, {from: accounts[0]})
 
         // after update
-        var maxValidator1 = await params.getMaxValidators()
+        var maxValidator1 = await params.getMaxProposers()
         assert.equal(maxValidator1.toString(), "2")
 
         // make sure reset

@@ -12,6 +12,8 @@ import "./Validator.sol";
 contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeMath for uint256;
+    uint256 powerReduction = 1 * 10 **10;
+
 
     address internal _previousProposer; // last proposer address
     address[] public allVals; // list all validators
@@ -231,7 +233,7 @@ contract Staking is IStaking, Ownable {
     }
 
     function startValidator() external onlyValidator {
-        if (valSets.length < IParams(params).getMaxValidators()) {
+        if (valSets.length < IParams(params).getMaxProposers()) {
             valSets.push(msg.sender);
             return;
         }
@@ -280,18 +282,18 @@ contract Staking is IStaking, Ownable {
         for (uint i = 0; i < total; i++) {
             address valAddr = valSets[i];
             signerAddrs[i] = valOf[valAddr];
-            votingPowers[i] = balanceOf[valAddr].div(1 * 10 ** 8);
+            votingPowers[i] = balanceOf[valAddr].div(powerReduction);
         }
         return (signerAddrs, votingPowers);
     }
 
-    function setMaxValidators(uint256 _maxValidators) external onlyOwner {
+    function setMaxProposers(uint256 _maxValidators) external onlyOwner {
         require(totalVoted >= ((2*sumVotingPowerProposer())/3), "Insufficient voting power");
         IParams(params).updateMaxValidator(_maxValidators);
         _resetVote();
     }
 
-    function proposalMaxValidators(uint256 _maxValidators) external onlyOwner {
+    function proposalMaxProposers(uint256 _maxValidators) external onlyOwner {
         proposal = _maxValidators;
     }
 
@@ -317,9 +319,9 @@ contract Staking is IStaking, Ownable {
         uint256 sumVotingPower;
         for (uint i = 0; i <  valSets.length; i++) {
             if (vote[valOf[valSets[i]]] == true) {
-                totalVoted +=  balanceOf[valSets[i]].div(1 * 10 ** 8);
+                totalVoted +=  balanceOf[valSets[i]].div(powerReduction);
             }
-            sumVotingPower += balanceOf[valSets[i]].div(1 * 10 ** 8);
+            sumVotingPower += balanceOf[valSets[i]].div(powerReduction);
         }
         return sumVotingPower;
     }
@@ -346,7 +348,7 @@ contract Staking is IStaking, Ownable {
         uint256 _signedBlockWindow,
         uint256 _minSignedPerWindow,
         uint256 _minStake,
-        uint256 _minValidatorBalance
+        uint256 _minValidatorStake
     ) external onlyOwner {
         IParams(params).updateValidatorParams(
             _downtimeJailDuration,
@@ -356,7 +358,7 @@ contract Staking is IStaking, Ownable {
             _signedBlockWindow,
             _minSignedPerWindow,
             _minStake,
-            _minValidatorBalance
+            _minValidatorStake
         );
     }
 
