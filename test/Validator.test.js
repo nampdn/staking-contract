@@ -317,6 +317,12 @@ contract("Validator", async (accounts) => {
         await val.undelegateWithAmount(web3.utils.toWei("1", "ether"), {from: accounts[5]})
         await staking.doubleSign(accounts[5], valSet[1][1], 1, {from: accounts[0]});
 
+        var totalSlashedToken = await staking.totalSlashedToken()
+        assert.equal(web3.utils.toWei("0.200475000000000001", "ether"), totalSlashedToken.toString())
+
+        var slashEventLength = await val.getSlashEventsLength()
+        assert.equal(slashEventLength.toString(), "2")
+
         const info = await val.inforValidator()
         assert.equal(info.jailed, true)
 

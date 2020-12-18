@@ -744,4 +744,8 @@ contract Validator is IValidator, Ownable {
 
         return _missedBlock;
     }
+
+    function getSlashEventsLength() public view returns(uint256) {
+        return slashEvents.length;
+    }
 }

@@ -25,6 +25,7 @@ contract Staking is IStaking, Ownable {
     uint256 public totalBonded; // Total bonded
     uint256 public proposal;
     uint256 public totalVoted;
+    uint256 public totalSlashedToken;
     address[] public valSets;
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
@@ -192,6 +193,7 @@ contract Staking is IStaking, Ownable {
 
 
     function burn(uint256 amount) external onlyValidator{
+        totalSlashedToken += amount;
         _burn(msg.sender, amount);
     }
 

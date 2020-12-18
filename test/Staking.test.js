@@ -98,5 +98,8 @@ contract("Staking", async (accounts) => {
         assert.equal(info.tokens.toString(), web3.utils.toWei("0.399999500000000000", "ether"))
         const slashEvent = await validator.slashEvents(0)
         assert.equal(slashEvent.fraction.toString(), web3.utils.toWei("0.00000125", "ether"))
+
+        var totalSlashedToken = await instance.totalSlashedToken()
+        assert.equal(web3.utils.toWei("0.0000005", "ether"), totalSlashedToken.toString())
     });
 })

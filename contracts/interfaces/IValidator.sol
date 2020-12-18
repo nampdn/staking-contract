@@ -23,6 +23,7 @@ interface IValidator {
     function getDelegationRewards(address _delAddr) external view returns (uint256);
     function getDelegations() external view returns (address[] memory, uint256[] memory);
     function validateSignature(uint256 _votingPower, bool _signed) external;
+    function getSlashEventsLength() external view returns(uint256);
     function doubleSign(
         uint256 votingPower,
         uint256 distributionHeight
