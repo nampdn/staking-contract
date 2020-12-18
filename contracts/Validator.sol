@@ -251,8 +251,8 @@ contract Validator is IValidator, Ownable {
 
     function undelegate() external onlyDelegator{
         Delegation storage del = delegationByAddr[msg.sender];
-        uint256 amount = del.stake;
-        _undelegate(msg.sender, amount);
+        uint256 amount = _tokenFromShare(del.shares);
+        _undelegate(msg.sender, _tokenFromShare(del.shares));
         _staking.undelegate(amount);
     }
 
@@ -262,6 +262,8 @@ contract Validator is IValidator, Ownable {
         _undelegate(msg.sender, _amount);
         _staking.undelegate(_amount);
     }
+
+
 
     function _undelegate(address payable from, uint256 _amount) private {
         _withdrawRewards(from);
@@ -276,7 +278,7 @@ contract Validator is IValidator, Ownable {
         uint256 amountRemoved = _removeDelShares(shares);
 
         if (_isUnbonding() && _isUnbondingComplete()) {
-            _withdraw(msg.sender, amountRemoved);
+            _withdraw(from, amountRemoved);
         } else {
             inforValidator.ubdEntryCount++;
             uint256 completionTime = block.timestamp.add(IParams(params).getUnbondingTime());
@@ -670,9 +672,10 @@ contract Validator is IValidator, Ownable {
 
     function _stopIfNeeded() private {
         if (!_isBonded()) return;
-        if (inforValidator.jailed || 
-            inforValidator.tokens < IParams(params).getMinValidatorStake()) {
+        uint256 minStake = IParams(params).getMinValidatorStake();
+        if (inforValidator.jailed || inforValidator.tokens < minStake) {
             _stop();
+           _staking.removeFromSets();
         }
     }
 

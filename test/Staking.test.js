@@ -3,6 +3,16 @@ const Validator = artifacts.require("Validator");
 const utils = require("./utils");
 
 contract("Staking", async (accounts) => {    
+
+    async function createValidator(account) {
+        const instance = await Staking.deployed();
+        const rate = web3.utils.toWei("0.4", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
+        const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const name = web3.utils.fromAscii("val1");
+        return instance.createValidator(name, rate, maxRate, maxChangeRate, {from: account})
+    }
+
     it("should create validator", async () => {
         const instance = await Staking.deployed();
         const rate = web3.utils.toWei("0.4", "ether");
@@ -102,4 +112,24 @@ contract("Staking", async (accounts) => {
         var totalSlashedToken = await instance.totalSlashedToken()
         assert.equal(web3.utils.toWei("0.0000005", "ether"), totalSlashedToken.toString())
     });
+
+    it("start/stop validator", async () => {
+        const staking = await Staking.deployed();
+        await createValidator(accounts[1])
+        const valAddr = await staking.allVals.call(1);
+        const val = await  Validator.at(valAddr);
+        await val.delegate({from: accounts[1], value: web3.utils.toWei("1", "ether")});
+
+        // start validator
+        await val.start({from: accounts[1]});
+        let valSets = await staking.getValidatorSets.call();
+        assert.equal(valSets[0].length, 1)
+        assert.equal(valSets[0][0], accounts[1])
+
+        // stop validator
+        await val.undelegate({from: accounts[1]})
+        valSets = await staking.getValidatorSets.call();
+        assert.equal(valSets[0].length, 0)
+
+    })
 })
