@@ -480,12 +480,13 @@ contract("Validator", async (accounts) => {
         assert.equal(inforVal1.status.toString(), "0") // unbonding
     })
 
-    // it ("should delete delegation", async () => {
-    //     const staking = await Staking.deployed();
-    //     const val9 = await Validator.at(await staking.allVals(5));
-    //     // await val9.undelegate({from: accounts[9]})
-    //     await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
-    // })
+    it ("should delete delegation", async () => {
+        const staking = await Staking.deployed();
+        const val9 = await Validator.at(await staking.allVals(5));
+     
+        await val9.undelegateWithAmount(web3.utils.toWei("0.015", "ether"), {from: accounts[9]})
+        await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
+    })
 
     it ("should get delegation", async () => {
         const staking = await Staking.deployed();
