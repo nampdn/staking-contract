@@ -192,16 +192,16 @@ contract Staking is IStaking, Ownable {
     }
 
 
-    function burn(uint256 amount) external onlyValidator{
+    function burn(uint256 amount, uint reason) external onlyValidator{
         totalSlashedToken += amount;
-        _burn(msg.sender, amount);
+        _burn(msg.sender, amount, reason);
     }
 
-    function _burn(address from, uint256 amount) private {
+    function _burn(address from, uint256 amount, uint reason) private {
         totalBonded = totalBonded.sub(amount);
         totalSupply = totalSupply.sub(amount);
         balanceOf[from] = balanceOf[from].sub(amount);
-        emit Burn(from, amount);
+        emit Burn(from, amount, reason);
     }
 
     // slash and jail validator forever
@@ -350,7 +350,9 @@ contract Staking is IStaking, Ownable {
         uint256 _signedBlockWindow,
         uint256 _minSignedPerWindow,
         uint256 _minStake,
-        uint256 _minValidatorStake
+        uint256 _minValidatorStake,
+        uint256 _minAmountChangeName
+        
     ) external onlyOwner {
         IParams(params).updateValidatorParams(
             _downtimeJailDuration,
@@ -360,7 +362,8 @@ contract Staking is IStaking, Ownable {
             _signedBlockWindow,
             _minSignedPerWindow,
             _minStake,
-            _minValidatorStake
+            _minValidatorStake,
+            _minAmountChangeName
         );
     }
 

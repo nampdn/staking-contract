@@ -216,10 +216,16 @@ contract Validator is IValidator, Ownable {
     }
 
     // update validate info
-    function update(bytes32 _name, uint256 _commissionRate) external onlyValidator {
+    function updateCommissionRate(uint256 _commissionRate) external onlyValidator {
         _updateCommissionRate(_commissionRate);
+        emit UpdateCommissionRate(_commissionRate);
+    }
+
+    function updateName(bytes32 _name) external payable onlyValidator {
+        require(msg.value > IParams(params).getMinAmountChangeName(), "Min amount is 10000 KAI");
         _updateName(_name);
-        emit UpdateValidator(_name, _commissionRate);
+        emit UpdateName(_name);
+         _staking.burn(msg.value, 1);
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
@@ -659,7 +665,7 @@ contract Validator is IValidator, Ownable {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
-        _staking.burn(tokensToBurn);
+        _staking.burn(tokensToBurn, 0);
     }
     
     function _jail(uint256 _jailedUntil, bool _tombstoned) private {

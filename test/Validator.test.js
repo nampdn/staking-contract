@@ -55,20 +55,21 @@ contract("Validator", async (accounts) => {
 
     it ("should not update validator", async () => {
         const instance = await Validator.deployed();
-        const name = web3.utils.fromAscii("");
+        const name = web3.utils.fromAscii("111111111111111");
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be changed more than one in 24h");
 
         await utils.advanceTime(86400);
 
         commissionRate = web3.utils.toWei("0.4", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be changed more than max change rate");
 
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be more than the max rate");
+
     })
 
     it ("should update validator", async () => {
@@ -76,13 +77,13 @@ contract("Validator", async (accounts) => {
         const name = web3.utils.fromAscii("12131");
         let commissionRate = web3.utils.toWei("0.3", "ether");
         await utils.advanceTime(86401);
-        var update = await instance.update(name, commissionRate, {from: accounts[0]});
+        var update = await instance.updateCommissionRate(commissionRate, {from: accounts[0]});
         var commission = await instance.commission.call();
         var expectedRate = commission.rate;
         assert.equal(commissionRate, expectedRate.toString());
 
         // check event
-        assert.equal(commissionRate, update.logs[0].args[1].toString());
+        assert.equal(commissionRate, update.logs[0].args[0].toString());
     })
 
     it ("should allocate token", async() => {
@@ -268,7 +269,7 @@ contract("Validator", async (accounts) => {
         const staking = await Staking.deployed();
         await staking.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 
         1814400, web3.utils.toWei("0.05", "ether"), 2,  web3.utils.toWei("0.5", "ether"), 
-        web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"));
+        web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"));
 
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
@@ -479,12 +480,12 @@ contract("Validator", async (accounts) => {
         assert.equal(inforVal1.status.toString(), "0") // unbonding
     })
 
-    it ("should delete delegation", async () => {
-        const staking = await Staking.deployed();
-        const val9 = await Validator.at(await staking.allVals(5));
-        await val9.undelegate({from: accounts[9]})
-        await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
-    })
+    // it ("should delete delegation", async () => {
+    //     const staking = await Staking.deployed();
+    //     const val9 = await Validator.at(await staking.allVals(5));
+    //     // await val9.undelegate({from: accounts[9]})
+    //     await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
+    // })
 
     it ("should get delegation", async () => {
         const staking = await Staking.deployed();
@@ -493,5 +494,13 @@ contract("Validator", async (accounts) => {
 
         var delegation = await val.getDelegations({from: accounts[5]})
         assert.equal("2", delegation[0].length)
-    })  
+    })
+    
+    it("should update name", async () => {
+        const staking = await Staking.deployed();
+        const val4 = await Validator.at(await staking.allVals(3));
+        const name = web3.utils.fromAscii("test");
+        await val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("2", "ether")})
+        await utils.assertRevert(val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), "Min amount is 10000 KAI")
+    })
 })

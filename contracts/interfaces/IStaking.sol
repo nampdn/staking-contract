@@ -22,7 +22,7 @@ interface IStaking {
     function undelegate(uint256 amount) external;
     function addDelegation(address delAddr) external;
     function removeFromSets() external;
-    function burn(uint256 amount) external;
+    function burn(uint256 amount, uint reason) external;
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
@@ -41,6 +41,6 @@ interface IStaking {
         uint256 _commissionMaxChangeRate
     );
 
-    event Burn(address from, uint256 amount);
+    event Burn(address from, uint256 amount, uint reason);
     event Mint(uint256 amount);
 }

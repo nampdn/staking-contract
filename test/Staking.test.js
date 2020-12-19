@@ -66,7 +66,7 @@ contract("Staking", async (accounts) => {
     it("finalize", async() => {
         const instance = await Staking.deployed();
         await instance.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 1814400, web3.utils.toWei("0.05", "ether"), 
-        100000, web3.utils.toWei("0.5", "ether"), web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"))
+        100000, web3.utils.toWei("0.5", "ether"), web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"))
         const contractAddr = await instance.allVals(0)
         const validator = await Validator.at(contractAddr)
         await instance.mint({from: accounts[0]});
