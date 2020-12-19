@@ -252,7 +252,7 @@ contract Validator is IValidator, Ownable {
     function undelegate() external onlyDelegator{
         Delegation storage del = delegationByAddr[msg.sender];
         uint256 amount = _tokenFromShare(del.shares);
-        _undelegate(msg.sender, _tokenFromShare(del.shares));
+        _undelegate(msg.sender, amount);
         _staking.undelegate(amount);
     }
 
