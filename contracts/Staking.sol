@@ -31,6 +31,10 @@ contract Staking is IStaking, Ownable {
     Minter public minter; // minter contract
     address public params;
 
+    uint256 public epoch = 1;
+    EnumerableSet.AddressSet private _proposals;
+    EnumerableSet.AddressSet private _activeProposers;
+
     // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(valOf[msg.sender] != address(0x0), "Ownable: caller is not the validator");
@@ -235,58 +239,66 @@ contract Staking is IStaking, Ownable {
     }
 
     function startValidator() external onlyValidator {
-        if (valSets.length < IParams(params).getMaxProposers()) {
-            valSets.push(msg.sender);
+        if (_proposers.length() < IParams(params).getMaxProposers()) {
+            _proposers.add(msg.sender);
             return;
         }
-        uint256 toStop;
-        uint256 minAmount = balanceOf[valSets[0]];
-        for (uint i = 0; i < valSets.length; i ++) {
-            require(valSets[i] != msg.sender);
-            if (balanceOf[valSets[i]] < minAmount) {
-                toStop = i;
-                minAmount = balanceOf[valSets[i]];
+        require(!_proposers.contains(msg.sender), "proposer")
+
+        address toStop;
+        uint256 minAmount = _proposals.at(0).balance;
+        for (uint i = 0; i < _proposals.length(); i ++) {
+            if (_proposals.at(i).balance < minAmount) {
+                toStop = _proposals.at(i);
+                minAmount = _proposals.at(i).balance
             }
         }
 
-        require(balanceOf[msg.sender] > minAmount, "Amount must greater than min amount");
+        require(msg.sender.balance > minAmount, "Amount must greater than min amount");
         _stopValidator(toStop);
-        valSets[toStop] = msg.sender;
+        _proposers.remove(toStop)
     }
 
-    function _stopValidator(uint setIndex) private {
-        IValidator(valSets[setIndex]).stop();
+    function _stopValidator(address valAddr) private {
+        IValidator(valAddr).stop();
     }
 
     function _isProposer(address _valAddr) private view returns (bool) {
-        for (uint i = 0; i < valSets.length; i++) {
-            if (valOf[valSets[i]] == _valAddr) {
-                return true;
-            }
-        }
-        return false;
+        return _activeProposers.contains(_valAddr);
     }
 
     function removeFromSets() external onlyValidator {
-        for (uint i = 0; i < valSets.length; i ++) {
-            if (valSets[i] == msg.sender) {
-                valSets[i] = valSets[valSets.length - 1];
-                valSets.pop();
-            }
-        }
+        _proposals.remove(msg.sender);
     } 
 
     // get current validator sets
     function getValidatorSets() external view returns (address[] memory, uint256[] memory) {
-        uint256 total = valSets.length;
-        address[] memory signerAddrs = new address[](total);
-        uint256[] memory votingPowers = new uint256[](total);
-        for (uint i = 0; i < total; i++) {
-            address valAddr = valSets[i];
-            signerAddrs[i] = valOf[valAddr];
-            votingPowers[i] = balanceOf[valAddr].div(powerReduction);
+        uint maxProposers = _params.getMaxProposers();
+        if (maxProposers > _proposals.length()) {
+            maxProposers = _proposals.length();
         }
-        return (signerAddrs, votingPowers);
+
+        address[] memory signers = new address[](maxProposers);
+        uint256[] memory powers = new uint256[](maxProposers);
+        for (uint i = 0; i < maxProposers; i++) {
+            address proposalAddr = _activeProposers.at(i);
+            IValidator val = IValidator(proposalAddr)
+            if (val.isActive()) {
+                signers[i] = valOf[proposalAddr];
+                signers[i] = proposalAddr.balance.div(powerReduction);
+            }
+        }
+        return signers, powers;
+    }
+
+    function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory){
+
+        // 1000 block per epoch
+       if (block.number/1000 > epoch) {
+           epoch += 1;
+           _activeProposers = _proposals;
+       }
+       return getValidatorSets();
     }
 
     function setMaxProposers(uint256 _maxValidators) external onlyOwner {
