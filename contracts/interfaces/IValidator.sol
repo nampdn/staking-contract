@@ -7,7 +7,8 @@ interface IValidator {
         address _owner,
         uint256 _rate, 
         uint256 _maxRate, 
-        uint256 _maxChangeRate
+        uint256 _maxChangeRate,
+        uint256 _minSelfDelegation
     ) external;
     function updateCommissionRate(uint256 _commissionRate) external;
     function updateName(bytes32 _name) external payable;

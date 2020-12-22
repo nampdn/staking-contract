@@ -25,6 +25,7 @@ contract Params is Ownable {
         uint256 minStake;
         uint256 minValidatorStake;
         uint256 minAmountChangeName;
+        uint256 minSelfDelegation;
     }
 
     struct MintParams {
@@ -59,7 +60,8 @@ contract Params is Ownable {
             minSignedPerWindow: 50 * 10**16, //50%
             minStake: 1 * 10**16, // 25 000 KAI
             minValidatorStake: 1 * 10**17, // 12500000 KAI
-            minAmountChangeName: 1 *10**17 // 10000 KAI
+            minAmountChangeName: 1 *10**17, // 10000 KAI
+            minSelfDelegation: 1 * 10**17 //25000 KAI
         });
 
         mintParams = MintParams({
@@ -90,7 +92,8 @@ contract Params is Ownable {
         uint256 _minSignedPerWindow,
         uint256 _minStake,
         uint256 _minValidatorStake,
-        uint256 _minAmountChangeName) 
+        uint256 _minAmountChangeName,
+        uint256 _minSelfDelegation) 
         external onlyOwner {
         
         validatorParams = ValidatorParams({
@@ -102,7 +105,8 @@ contract Params is Ownable {
             minSignedPerWindow: _minSignedPerWindow,
             minStake: _minStake, // 10 000 kai
             minValidatorStake: _minValidatorStake,
-            minAmountChangeName: _minAmountChangeName
+            minAmountChangeName: _minAmountChangeName,
+            minSelfDelegation: _minSelfDelegation
         });
     }
 
@@ -189,5 +193,9 @@ contract Params is Ownable {
 
     function getMinAmountChangeName() external view returns (uint256) {
         return validatorParams.minAmountChangeName;
+    }
+
+    function getMinSelfDelegation() external view returns (uint256) {
+        return validatorParams.minSelfDelegation;
     }
 }

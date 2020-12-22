@@ -14,7 +14,6 @@ contract Staking is IStaking, Ownable {
     using SafeMath for uint256;
     uint256 powerReduction = 1 * 10 **10;
 
-
     address internal _previousProposer; // last proposer address
     address[] public allVals; // list all validators
     mapping(address => address) public ownerOf; // Owner of the validator
@@ -48,7 +47,8 @@ contract Staking is IStaking, Ownable {
         bytes32 name,
         uint256 rate, 
         uint256 maxRate, 
-        uint256 maxChangeRate 
+        uint256 maxChangeRate,
+        uint256 minSelfDelegation 
     ) external returns (address val) {
         require(ownerOf[msg.sender] == address(0x0), "Valdiator owner exists");
         require(
@@ -63,18 +63,23 @@ contract Staking is IStaking, Ownable {
             rate <= maxRate,
             "commission rate cannot be more than the max rate"
         );
+        require(
+            msg.value >= IParams(params).getMinSelfDelegation(),
+            "self delegation below minimum"
+        );
+
         bytes memory bytecode = type(Validator).creationCode;
         bytes32 salt = keccak256(abi.encodePacked(name, rate, maxRate, 
-            maxChangeRate, msg.sender));
+            maxChangeRate, minSelfDelegation, msg.sender));
         assembly {
             val := create2(0, add(bytecode, 32), mload(bytecode), salt)
         }
         IValidator(val).initialize(name, msg.sender, rate, maxRate, 
-            maxChangeRate);
+            maxChangeRate, minSelfDelegation);
         
         emit CreatedValidator(
             name,msg.sender,rate,
-            maxRate,maxChangeRate
+            maxRate,maxChangeRate,minSelfDelegation
         );
 
         allVals.push(val);
@@ -351,8 +356,8 @@ contract Staking is IStaking, Ownable {
         uint256 _minSignedPerWindow,
         uint256 _minStake,
         uint256 _minValidatorStake,
-        uint256 _minAmountChangeName
-        
+        uint256 _minAmountChangeName,
+        uint256 _minSelfDelegation
     ) external onlyOwner {
         IParams(params).updateValidatorParams(
             _downtimeJailDuration,
@@ -363,7 +368,8 @@ contract Staking is IStaking, Ownable {
             _minSignedPerWindow,
             _minStake,
             _minValidatorStake,
-            _minAmountChangeName
+            _minAmountChangeName,
+            _minSelfDelegation
         );
     }
 
