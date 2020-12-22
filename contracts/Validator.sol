@@ -187,8 +187,12 @@ contract Validator is IValidator, Ownable {
     }
 
     function isActive() external view returns (bool){
-        uint256 currentEpoch = _staking.epoch()
-        return activationEpoch >= currentEpoch < endEpoch;
+        uint256 currentEpoch = _staking.epoch();
+        uint256 minStake = IParams(params).getMinValidatorStake();
+        return (activationEpoch >= currentEpoch < endEpoch && 
+            !inforValidator.jailed && 
+            inforValidator.tokens >= minStake
+        );
     }
     
     // delegate for this validator

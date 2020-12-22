@@ -19,7 +19,6 @@ contract Staking is IStaking, Ownable {
     address[] public allVals; // list all validators
     mapping(address => address) public ownerOf; // Owner of the validator
     mapping(address => address) public valOf; // Validator of the owner
-    mapping(address => uint256) public balanceOf; // Balance of the validator
     mapping(address => bool) public vote;
     uint256 public totalSupply = 5000000000 * 10**18; // Total Supply
     uint256 public totalBonded; // Total bonded
@@ -175,7 +174,6 @@ contract Staking is IStaking, Ownable {
 
     function _delegate(address from, uint256 amount) private {
         totalBonded = totalBonded.add(amount);
-        balanceOf[from] = balanceOf[from].add(amount);
     }
 
     function undelegate(uint256 amount) external onlyValidator {
@@ -184,7 +182,6 @@ contract Staking is IStaking, Ownable {
 
     function _undelegate(address from, uint256 amount) private {
         totalBonded = totalBonded.sub(amount);
-        balanceOf[from] = balanceOf[from].sub(amount);
     }
 
     function removeDelegation(address delAddr) external onlyValidator{
@@ -204,7 +201,6 @@ contract Staking is IStaking, Ownable {
     function _burn(address from, uint256 amount) private {
         totalBonded = totalBonded.sub(amount);
         totalSupply = totalSupply.sub(amount);
-        balanceOf[from] = balanceOf[from].sub(amount);
         emit Burn(from, amount);
     }
 
@@ -292,9 +288,8 @@ contract Staking is IStaking, Ownable {
     }
 
     function applyAndReturnValidatorSets() external returns (address[] memory, uint256[] memory){
-
-        // 1000 block per epoch
-       if (block.number/1000 > epoch) {
+        uint blocksPerEpoch = IParams(params).getBlocksPerEpoch();
+       if (block.number.div(blocksPerEpoch) > epoch) {
            epoch += 1;
            _activeProposers = _proposals;
        }
@@ -333,9 +328,9 @@ contract Staking is IStaking, Ownable {
         uint256 sumVotingPower;
         for (uint i = 0; i <  valSets.length; i++) {
             if (vote[valOf[valSets[i]]] == true) {
-                totalVoted +=  balanceOf[valSets[i]].div(powerReduction);
+                totalVoted +=  valSets[i].balance.div(powerReduction);
             }
-            sumVotingPower += balanceOf[valSets[i]].div(powerReduction);
+            sumVotingPower += valSets[i].balance.div(powerReduction);
         }
         return sumVotingPower;
     }

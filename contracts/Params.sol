@@ -13,6 +13,7 @@ contract Params is Ownable {
         uint256 baseProposerReward;
         uint256 bonusProposerReward;
         uint256 maxProposers;
+        uint256 blocksPerEpoch;
     }
 
     struct ValidatorParams {
@@ -46,7 +47,8 @@ contract Params is Ownable {
         stakingParams = StakingParams({
             baseProposerReward: 1 * 10**16,
             bonusProposerReward: 4 * 10**16,
-            maxProposers: 20
+            maxProposers: 20,
+            blocksPerEpoch: 1000,
         });
 
         validatorParams = ValidatorParams({
@@ -181,5 +183,9 @@ contract Params is Ownable {
 
     function getMinValidatorStake() external view returns (uint256) {
         return validatorParams.minValidatorStake;
+    }
+
+     function getBlocksPerEpoch() external view returns (uint256) {
+        return stakingParams.blocksPerEpoch;
     }
 }
