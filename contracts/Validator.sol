@@ -132,6 +132,10 @@ contract Validator is IValidator, Ownable {
     address public params;
     IStaking private _staking;
 
+
+    uint256 public activationEpoch;
+    uint256 public endEpoch;
+
      // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
         require(inforValidator.signer == msg.sender, "Ownable: caller is not the validator");
@@ -180,6 +184,11 @@ contract Validator is IValidator, Ownable {
         emit UpdatedSigner(inforValidator.signer, signerAddr);
         inforValidator.signer = signerAddr;
         _staking.updateSigner(signerAddr);
+    }
+
+    function isActive() external view returns (bool){
+        uint256 currentEpoch = _staking.epoch()
+        return activationEpoch >= currentEpoch < endEpoch;
     }
     
     // delegate for this validator
@@ -704,6 +713,7 @@ contract Validator is IValidator, Ownable {
         _staking.startValidator();
         inforValidator.status = Status.Bonded;
         signingInfo.startHeight = block.number;
+        activationEpoch = _staking.epoch() + 1;
         emit Started();
     }
 
@@ -716,6 +726,7 @@ contract Validator is IValidator, Ownable {
         inforValidator.status = Status.Unbonding;
         inforValidator.unbondingHeight = block.number;
         inforValidator.unbondingTime = block.timestamp.add(IParams(params).getUnbondingTime());
+        endEpoch = _staking.epoch() + 1;
         emit Stopped();
     }
 
