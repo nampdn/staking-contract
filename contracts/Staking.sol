@@ -78,7 +78,7 @@ contract Staking is IStaking, Ownable {
         
         emit CreatedValidator(
             name,msg.sender,rate,
-            maxRate,maxChangeRate,msg.value
+            maxRate,maxChangeRate
         );
 
         allVals.push(val);

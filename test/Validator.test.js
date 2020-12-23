@@ -1,129 +1,131 @@
-// const Validator = artifacts.require("Validator");
-// const Staking = artifacts.require("Staking");
-// const Minter = artifacts.require("Minter");
-// const Params = artifacts.require("Params");
-// const utils = require("./utils");
+const Validator = artifacts.require("Validator");
+const Staking = artifacts.require("Staking");
+const Minter = artifacts.require("Minter");
+const Params = artifacts.require("Params");
+const utils = require("./utils");
 
-// contract("Validator", async (accounts) => {
-//     async function finalize(notSigned) {
-//         notSigned = notSigned  || [];
-//         let instance = await Staking.deployed();
-//         const validatorSet = await instance.getValidatorSets.call();
-//         await instance.mint();
-//         const minter = await Minter.at(await instance.minter())
-//         const blockProvision = await minter.getBlockProvision();
-//         await instance.deposit({from: accounts[0], value: blockProvision.toString()})
-//         await instance.setPreviousProposer(accounts[0]);
-//         let signed = validatorSet[0].map(addr => notSigned.indexOf(addr) === -1);
-//         await instance.finalize(validatorSet[0], validatorSet[1], signed)
-//     }
+contract("Validator", async (accounts) => {
+    async function finalize(notSigned) {
+        notSigned = notSigned  || [];
+        let instance = await Staking.deployed();
+        const validatorSet = await instance.getValidatorSets.call();
+        await instance.mint();
+        const minter = await Minter.at(await instance.minter())
+        const blockProvision = await minter.getBlockProvision();
+        await instance.deposit({from: accounts[0], value: blockProvision.toString()})
+        await instance.setPreviousProposer(accounts[0]);
+        let signed = validatorSet[0].map(addr => notSigned.indexOf(addr) === -1);
+        await instance.finalize(validatorSet[0], validatorSet[1], signed)
+    }
 
-//     async function createValidator(from) {
-//         const staking = await Staking.deployed()
-//         const rate = web3.utils.toWei("0.4", "ether");
-//         const maxRate = web3.utils.toWei("0.5", "ether");
-//         const maxChangeRate = web3.utils.toWei("0.1", "ether");
-//         const name = web3.utils.fromAscii("val1");
-//         await staking.createValidator(name, rate, maxRate, maxChangeRate, {from});
-//         const val = await Validator.at(await staking.ownerOf(from));
-//         return val;
-//     }
+    async function createValidator(from) {
+        const staking = await Staking.deployed()
+        const rate = web3.utils.toWei("0.4", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
+        const maxChangeRate = web3.utils.toWei("0.1", "ether");
+        const name = web3.utils.fromAscii("val1");
+        var seflDelegate = web3.utils.toWei("0.1", "ether");
+        await staking.createValidator(name, rate, maxRate, maxChangeRate, {from, value: seflDelegate});
+        const val = await Validator.at(await staking.ownerOf(from));
+        return val;
+    }
 
     
-//     it("should create validator", async () => {
-//         const instance = await Validator.deployed();
+    it("should create validator", async () => {
+        const instance = await Validator.deployed();
 
-//         const rate = web3.utils.toWei("0.1", "ether");
-//         const maxRate = web3.utils.toWei("0.5", "ether");
-//         const maxChangeRate = web3.utils.toWei("0.2", "ether");
-//         const name = web3.utils.fromAscii("val1");
-//         await instance.initialize(name, accounts[0], rate, maxRate, maxChangeRate, {from: accounts[0]});
+        const rate = web3.utils.toWei("0.1", "ether");
+        const maxRate = web3.utils.toWei("0.5", "ether");
+        const maxChangeRate = web3.utils.toWei("0.2", "ether");
+        const name = web3.utils.fromAscii("val1");
+        await instance.initialize(name, accounts[0], rate, maxRate, maxChangeRate, {from: accounts[0]});
 
-//         var inforValidator = await instance.inforValidator({from: accounts[0]});
-//         var commission = await instance.commission({from: accounts[0]});
+        var inforValidator = await instance.inforValidator({from: accounts[0]});
+        var commission = await instance.commission({from: accounts[0]});
 
-//         var expectedName = inforValidator.name;
-//         var expectedRate = commission.rate;
-//         var expectedMaxRate = commission.maxRate;
-//         var expectedMaxChangeRate = commission.maxChangeRate;
+        var expectedName = inforValidator.name;
+        var expectedRate = commission.rate;
+        var expectedMaxRate = commission.maxRate;
+        var expectedMaxChangeRate = commission.maxChangeRate;
 
-//         assert.equal("val1", web3.utils.toAscii(expectedName).toString().replace(/\0/g, ''));
-//         assert.equal(rate, expectedRate.toString());
-//         assert.equal(maxRate, expectedMaxRate.toString());
-//         assert.equal(maxChangeRate, expectedMaxChangeRate.toString());
-//     })
+        assert.equal("val1", web3.utils.toAscii(expectedName).toString().replace(/\0/g, ''));
+        assert.equal(rate, expectedRate.toString());
+        assert.equal(maxRate, expectedMaxRate.toString());
+        assert.equal(maxChangeRate, expectedMaxChangeRate.toString());
+    })
 
-//     it ("should not update validator", async () => {
-//         const instance = await Validator.deployed();
-//         const name = web3.utils.fromAscii("111111111111111");
-//         commissionRate = web3.utils.toWei("2", "ether");
-//         await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
-//         "commission cannot be changed more than one in 24h");
+    it ("should not update validator", async () => {
+        const instance = await Validator.deployed();
+        const name = web3.utils.fromAscii("111111111111111");
+        commissionRate = web3.utils.toWei("2", "ether");
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
+        "commission cannot be changed more than one in 24h");
 
-//         await utils.advanceTime(86400);
+        await utils.advanceTime(86400);
 
-//         commissionRate = web3.utils.toWei("0.4", "ether");
-//         await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
-//         "commission cannot be changed more than max change rate");
+        commissionRate = web3.utils.toWei("0.4", "ether");
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
+        "commission cannot be changed more than max change rate");
 
-//         commissionRate = web3.utils.toWei("2", "ether");
-//         await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
-//         "commission cannot be more than the max rate");
+        commissionRate = web3.utils.toWei("2", "ether");
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
+        "commission cannot be more than the max rate");
 
-//     })
+    })
 
-//     it ("should update validator", async () => {
-//         const instance = await Validator.deployed();
-//         const name = web3.utils.fromAscii("12131");
-//         let commissionRate = web3.utils.toWei("0.3", "ether");
-//         await utils.advanceTime(86401);
-//         var update = await instance.updateCommissionRate(commissionRate, {from: accounts[0]});
-//         var commission = await instance.commission.call();
-//         var expectedRate = commission.rate;
-//         assert.equal(commissionRate, expectedRate.toString());
+    it ("should update validator", async () => {
+        const instance = await Validator.deployed();
+        const name = web3.utils.fromAscii("12131");
+        let commissionRate = web3.utils.toWei("0.3", "ether");
+        await utils.advanceTime(86401);
+        var update = await instance.updateCommissionRate(commissionRate, {from: accounts[0]});
+        var commission = await instance.commission.call();
+        var expectedRate = commission.rate;
+        assert.equal(commissionRate, expectedRate.toString());
 
-//         // check event
-//         assert.equal(commissionRate, update.logs[0].args[0].toString());
-//     })
+        // check event
+        assert.equal(commissionRate, update.logs[0].args[0].toString());
+    })
 
-//     it ("should allocate token", async() => {
-//         const instance = await Validator.deployed();
-//         var rewards = web3.utils.toWei("1", "ether");
-//         await instance.allocateToken(rewards, {from: accounts[0]});
+    it ("should allocate token", async() => {
+        const instance = await Validator.deployed();
+        var rewards = web3.utils.toWei("1", "ether");
+        await instance.allocateToken(rewards, {from: accounts[0]});
 
-//         var inforValidator = await instance.inforValidator({from: accounts[0]});
+        var inforValidator = await instance.inforValidator({from: accounts[0]});
 
-//         var commission = await instance.commission({from: accounts[0]});
-//         // calculate expected commsission = 1 * rate = rate
-//         var expectedCommsission = commission.rate.toString()
-//         assert.equal(inforValidator.accumulatedCommission.toString(), expectedCommsission);
-//     })
+        var commission = await instance.commission({from: accounts[0]});
+        // calculate expected commsission = 1 * rate = rate
+        var expectedCommsission = commission.rate.toString()
+        assert.equal(inforValidator.accumulatedCommission.toString(), expectedCommsission);
+    })
     
 
-//     it ("should delegate", async () => {
-//         const staking = await Staking.deployed()
-//         const validator =  await createValidator(accounts[0]);
-//         const valAddr = await staking.allVals(0)
+    it ("should delegate", async () => {
+        const staking = await Staking.deployed()
+        const validator =  await createValidator(accounts[0]);
+        const valAddr = await staking.allVals(0)
 
-//         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
-//         await validator.start();
-//         const delegation = await validator.delegationByAddr(accounts[0])
-//         assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
+        // await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
+        await validator.start();
+        const delegation = await validator.delegationByAddr(accounts[0])
+        console.log("sssssssssssssssssssss", delegation.stake.toString())
+        // assert.equal(delegation.stake.toString(), web3.utils.toWei("1", "ether"))
 
-//         var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
-//         const delegation2 = await validator.delegationByAddr(accounts[1])
-//         assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
-//         const valInfo = await validator.inforValidator()
-//         assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
-//         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
-//         assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
-//         assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
+        // var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
+        // const delegation2 = await validator.delegationByAddr(accounts[1])
+        // assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
+        // const valInfo = await validator.inforValidator()
+        // assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
+        // assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
+        // assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
+        // assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
 
-//         // check event
-//         assert.equal(accounts[1], delegate.logs[0].args[0]) // check delegator address
-//         assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[1]) // check delagate amount
+        // // check event
+        // assert.equal(accounts[1], delegate.logs[0].args[0]) // check delegator address
+        // assert.equal(web3.utils.toWei("0.4", "ether"), delegate.logs[0].args[1]) // check delagate amount
         
-//     })
+    })
 
 //     it ("should undelegate", async () => {
 //         const staking = await Staking.deployed();
@@ -504,4 +506,4 @@
 //         await val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("2", "ether")})
 //         await utils.assertRevert(val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), "Min amount is 10000 KAI")
 //     })
-// })
+})

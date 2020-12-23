@@ -197,9 +197,7 @@ contract Validator is IValidator, Ownable {
     }
 
     function _updateName(bytes32 _name) private {
-        if (_name[0] != 0) {
-            inforValidator.name = _name;
-        }
+        inforValidator.name = _name;
     }
 
     function _updateCommissionRate(uint256 _commissionRate) private {
@@ -229,7 +227,7 @@ contract Validator is IValidator, Ownable {
     }
 
     function updateName(bytes32 _name) external payable onlyValidator {
-        require(msg.value > IParams(params).getMinAmountChangeName(), "Min amount is 10000 KAI");
+        require(msg.value >= IParams(params).getMinAmountChangeName(), "Min amount is 10000 KAI");
         _updateName(_name);
         emit UpdateName(_name);
          _staking.burn(msg.value, 1);
