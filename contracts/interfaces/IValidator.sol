@@ -7,8 +7,7 @@ interface IValidator {
         address _owner,
         uint256 _rate, 
         uint256 _maxRate, 
-        uint256 _maxChangeRate,
-        uint256 _minSelfDelegation
+        uint256 _maxChangeRate
     ) external;
     function updateCommissionRate(uint256 _commissionRate) external;
     function updateName(bytes32 _name) external payable;
@@ -26,6 +25,7 @@ interface IValidator {
     function getDelegations() external view returns (address[] memory, uint256[] memory);
     function validateSignature(uint256 _votingPower, bool _signed) external;
     function getSlashEventsLength() external view returns(uint256);
+    function selfDelegate(address payable val, uint256 amount) external;
     function doubleSign(
         uint256 votingPower,
         uint256 distributionHeight

@@ -6,9 +6,8 @@ interface IStaking {
         bytes32 name,
         uint256 commissionRate, 
         uint256 commissionMaxRate, 
-        uint256 commissionMaxChangeRate,
-        uint256 minSelfDelegation
-    ) external returns (address val);
+        uint256 commissionMaxChangeRate
+    ) external payable returns (address val);
     function finalize(
         address[] calldata _signerAdds, 
         uint256[] calldata _votingPower, 

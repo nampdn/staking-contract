@@ -88,7 +88,7 @@ contract Validator is IValidator, Ownable {
         uint256 referenceCount;
     }
 
-    // SigningInfo defines a validator's signing info for monitoring their
+    // SigningInfo defines a validator's signing info for monitoring their+
     // liveness activity.
     struct SigningInfo {
         // height at which validator was first a candidate OR was unjailed
@@ -112,6 +112,7 @@ contract Validator is IValidator, Ownable {
         uint256 accumulatedCommission;
         uint256 ubdEntryCount; // unbonding delegation entries
         uint256 updateTime; // last update time
+        uint256 minSelfDelegation;
         Status status; // validator status
         uint256 unbondingTime; // unbonding time
         uint256 unbondingHeight; // unbonding height
@@ -187,6 +188,12 @@ contract Validator is IValidator, Ownable {
         _delegate(msg.sender, msg.value);
         _staking.delegate(msg.value);
         _staking.addDelegation(msg.sender);
+    }
+
+    function selfDelegate(address payable val, uint256 amount) external onlyOwner {
+         _delegate(val, amount);
+        _staking.delegate(amount);
+        _staking.addDelegation(val);
     }
 
     function _updateName(bytes32 _name) private {
@@ -268,8 +275,6 @@ contract Validator is IValidator, Ownable {
         _undelegate(msg.sender, _amount);
         _staking.undelegate(_amount);
     }
-
-
 
     function _undelegate(address payable from, uint256 _amount) private {
         _withdrawRewards(from);

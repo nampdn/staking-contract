@@ -10,7 +10,8 @@ contract("Staking", async (accounts) => {
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const name = web3.utils.fromAscii("val1");
-        return instance.createValidator(name, rate, maxRate, maxChangeRate, {from: account})
+        var selfDelegate =  web3.utils.toWei("0.1", "ether");
+        return instance.createValidator(name, rate, maxRate, maxChangeRate, {from: account, value: selfDelegate})
     }
 
     it("should create validator", async () => {
@@ -19,7 +20,8 @@ contract("Staking", async (accounts) => {
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
         const name = web3.utils.fromAscii("val1");
-        await instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0]})
+        var selfDelegate =  web3.utils.toWei("0.2", "ether");
+        await instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0], value: selfDelegate})
         await utils.assertRevert(instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0]}), "Valdiator owner exists") 
         await instance.transferOwnership(accounts[0])
         assert.equal(await instance.allValsLength(), 1);
@@ -52,13 +54,21 @@ contract("Staking", async (accounts) => {
                 from: accounts[5],
                 value: bond,
                 message: "commission max change rate can not be more than the max rate"
+            },
+            {
+                rate: 0,
+                maxRate: web3.utils.toWei("0.9", "ether"),
+                maxChangeRate: web3.utils.toWei("1", "ether"),
+                from: accounts[5],
+                value: web3.utils.toWei("0.001", "ether"),
+                message: "self delegation below minimum"
             }
         ];
 
         const name = web3.utils.fromAscii("val5");
 
         for(var testCase of testCases) {
-            await utils.assertRevert(instance.createValidator(name, testCase.rate, testCase.maxRate, testCase.maxChangeRate, {from: testCase.from}), 
+            await utils.assertRevert(instance.createValidator(name, testCase.rate, testCase.maxRate, testCase.maxChangeRate, {from: testCase.from, value: testCase.value}), 
                 "Returned error: VM Exception while processing transaction: revert");
         }
     })
@@ -66,7 +76,7 @@ contract("Staking", async (accounts) => {
     it("finalize", async() => {
         const instance = await Staking.deployed();
         await instance.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 1814400, web3.utils.toWei("0.05", "ether"), 
-        100000, web3.utils.toWei("0.5", "ether"), web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"))
+        100000, web3.utils.toWei("0.5", "ether"), web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"))
         const contractAddr = await instance.allVals(0)
         const validator = await Validator.at(contractAddr)
         await instance.mint({from: accounts[0]});
