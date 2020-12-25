@@ -24,7 +24,8 @@ contract("Staking", async (accounts) => {
         await instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0], value: selfDelegate})
         await utils.assertRevert(instance.createValidator(name, rate, maxRate, maxChangeRate, {from: accounts[0]}), "Valdiator owner exists") 
         await instance.transferOwnership(accounts[0])
-        assert.equal(await instance.allValsLength(), 1);
+        var valAddr = await instance.getAllValidator()
+        assert.equal(await instance.allValsLength(), valAddr.length);
     })
 
     it ("should not create validator", async() => {
