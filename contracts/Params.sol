@@ -42,7 +42,7 @@ contract Params is Ownable {
     MintParams public mintParams;
 
 
-    constructor() public {
+ constructor() public {
         transferOwnership(msg.sender);
         _staking = IStaking(msg.sender);
 
@@ -53,26 +53,27 @@ contract Params is Ownable {
         });
 
         validatorParams = ValidatorParams({
-            downtimeJailDuration: 3600, // 1 hour
+            downtimeJailDuration: 300, // 3 days
             slashFractionDowntime: 5 * 10**16, // 5%
-            unbondingTime: 1814400, // 21 days
-            slashFractionDoubleSign: 25 * 10**16, // 25%
-            signedBlockWindow: 10000,
-            minSignedPerWindow: 50 * 10**16, // 50%
-            minStake: 25000 * 10**18, // 25 000 KAI
-            minValidatorStake: 12500000 * 10**18, // 12500000 KAI
-            minAmountChangeName: 10000 *10**18, // 10000 KAI
-	        minSelfDelegation: 25000 * 10**18 // 25 000 KAI
+            unbondingTime: 300, // 7 days
+            slashFractionDoubleSign: 25 * 10**16, //25%
+            signedBlockWindow: 100,
+            minSignedPerWindow: 50 * 10**16, //50%
+            minStake: 1 * 10**16, // 25 000 KAI
+            minValidatorStake: 1 * 10**17, // 12500000 KAI
+            minAmountChangeName: 1 *10**17, // 10000 KAI
+            minSelfDelegation: 1 * 10**17 //25000 KAI
         });
 
         mintParams = MintParams({
-            inflationRateChange: 1 * 10**15, // 0.1%
+            inflationRateChange: 1 * 10**16, // 1%
             goalBonded: 50 * 10**16, // 50%
-            blocksPerYear: 7008000, // 4.5s per block
+            blocksPerYear: 6307200,
             inflationMax: 5 * 10**16, // 5%
-            inflationMin: 21024 * 10**12 // 1%
+            inflationMin: 1 * 10**16 // 1%
         });
     }
+
 
     function updateBaseReward(uint256 _baseProposerReward, uint256 _bonusProposerReward) external onlyOwner {
         stakingParams.baseProposerReward = _baseProposerReward;
