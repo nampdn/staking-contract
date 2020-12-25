@@ -294,6 +294,16 @@ contract Staking is IStaking, Ownable {
         return (signerAddrs, votingPowers);
     }
 
+    // get all validator 
+    function getAllValidator() external view returns (address[] memory) {
+        uint256 total = allVals.length;
+        address[] memory valAddrs = new address[](total);
+        for (uint i = 0; i < total; i++) {
+            valAddrs[i] = allVals[i];
+        }
+        return valAddrs;
+    }
+
     function setMaxProposers(uint256 _maxValidators) external onlyOwner {
         require(totalVoted >= ((2*sumVotingPowerProposer())/3), "Insufficient voting power");
         IParams(params).updateMaxValidator(_maxValidators);
