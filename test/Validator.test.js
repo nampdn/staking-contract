@@ -442,6 +442,9 @@ contract("Validator", async (accounts) => {
         // check infor delegate 
         var delegation =  await val.delegationByAddr(accounts[4]);
         assert.equal(web3.utils.toWei("3.000000000000000002", "ether"), delegation.stake.toString())
+
+        var stake = await val.getDelegatorStake(accounts[4])
+        assert.equal(web3.utils.toWei("3.000000000000000002", "ether"), stake.toString())
      
         var undelegate = await val.undelegate({from: accounts[4]});
         assert.equal(undelegate.logs[0].event, 'Withdraw')

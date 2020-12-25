@@ -757,6 +757,16 @@ contract Validator is IValidator, Ownable {
         return _missedBlock;
     }
 
+    function getDelegatorStake(address _delAddr)
+        public
+        view
+        returns (uint256)
+    {
+        require(delegations.contains(_delAddr), "delegation not found");
+        Delegation memory del = delegationByAddr[_delAddr];
+        return _tokenFromShare(del.shares);
+    }
+
     function getSlashEventsLength() public view returns(uint256) {
         return slashEvents.length;
     }
