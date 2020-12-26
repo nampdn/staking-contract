@@ -122,25 +122,30 @@ contract("Staking", async (accounts) => {
 
         var totalSlashedToken = await instance.totalSlashedToken()
         assert.equal(web3.utils.toWei("0.0000005", "ether"), totalSlashedToken.toString())
+
+        var treasury = await instance.treasury();
+        console.log("treasuryssssssssssssssssssssss", treasury)
+        var bal = await web3.eth.getBalance(contractAddr);
+        console.log("sssssssssssssssssssssssssssssssssss",bal.toString())
     });
 
-    it("start/stop validator", async () => {
-        const staking = await Staking.deployed();
-        await createValidator(accounts[1])
-        const valAddr = await staking.allVals.call(1);
-        const val = await  Validator.at(valAddr);
-        await val.delegate({from: accounts[1], value: web3.utils.toWei("1", "ether")});
+    // it("start/stop validator", async () => {
+    //     const staking = await Staking.deployed();
+    //     await createValidator(accounts[1])
+    //     const valAddr = await staking.allVals.call(1);
+    //     const val = await  Validator.at(valAddr);
+    //     await val.delegate({from: accounts[1], value: web3.utils.toWei("1", "ether")});
 
-        // start validator
-        await val.start({from: accounts[1]});
-        let valSets = await staking.getValidatorSets.call();
-        assert.equal(valSets[0].length, 1)
-        assert.equal(valSets[0][0], accounts[1])
+    //     // start validator
+    //     await val.start({from: accounts[1]});
+    //     let valSets = await staking.getValidatorSets.call();
+    //     assert.equal(valSets[0].length, 1)
+    //     assert.equal(valSets[0][0], accounts[1])
 
-        // stop validator
-        await val.undelegate({from: accounts[1]})
-        valSets = await staking.getValidatorSets.call();
-        assert.equal(valSets[0].length, 0)
+    //     // stop validator
+    //     await val.undelegate({from: accounts[1]})
+    //     valSets = await staking.getValidatorSets.call();
+    //     assert.equal(valSets[0].length, 0)
 
-    })
+    // })
 })

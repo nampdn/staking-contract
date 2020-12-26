@@ -74,7 +74,6 @@ contract Params is Ownable {
         });
     }
 
-
     function updateBaseReward(uint256 _baseProposerReward, uint256 _bonusProposerReward) external onlyOwner {
         stakingParams.baseProposerReward = _baseProposerReward;
         stakingParams.bonusProposerReward = _bonusProposerReward;

@@ -8,6 +8,7 @@ import "./Ownable.sol";
 import "./Params.sol";
 import "./EnumerableSet.sol";
 import "./Validator.sol";
+import "./Treasury.sol";
 
 contract Staking is IStaking, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -29,6 +30,7 @@ contract Staking is IStaking, Ownable {
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
     Minter public minter; // minter contract
     address public params;
+    address public treasury;
 
     // Functions with this modifier can only be executed by the validator
     modifier onlyValidator() {
@@ -38,6 +40,7 @@ contract Staking is IStaking, Ownable {
 
     constructor() public {
         params = address(new Params());
+        treasury = address(new Treasury(address(this)));
         minter = new Minter(params);
        
     }
@@ -85,6 +88,7 @@ contract Staking is IStaking, Ownable {
         ownerOf[msg.sender] = val;
         valOf[val] = msg.sender;
         IValidator(val).setParams(params);
+        IValidator(val).setTreasury(treasury);
         IValidator(val).selfDelegate(msg.sender, msg.value);
     }
 
@@ -196,7 +200,6 @@ contract Staking is IStaking, Ownable {
         valOfDel[delAddr].add(msg.sender);
     }
 
-
     function burn(uint256 amount, uint reason) external onlyValidator{
         totalSlashedToken += amount;
         _burn(msg.sender, amount, reason);
@@ -204,12 +207,11 @@ contract Staking is IStaking, Ownable {
 
     function _burn(address from, uint256 amount, uint reason) private {
         totalBonded = totalBonded.sub(amount);
-        totalSupply = totalSupply.sub(amount);
-        balanceOf[from] = balanceOf[from].sub(amount);
+        balanceOf[from] = balanceOf[from].sub(amount);        
         emit Burn(from, amount, reason);
     }
 
-    // slash and jail validator forever
+    // slash and jail validator forever-
     function doubleSign(
         address signerAddr,
         uint256 votingPower,

@@ -131,6 +131,7 @@ contract Validator is IValidator, Ownable {
     SigningInfo public signingInfo; // signing info
     mapping(uint => bool) private missedBlock; // missed block
     address public params;
+    address public treasury;
     IStaking private _staking;
 
      // Functions with this modifier can only be executed by the validator
@@ -173,6 +174,10 @@ contract Validator is IValidator, Ownable {
 
     function setParams(address _params) external {
         params = _params;
+    }
+
+    function setTreasury(address _treasury) external {
+        treasury = _treasury;
     }
     
     // update signer address
@@ -231,6 +236,7 @@ contract Validator is IValidator, Ownable {
         _updateName(_name);
         emit UpdateName(_name);
          _staking.burn(msg.value, 1);
+        address(uint160(address(treasury))).transfer(msg.value);
     }
     
     // _allocateTokens allocate tokens to a particular validator, splitting according to commission
@@ -415,7 +421,8 @@ contract Validator is IValidator, Ownable {
         if (!previous && missed) { // value has changed from not missed to missed, increment counter
             signingInfo.missedBlockCounter++;
             missedBlock[index] = true;
-        } else if (previous && !missed) { // value has changed from missed to not missed, decrement counter
+        }
+        if (previous && !missed) { // value has changed from missed to not missed, decrement counter
             signingInfo.missedBlockCounter--;
             missedBlock[index] = false;
         }
@@ -668,6 +675,7 @@ contract Validator is IValidator, Ownable {
         }
 
         inforValidator.tokens = inforValidator.tokens.sub(tokensToBurn);
+        address(uint160(address(treasury))).transfer(tokensToBurn);
         _staking.burn(tokensToBurn, 0);
     }
     
@@ -769,5 +777,8 @@ contract Validator is IValidator, Ownable {
 
     function getSlashEventsLength() public view returns(uint256) {
         return slashEvents.length;
+    }
+
+    function () external payable {
     }
 }
