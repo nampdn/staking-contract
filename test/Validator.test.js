@@ -1,4 +1,5 @@
 const Validator = artifacts.require("Validator");
+const Treasury = artifacts.require("Treasury");
 const Staking = artifacts.require("Staking");
 const Minter = artifacts.require("Minter");
 const Params = artifacts.require("Params");
@@ -509,4 +510,31 @@ contract("Validator", async (accounts) => {
         await val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("2", "ether")})
         await utils.assertRevert(val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), "Min amount is 10000 KAI")
     })
+
+    it("should proposal use treasury", async () => {
+        const staking = await Staking.deployed();
+        const val4 = await Validator.at(await staking.allVals(3));
+        var treasuryAddr = await val4.treasury()
+        var treasury = await Treasury.at(treasuryAddr)
+        var treasuryBalance = await web3.eth.getBalance(treasuryAddr)
+
+        // proposal
+        await treasury.addProposal(web3.utils.toWei("0.1", "ether"), {from: accounts[4], value: web3.utils.toWei("2", "ether")})
+        assert.equal(await treasury.allProposal(), "1")
+
+        // vote
+        await treasury.addVote(0, {from: accounts[6]})
+
+        // make sure vote
+        var proposal = await treasury.proposals(0)
+        assert.equal(proposal[0], accounts[4])
+        assert.equal(proposal[4].toString(), web3.utils.toWei("2", "ether"))
+
+        await treasury.confirmProposal(0, {from: accounts[4]})
+        var proposal1 = await treasury.proposals(0)
+        assert.equal(proposal1[0], accounts[4])
+        assert.equal(proposal1[5], true)
+        
+    }) 
+
 })
