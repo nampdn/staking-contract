@@ -6,9 +6,8 @@ interface IStaking {
         bytes32 name,
         uint256 commissionRate, 
         uint256 commissionMaxRate, 
-        uint256 commissionMaxChangeRate, 
-        uint256 minSelfDelegation
-    ) external returns (address val);
+        uint256 commissionMaxChangeRate
+    ) external payable returns (address val);
     function finalize(
         address[] calldata _signerAdds, 
         uint256[] calldata _votingPower, 
@@ -23,11 +22,15 @@ interface IStaking {
     function undelegate(uint256 amount) external;
     function addDelegation(address delAddr) external;
     function removeFromSets() external;
-    function burn(uint256 amount) external;
+    function burn(uint256 amount, uint reason) external;
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
     function startValidator() external;
+    function proposalMaxProposers(uint256 _maxValidators) external;
+    function setProposalFail() external;
+    function addVote() external;
+    function sumVotingPowerProposer() external returns (uint256);
 
     // @dev Emitted when validator is created;
     event CreatedValidator(
@@ -35,10 +38,9 @@ interface IStaking {
         address payable _valAddr,
         uint256 _commissionRate,
         uint256 _commissionMaxRate,
-        uint256 _commissionMaxChangeRate,
-        uint256 _minSelfDelegation
+        uint256 _commissionMaxChangeRate
     );
 
-    event Burn(address from, uint256 amount);
+    event Burn(address from, uint256 amount, uint reason);
     event Mint(uint256 amount);
 }

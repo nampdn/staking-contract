@@ -1,7 +1,8 @@
-const Validator = artifacts.require("ValidatorTest");
-const Staking = artifacts.require("StakingTest");
-const Staking2 = artifacts.require("Staking");
+const Validator = artifacts.require("Validator");
+const Treasury = artifacts.require("Treasury");
+const Staking = artifacts.require("Staking");
 const Minter = artifacts.require("Minter");
+const Params = artifacts.require("Params");
 const utils = require("./utils");
 
 contract("Validator", async (accounts) => {
@@ -23,11 +24,10 @@ contract("Validator", async (accounts) => {
         const rate = web3.utils.toWei("0.4", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
-        await staking.createValidatorTest(name, rate, maxRate, maxChangeRate, minSelfDelegation, {from});
+        var seflDelegate = web3.utils.toWei("0.1", "ether");
+        await staking.createValidator(name, rate, maxRate, maxChangeRate, {from, value: seflDelegate});
         const val = await Validator.at(await staking.ownerOf(from));
-        await val.setParamsTest();
         return val;
     }
 
@@ -38,9 +38,8 @@ contract("Validator", async (accounts) => {
         const rate = web3.utils.toWei("0.1", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.2", "ether");
-        const minSelfDelegation = web3.utils.toWei("0.5", "ether");
         const name = web3.utils.fromAscii("val1");
-        await instance.initialize(name, accounts[0], rate, maxRate, maxChangeRate, minSelfDelegation, {from: accounts[0]});
+        await instance.initialize(name, accounts[0], rate, maxRate, maxChangeRate, {from: accounts[0]});
 
         var inforValidator = await instance.inforValidator({from: accounts[0]});
         var commission = await instance.commission({from: accounts[0]});
@@ -49,39 +48,29 @@ contract("Validator", async (accounts) => {
         var expectedRate = commission.rate;
         var expectedMaxRate = commission.maxRate;
         var expectedMaxChangeRate = commission.maxChangeRate;
-        var expectedMinselfDelegation = inforValidator.minSelfDelegation;
 
         assert.equal("val1", web3.utils.toAscii(expectedName).toString().replace(/\0/g, ''));
         assert.equal(rate, expectedRate.toString());
         assert.equal(maxRate, expectedMaxRate.toString());
         assert.equal(maxChangeRate, expectedMaxChangeRate.toString());
-        assert.equal(minSelfDelegation, expectedMinselfDelegation.toString());
     })
 
     it ("should not update validator", async () => {
         const instance = await Validator.deployed();
-        const name = web3.utils.fromAscii("");
+        const name = web3.utils.fromAscii("111111111111111");
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be changed more than one in 24h");
 
         await utils.advanceTime(86400);
 
         commissionRate = web3.utils.toWei("0.4", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be changed more than max change rate");
 
         commissionRate = web3.utils.toWei("2", "ether");
-        await utils.assertRevert(instance.update(name, commissionRate, 0, {from: accounts[0]}), 
+        await utils.assertRevert(instance.updateCommissionRate(commissionRate, {from: accounts[0]}), 
         "commission cannot be more than the max rate");
-
-        minSelfDelegation = web3.utils.toWei("0.2", "ether");
-        await utils.assertRevert(instance.update(name, 0, minSelfDelegation, {from: accounts[0]}), 
-        "minimum self delegation cannot be decrease");
-
-        minSelfDelegation = web3.utils.toWei("0.55", "ether");
-        await utils.assertRevert(instance.update(name, 0, minSelfDelegation, {from: accounts[0]}), 
-        "self delegation below minimum");
 
     })
 
@@ -90,14 +79,13 @@ contract("Validator", async (accounts) => {
         const name = web3.utils.fromAscii("12131");
         let commissionRate = web3.utils.toWei("0.3", "ether");
         await utils.advanceTime(86401);
-        var update = await instance.update(name, commissionRate, 0, {from: accounts[0]});
+        var update = await instance.updateCommissionRate(commissionRate, {from: accounts[0]});
         var commission = await instance.commission.call();
         var expectedRate = commission.rate;
         assert.equal(commissionRate, expectedRate.toString());
 
         // check event
-        assert.equal(commissionRate, update.logs[0].args[1].toString());
-        assert.equal("0", update.logs[0].args[2].toString());
+        assert.equal(commissionRate, update.logs[0].args[0].toString());
     })
 
     it ("should allocate token", async() => {
@@ -119,16 +107,16 @@ contract("Validator", async (accounts) => {
         const validator =  await createValidator(accounts[0]);
         const valAddr = await staking.allVals(0)
 
-        await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.4", "ether")})
+        await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.3", "ether")})
         await validator.start();
         const delegation = await validator.delegationByAddr(accounts[0])
-        assert.equal(delegation.shares.toString(), web3.utils.toWei("1", "ether"))
+        assert.equal(delegation.stake.toString(), web3.utils.toWei("0.4", "ether"))
 
         var delegate = await validator.delegate({from: accounts[1], value: web3.utils.toWei("0.4", "ether")})
         const delegation2 = await validator.delegationByAddr(accounts[1])
-        assert.equal(delegation2.shares.toString(), web3.utils.toWei("1", "ether"))
+        assert.equal(delegation2.shares.toString(), web3.utils.toWei("4", "ether"))
         const valInfo = await validator.inforValidator()
-        assert.equal(valInfo.delegationShares, web3.utils.toWei("2", "ether"))
+        assert.equal(valInfo.delegationShares.toString(), web3.utils.toWei("8", "ether"))
         assert.equal(valInfo.tokens.toString(), web3.utils.toWei("0.8", "ether"))
         assert.equal(valInfo.tokens.toString(), await staking.balanceOf(valAddr))
         assert.equal(await staking.totalBonded(), valInfo.tokens.toString())
@@ -153,7 +141,7 @@ contract("Validator", async (accounts) => {
         var delegation =  await validator.delegationByAddr(accounts[1]);
 
         // check balance remaining
-        assert.equal(delegation.shares.toString(), web3.utils.toWei("0.75", "ether"))
+        assert.equal(delegation.shares.toString(), web3.utils.toWei("3", "ether"))
         assert.equal(delegation.stake.toString(), web3.utils.toWei("0.3", "ether"))
 
         // undelegate all stake amount
@@ -226,7 +214,6 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(valAddr)
         await utils.advanceTime(1814401);
         var withdraw = await validator.withdraw({from: accounts[1]})
-
         // check event
         assert.equal(accounts[1], withdraw.logs[0].args[0])
     })
@@ -247,7 +234,7 @@ contract("Validator", async (accounts) => {
         await finalize([]);
         var commissionRewards = await validator.getCommissionRewards({from: accounts[0]})
 
-        assert.equal("6341958396752917299", commissionRewards.toString())
+        assert.equal("3170979198376458649", commissionRewards.toString())
         await validator.withdrawCommission({from: accounts[0]})
     })
 
@@ -267,7 +254,7 @@ contract("Validator", async (accounts) => {
         const validator = await Validator.at(contractAddr)
         var delegationRewards = await validator.getDelegationRewards(accounts[0], {from: accounts[0]})
 
-        assert.equal("5248517293864483283", delegationRewards.toString())
+        assert.equal("2624258646932241641", delegationRewards.toString())
         const tx = await validator.withdrawRewards({from: accounts[0]})
     })
 
@@ -282,6 +269,10 @@ contract("Validator", async (accounts) => {
 
     it("should unjail", async () => {
         const staking = await Staking.deployed();
+        await staking.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 
+        1814400, web3.utils.toWei("0.05", "ether"), 20,  web3.utils.toWei("0.5", "ether"), 
+        web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.01", "ether"));
+
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
         const amount = web3.utils.toWei("5", "ether");
@@ -293,17 +284,19 @@ contract("Validator", async (accounts) => {
         assert.equal(info.jailed, false)
 
         // first jail
-        await finalize([accounts[5]]);
-        let missedBlock = await val.getMissedBlock.call();
-        assert.equal(missedBlock[0], true);
-        await finalize([accounts[5]]);
-        missedBlock = await val.getMissedBlock.call();
-        assert.equal(missedBlock[0], false);
+        for (var i=0; i<11; i++) {
+            await finalize([accounts[5]]);
+        }
+        // let missedBlock = await val.getMissedBlock.call();
+        // assert.equal(missedBlock[0], true);
+        // await finalize([accounts[5]]);
+        // missedBlock = await val.getMissedBlock.call();
+        // assert.equal(missedBlock[0], false);
         // after jail
         info = await val.inforValidator.call();
         assert.equal(info.jailed, true)
         // downtime slashed: 5 - 5 * 0,01% = 4.9995
-        assert.equal(info.tokens.toString(), web3.utils.toWei("4.9995", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei("5.09949", "ether"))
         
         // unjail
         await utils.advanceTime(601);
@@ -329,23 +322,73 @@ contract("Validator", async (accounts) => {
         await val.undelegateWithAmount(web3.utils.toWei("1", "ether"), {from: accounts[5]})
         await staking.doubleSign(accounts[5], valSet[1][1], 1, {from: accounts[0]});
 
+        var totalSlashedToken = await staking.totalSlashedToken()
+        assert.equal(web3.utils.toWei("0.205484500000000001", "ether"), totalSlashedToken.toString())
+
+        var slashEventLength = await val.getSlashEventsLength()
+        assert.equal(slashEventLength.toString(), "2")
+
         const info = await val.inforValidator()
         assert.equal(info.jailed, true)
 
         valSet = await staking.getValidatorSets()
         assert.equal(valSet[0].length, 1);
-        assert.equal(info.tokens.toString(), web3.utils.toWei("3.799525000000000000", "ether"))
+        assert.equal(info.tokens.toString(), web3.utils.toWei('3.894515500000000000', "ether"))
 
         const ubdEntries = await val.getUBDEntries.call(accounts[5])
         assert.equal(ubdEntries[0][0].toString(), web3.utils.toWei("0.95", "ether"))
     })
 
+    it ("Should not update max validator", async () => {
+        const staking = await Staking.deployed();
+
+        await createValidator(accounts[8]);
+        const val8 = await Validator.at(await staking.allVals(2));
+        const amount8 = web3.utils.toWei("0.1", "ether");
+        await val8.delegate({from: accounts[8], value: amount8})
+        await val8.start({from: accounts[8]});
+
+        // proposal max validator
+        await staking.proposalMaxProposers(2, {from: accounts[0]})
+        var proposal = await staking.proposal() 
+        assert.equal(proposal.toString(), 2)
+        await utils.assertRevert(staking.addVote({from: accounts[3]}), "Not the proposer");
+        await staking.addVote({from: accounts[8]})
+        await utils.assertRevert(staking.addVote({from: accounts[8]}), "Vote only once");
+        await utils.assertRevert(staking.setMaxProposers(2, {from: accounts[0]}), "Insufficient voting power");
+    })
+
+    it ("Should update max validator", async () => {
+        const staking = await Staking.deployed();
+
+        // befor update
+        const params = await Params.at(await staking.params())
+        var maxValidator = await params.getMaxProposers()
+        assert.equal(maxValidator.toString(), "20")
+        await staking.addVote({from: accounts[0]})
+        var voted = await staking.vote(accounts[0])
+        assert.equal(voted, true)
+        await staking.setMaxProposers(2, {from: accounts[0]})
+
+        // after update
+        var maxValidator1 = await params.getMaxProposers()
+        assert.equal(maxValidator1.toString(), "2")
+
+        // make sure reset
+        var voted1 = await staking.vote(accounts[0])
+        assert.equal(voted1, false)
+        var vote2 = await staking.vote(accounts[8])
+        assert.equal(vote2, false)
+        var totalVote = await staking.totalVoted()
+        assert.equal(totalVote.toString(), "0")
+    })
+
     it ("should withdraw when validator stop", async () => {
         const staking = await Staking.deployed();
-        await staking.setMaxValidator(2, {from: accounts[0]})
         const val0 = await Validator.at(await staking.allVals(0));
+
         await createValidator(accounts[4]);
-        const val4 = await Validator.at(await staking.allVals(2));
+        const val4 = await Validator.at(await staking.allVals(3));
         await val4.delegate({from: accounts[4], value: web3.utils.toWei("3", "ether")})
         await val4.start({from: accounts[4]});
         
@@ -355,7 +398,7 @@ contract("Validator", async (accounts) => {
         await val1.delegate({from: accounts[6], value:  web3.utils.toWei("7", "ether")})
 
         await createValidator(accounts[6]);
-        const val6 = await Validator.at(await staking.allVals(3));
+        const val6 = await Validator.at(await staking.allVals(4));
         await val6.delegate({from: accounts[6], value:  web3.utils.toWei("0.6", "ether")})
 
         // reject when the validator is added has an amount smaller than min amount in val set. 
@@ -399,7 +442,10 @@ contract("Validator", async (accounts) => {
 
         // check infor delegate 
         var delegation =  await val.delegationByAddr(accounts[4]);
-        assert.equal(web3.utils.toWei("2.999999999999999999", "ether"), delegation.stake.toString())
+        assert.equal(web3.utils.toWei("3.000000000000000002", "ether"), delegation.stake.toString())
+
+        var stake = await val.getDelegatorStake(accounts[4])
+        assert.equal(web3.utils.toWei("3.000000000000000002", "ether"), stake.toString())
      
         var undelegate = await val.undelegate({from: accounts[4]});
         assert.equal(undelegate.logs[0].event, 'Withdraw')
@@ -421,10 +467,10 @@ contract("Validator", async (accounts) => {
     it ("should not start validator with balance smaller than min validator balance", async () => {
         const staking = await Staking.deployed();
         await createValidator(accounts[9]);
-        const val9 = await Validator.at(await staking.allVals(4));
+        const val9 = await Validator.at(await staking.allVals(5));
         await val9.delegate({from: accounts[9], value:  web3.utils.toWei("0.015", "ether")})
 
-        await utils.assertRevert(val9.start({from: accounts[9]}), "Address balance must greater or equal minimum validator balance")
+        await utils.assertRevert(val9.start({from: accounts[9]}), "Amount must greater than min amount")
 
         await val9.delegate({from: accounts[9], value:  web3.utils.toWei("10", "ether")})
         await val9.start({from: accounts[9]})
@@ -438,14 +484,14 @@ contract("Validator", async (accounts) => {
         await val9.withdraw({from: accounts[9]})
         // after undelegate
         var inforVal1 = await val9.inforValidator({from: accounts[9]})
-        assert.equal(inforVal1.status.toString(), "0") // unbonding
+        assert.equal(inforVal1.status.toString(), "2") // unbonding
     })
 
     it ("should delete delegation", async () => {
         const staking = await Staking.deployed();
-        const val9 = await Validator.at(await staking.allVals(4));
-        await val9.undelegate({from: accounts[9]})
-        await utils.assertRevert(val9.undelegate({from: accounts[9]}), "delegation not found")
+        const val9 = await Validator.at(await staking.allVals(5));
+        var inforVal1 = await val9.inforValidator({from: accounts[9]})
+        await val9.undelegateWithAmount(web3.utils.toWei("0.115", "ether"), {from: accounts[9]})
     })
 
     it ("should get delegation", async () => {
@@ -456,4 +502,39 @@ contract("Validator", async (accounts) => {
         var delegation = await val.getDelegations({from: accounts[5]})
         assert.equal("2", delegation[0].length)
     })
+    
+    it("should update name", async () => {
+        const staking = await Staking.deployed();
+        const val4 = await Validator.at(await staking.allVals(3));
+        const name = web3.utils.fromAscii("test");
+        await val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("2", "ether")})
+        await utils.assertRevert(val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), "Min amount is 10000 KAI")
+    })
+
+    it("should proposal use treasury", async () => {
+        const staking = await Staking.deployed();
+        const val4 = await Validator.at(await staking.allVals(3));
+        var treasuryAddr = await val4.treasury()
+        var treasury = await Treasury.at(treasuryAddr)
+        var treasuryBalance = await web3.eth.getBalance(treasuryAddr)
+
+        // proposal
+        await treasury.addProposal(web3.utils.toWei("0.1", "ether"), {from: accounts[4], value: web3.utils.toWei("2", "ether")})
+        assert.equal(await treasury.allProposal(), "1")
+
+        // vote
+        await treasury.addVote(0, {from: accounts[6]})
+
+        // make sure vote
+        var proposal = await treasury.proposals(0)
+        assert.equal(proposal[0], accounts[4])
+        assert.equal(proposal[4].toString(), web3.utils.toWei("2", "ether"))
+
+        await treasury.confirmProposal(0, {from: accounts[4]})
+        var proposal1 = await treasury.proposals(0)
+        assert.equal(proposal1[0], accounts[4])
+        assert.equal(proposal1[5], true)
+        
+    }) 
+
 })

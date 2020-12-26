@@ -7,10 +7,10 @@ interface IValidator {
         address _owner,
         uint256 _rate, 
         uint256 _maxRate, 
-        uint256 _maxChangeRate, 
-        uint256 _minSelfDelegation
+        uint256 _maxChangeRate
     ) external;
-    function update(bytes32 _name, uint256 _commissionRate, uint256 _minSelfDelegation) external;
+    function updateCommissionRate(uint256 _commissionRate) external;
+    function updateName(bytes32 _name) external payable;
     function unjail() external;
     function allocateToken(uint256 _rewards) external;
     function delegate() external payable;
@@ -18,11 +18,15 @@ interface IValidator {
     function withdrawCommission()external;
     function withdraw() external;
     function undelegate() external;
+    function setParams(address _params) external;
+    function setTreasury(address _treasury) external;
     function undelegateWithAmount(uint256 _amount) external;
     function getCommissionRewards() external view returns (uint256);
     function getDelegationRewards(address _delAddr) external view returns (uint256);
     function getDelegations() external view returns (address[] memory, uint256[] memory);
     function validateSignature(uint256 _votingPower, bool _signed) external;
+    function getSlashEventsLength() external view returns(uint256);
+    function selfDelegate(address payable val, uint256 amount) external;
     function doubleSign(
         uint256 votingPower,
         uint256 distributionHeight
@@ -31,10 +35,12 @@ interface IValidator {
     function stop() external;
 
     // @dev Emitted when validator is updated;
-    event UpdateValidator(
-        bytes32 _name,
-        uint256 _commissionRate,
-        uint256 _minSelfDelegation
+    event UpdateCommissionRate(
+        uint256 _commissionRate
+    );
+
+    event UpdateName(
+       bytes32 _name
     );
 
     // @dev Emitted when validater commission is withdraw
