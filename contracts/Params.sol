@@ -153,6 +153,7 @@ contract Params is Ownable {
         uint256 quorum = totalVotingPowers.mul(2).div(3).add(1);
         if (voteYes < quorum) {
             proposal.status = ProposalStatus.Rejected;
+            address(uint160(address(_staking.treasury()))).transfer(proposal.deposit);
             return;
         }
 
