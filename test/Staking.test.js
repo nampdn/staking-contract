@@ -1,6 +1,7 @@
 const Staking = artifacts.require("StakingTest");
 const Validator = artifacts.require("Validator");
 const utils = require("./utils");
+const Params = artifacts.require("Params");
 
 contract("Staking", async (accounts) => {    
 
@@ -16,6 +17,8 @@ contract("Staking", async (accounts) => {
 
     it("should create validator", async () => {
         const instance = await Staking.deployed();
+        await instance.createParamsTest();
+
         const rate = web3.utils.toWei("0.4", "ether");
         const maxRate = web3.utils.toWei("0.5", "ether");
         const maxChangeRate = web3.utils.toWei("0.1", "ether");
@@ -74,10 +77,28 @@ contract("Staking", async (accounts) => {
         }
     })
 
+    async function createParamProposal() {
+        const staking = await Staking.deployed();
+        const params = await Params.at(await staking.params());
+        await params.addProposal([3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [
+            600, 
+            web3.utils.toWei("0.0001", "ether"), 
+            1814400, 
+            web3.utils.toWei("0.05", "ether"), 
+            100000, 
+            web3.utils.toWei("0.5", "ether"), 
+            web3.utils.toWei("0.01", "ether"), 
+            web3.utils.toWei("0.1", "ether"), 
+            web3.utils.toWei("0.1", "ether"), 
+            web3.utils.toWei("0.1", "ether")
+        ]
+        , {from: accounts[0], value: web3.utils.toWei("1", "ether")})
+        await params.confirmProposal(0);
+    }
+
     it("finalize", async() => {
         const instance = await Staking.deployed();
-        await instance.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 1814400, web3.utils.toWei("0.05", "ether"), 
-        100000, web3.utils.toWei("0.5", "ether"), web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"))
+        await createParamProposal();
         const contractAddr = await instance.allVals(0)
         const validator = await Validator.at(contractAddr)
         await instance.mint({from: accounts[0]});

@@ -1,6 +1,6 @@
 const Validator = artifacts.require("Validator");
 const Treasury = artifacts.require("Treasury");
-const Staking = artifacts.require("Staking");
+const Staking = artifacts.require("StakingTest");
 const Minter = artifacts.require("Minter");
 const Params = artifacts.require("Params");
 const utils = require("./utils");
@@ -104,6 +104,7 @@ contract("Validator", async (accounts) => {
 
     it ("should delegate", async () => {
         const staking = await Staking.deployed()
+        await staking.createParamsTest();
         const validator =  await createValidator(accounts[0]);
         const valAddr = await staking.allVals(0)
 
@@ -267,11 +268,28 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(validator.withdrawRewards({from: accounts[3]}), "delegation not found");
     })
 
+    async function createParamProposal() {
+        const staking = await Staking.deployed();
+        const params = await Params.at(await staking.params());
+        await params.addProposal([3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [
+            600, 
+            web3.utils.toWei("0.0001", "ether"), 
+            1814400, 
+            web3.utils.toWei("0.05", "ether"), 
+            20,  
+            web3.utils.toWei("0.5", "ether"), 
+            web3.utils.toWei("0.01", "ether"), 
+            web3.utils.toWei("0.1", "ether"), 
+            web3.utils.toWei("0.1", "ether"), 
+            web3.utils.toWei("0.01", "ether")
+        ]
+        , {from: accounts[0], value: web3.utils.toWei("1", "ether")})
+        await params.confirmProposal(0);
+    }
+
     it("should unjail", async () => {
         const staking = await Staking.deployed();
-        await staking.setValidatorParams(600, web3.utils.toWei("0.0001", "ether"), 
-        1814400, web3.utils.toWei("0.05", "ether"), 20,  web3.utils.toWei("0.5", "ether"), 
-        web3.utils.toWei("0.01", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.1", "ether"), web3.utils.toWei("0.01", "ether"));
+        await createParamProposal();
 
         await createValidator(accounts[5]);
         const val = await Validator.at(await staking.allVals(1));
@@ -347,40 +365,16 @@ contract("Validator", async (accounts) => {
         const amount8 = web3.utils.toWei("0.1", "ether");
         await val8.delegate({from: accounts[8], value: amount8})
         await val8.start({from: accounts[8]});
-
-        // proposal max validator
-        await staking.proposalMaxProposers(2, {from: accounts[0]})
-        var proposal = await staking.proposal() 
-        assert.equal(proposal.toString(), 2)
-        await utils.assertRevert(staking.addVote({from: accounts[3]}), "Not the proposer");
-        await staking.addVote({from: accounts[8]})
-        await utils.assertRevert(staking.addVote({from: accounts[8]}), "Vote only once");
-        await utils.assertRevert(staking.setMaxProposers(2, {from: accounts[0]}), "Insufficient voting power");
     })
 
     it ("Should update max validator", async () => {
         const staking = await Staking.deployed();
-
-        // befor update
-        const params = await Params.at(await staking.params())
-        var maxValidator = await params.getMaxProposers()
-        assert.equal(maxValidator.toString(), "20")
-        await staking.addVote({from: accounts[0]})
-        var voted = await staking.vote(accounts[0])
-        assert.equal(voted, true)
-        await staking.setMaxProposers(2, {from: accounts[0]})
-
-        // after update
-        var maxValidator1 = await params.getMaxProposers()
-        assert.equal(maxValidator1.toString(), "2")
-
-        // make sure reset
-        var voted1 = await staking.vote(accounts[0])
-        assert.equal(voted1, false)
-        var vote2 = await staking.vote(accounts[8])
-        assert.equal(vote2, false)
-        var totalVote = await staking.totalVoted()
-        assert.equal(totalVote.toString(), "0")
+        const params = await Params.at(await staking.params());
+        await params.addProposal([2], [
+            2 
+        ]
+        , {from: accounts[0], value: web3.utils.toWei("1", "ether")})
+        await params.confirmProposal(1);
     })
 
     it ("should withdraw when validator stop", async () => {
