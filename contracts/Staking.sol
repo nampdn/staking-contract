@@ -23,8 +23,6 @@ contract Staking is IStaking, Ownable {
     mapping(address => bool) public vote;
     uint256 public totalSupply = 5000000000 * 10**18; // Total Supply
     uint256 public totalBonded; // Total bonded
-    uint256 public proposal;
-    uint256 public totalVoted;
     uint256 public totalSlashedToken;
     address[] public valSets;
     mapping(address => EnumerableSet.AddressSet) private valOfDel; // validators of delegator
@@ -304,85 +302,6 @@ contract Staking is IStaking, Ownable {
             valAddrs[i] = allVals[i];
         }
         return valAddrs;
-    }
-
-    function setMaxProposers(uint256 _maxValidators) external onlyOwner {
-        require(totalVoted >= ((2*sumVotingPowerProposer())/3), "Insufficient voting power");
-        IParams(params).updateMaxValidator(_maxValidators);
-        _resetVote();
-    }
-
-    function proposalMaxProposers(uint256 _maxValidators) external onlyOwner {
-        proposal = _maxValidators;
-    }
-
-    function setProposalFail() external onlyOwner {
-        _resetVote();
-    }
-
-    // resetVote performs after set max validator success or proposal fail
-    function _resetVote() private {
-        for (uint i = 0; i <  valSets.length; i++) {
-            vote[valOf[valSets[i]]] = false;
-        }
-        totalVoted = 0;
-    }
-
-    function addVote() external {
-        require(_isProposer(msg.sender) == true, "Not the proposer");
-        require(vote[msg.sender] == false, "Vote only once");  
-        vote[msg.sender] = true;
-    }
-
-    function sumVotingPowerProposer() public returns (uint256) {
-        uint256 sumVotingPower;
-        for (uint i = 0; i <  valSets.length; i++) {
-            if (vote[valOf[valSets[i]]] == true) {
-                totalVoted +=  balanceOf[valSets[i]].div(powerReduction);
-            }
-            sumVotingPower += balanceOf[valSets[i]].div(powerReduction);
-        }
-        return sumVotingPower;
-    }
-    
-    function setPreviousProposer(address previousProposer) external onlyOwner {
-        _previousProposer = previousProposer;
-    }
-
-    function setMintParams(
-        uint256 _inflationRateChange,
-        uint256 _goalBonded,
-        uint256 _blocksPerYear,
-        uint256 _inflationMax,
-        uint256 _inflationMin
-    ) external onlyOwner {
-        IParams(params).updateMintParams(_inflationRateChange, _goalBonded, _blocksPerYear, _inflationMax, _inflationMin);
-    }
-
-    function setValidatorParams(
-        uint256 _downtimeJailDuration,
-        uint256 _slashFractionDowntime,
-        uint256 _unbondingTime,
-        uint256 _slashFractionDoubleSign,
-        uint256 _signedBlockWindow,
-        uint256 _minSignedPerWindow,
-        uint256 _minStake,
-        uint256 _minValidatorStake,
-        uint256 _minAmountChangeName,
-        uint256 _minSelfDelegation
-    ) external onlyOwner {
-        IParams(params).updateValidatorParams(
-            _downtimeJailDuration,
-            _slashFractionDowntime,
-            _unbondingTime,
-            _slashFractionDoubleSign,
-            _signedBlockWindow,
-            _minSignedPerWindow,
-            _minStake,
-            _minValidatorStake,
-            _minAmountChangeName,
-            _minSelfDelegation
-        );
     }
 
     function deposit() external payable {
