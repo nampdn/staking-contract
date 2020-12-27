@@ -172,11 +172,11 @@ contract Validator is IValidator, Ownable {
         _initializeValidator();
     }
 
-    function setParams(address _params) external {
+    function setParams(address _params) external onlyOwner {
         params = _params;
     }
 
-    function setTreasury(address _treasury) external {
+    function setTreasury(address _treasury) external onlyOwner {
         treasury = _treasury;
     }
     

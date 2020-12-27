@@ -62,7 +62,7 @@ contract Treasury {
                 totalPowerVoteYes = totalPowerVoteYes + votingPowers[i];
             }
         }
-        
+
         uint256 quorum = (2 * totalVotingPowers)/3 + 1;
         if (totalPowerVoteYes < quorum) {
             return;
