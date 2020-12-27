@@ -39,7 +39,6 @@ contract Treasury {
         }));
     }
 
-
     function addVote(uint256 proposalId) public {    
         require(proposalId < proposals.length, "Proposal not found");
         require(proposals[proposalId].endTime > block.timestamp, "Inactive proposal");

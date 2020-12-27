@@ -529,14 +529,24 @@ contract("Validator", async (accounts) => {
         var treasuryAddr = await val4.treasury()
         var treasury = await Treasury.at(treasuryAddr)
         var treasuryBalance = await web3.eth.getBalance(treasuryAddr)
-    
+
+        var val0 = await Validator.at(await staking.allVals(0));
+        await val0.delegate({from: accounts[0], value: web3.utils.toWei("10", "ether")})
+        await val0.start({from: accounts[0]})
+
         // proposal
         await treasury.addProposal(web3.utils.toWei("0.1", "ether"), {from: accounts[4], value: web3.utils.toWei("2", "ether")})
         assert.equal(await treasury.allProposal(), "1")
-        
         // vote
         await utils.assertRevert(treasury.addVote(1, {from: accounts[6]}), "Proposal not found")
         await treasury.addVote(0, {from: accounts[6]})
+        await treasury.confirmProposal(0, {from: accounts[4]})
+        var proposal1 = await treasury.proposals(0)
+        assert.equal(proposal1[0], accounts[4])
+        assert.equal(proposal1[5], false)
+
+        // add vote from val0
+        await treasury.addVote(0, {from: accounts[0]})
         await utils.advanceTime(1814402);
         await utils.assertRevert(treasury.addVote(0, {from: accounts[6]}), "Inactive proposal")
 
@@ -549,6 +559,7 @@ contract("Validator", async (accounts) => {
         var proposal1 = await treasury.proposals(0)
         assert.equal(proposal1[0], accounts[4])
         assert.equal(proposal1[5], true)
+
         var treasuryBalance2 = await web3.eth.getBalance(treasuryAddr)
         assert.equal(treasuryBalance2, web3.utils.toWei("2.105484500000000001", "ether"))
         await utils.assertRevert(treasury.confirmProposal(0, {from: accounts[4]}), "Proposal successed") 
