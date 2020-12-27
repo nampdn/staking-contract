@@ -57,12 +57,13 @@ contract Treasury {
         uint256 totalPowerVoteYes;
         uint256 totalVotingPowers;
         for (uint i = 0; i < signers.length; i ++) {
+             totalVotingPowers = totalVotingPowers + votingPowers[i];
             if (proposals[proposalId].votes[signers[i]]) {
                 totalPowerVoteYes = totalPowerVoteYes + votingPowers[i];
             }
         }
+        
         uint256 quorum = (2 * totalVotingPowers)/3 + 1;
-
         if (totalPowerVoteYes < quorum) {
             return;
         }
