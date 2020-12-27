@@ -15,10 +15,24 @@ contract("Minter", async (accounts) => {
         }
     }
 
+    async function createParamProposal() {
+        const staking = await Staking.deployed();
+        await staking.createParamsTest();
+        const params = await Params.at(await staking.params());
+        await params.addProposal([13, 14, 15, 16, 17], [
+            web3.utils.toWei("0.05", "ether"), 
+            web3.utils.toWei("0.35", "ether"), 
+            5, 
+            web3.utils.toWei("0.07", "ether"), 
+            web3.utils.toWei("0.02", "ether")]
+        , {from: accounts[0], value: web3.utils.toWei("1", "ether")})
+        await params.confirmProposal(0);
+    }
+
     it("mint", async () => {
         const staking = await Staking.deployed();
         await staking.createMinterTest();
-        await staking.setMintParams(web3.utils.toWei("0.05", "ether"), web3.utils.toWei("0.35", "ether"), 5, web3.utils.toWei("0.07", "ether"), web3.utils.toWei("0.02", "ether"), {from: accounts[0]});
+        await createParamProposal();
 
         const minter = await Minter.at(await staking.minter())
         var paramsAddr = await staking.params()
