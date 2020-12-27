@@ -27,11 +27,8 @@ interface IStaking {
     function withdrawRewards(address payable _to, uint256 _amount) external;
     function updateSigner(address signerAddr) external;
     function startValidator() external;
-    function proposalMaxProposers(uint256 _maxValidators) external;
-    function setProposalFail() external;
-    function addVote() external;
-    function sumVotingPowerProposer() external returns (uint256);
     function getValidatorSets() external view returns (address[] memory, uint256[] memory);
+    function treasury() external view returns(address);
 
     // @dev Emitted when validator is created;
     event CreatedValidator(

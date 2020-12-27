@@ -8,15 +8,15 @@ import {IParams} from "./interfaces/IParams.sol";
 contract Params is Ownable {
 
     enum ProposalStatus {
+        Pending,
         Passed,
-        Rejected,
-        Pending
+        Rejected
     }
 
     enum VoteOption {
+        Abstain,
         Yes,
-        No,
-        Abstain
+        No
     }
 
     enum ParamKey {
@@ -68,6 +68,7 @@ contract Params is Ownable {
     Proposal[] public proposals;
 
 
+
     constructor() public {
         _staking = IStaking(msg.sender);
 
@@ -103,8 +104,16 @@ contract Params is Ownable {
         params[uint256(key)] = value; 
     }
 
-    function _getParam(ParamKey key) public view returns (uint256) {
+    function _getParam(ParamKey key) private view returns (uint256) {
         return params[uint256(key)];
+    }
+
+    function getParam(ParamKey key) public view returns (uint256) {
+        return _getParam(key);
+    }
+
+    function allProposal() public view returns (uint) {
+        return proposals.length;
     }
 
     function addProposal(ParamKey[] memory keys, uint256[] memory values) public payable returns (uint) {
@@ -122,43 +131,28 @@ contract Params is Ownable {
     }
 
     function addVote(uint proposalId, VoteOption option) public {
-        require(proposals.length < proposalId, "proposal not found");
+        require(proposalId < proposals.length, "proposal not found");
         require(proposals[proposalId].endTime > block.timestamp, "inactive proposal");
         proposals[proposalId].votes[msg.sender] = option;
     }
-
     function confirmProposal(uint proposalId) public {
-        require(proposals.length < proposalId, "proposal not found");
-        require(proposals[proposalId].endTime < block.timestamp, "end time");
-        address[] memory signers;
-        uint256[] memory votingPowers;
-        (signers, votingPowers) = _staking.getValidatorSets();
+        require(proposalId < proposals.length, "proposal not found");
+        require(proposals[proposalId].status == ProposalStatus.Pending, "proposal status pending");
+        require(proposals[proposalId].endTime < block.timestamp, "Inactive proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        uint256 totalVotingPowers;
-        uint256 totalPowerVoteYes;
-        uint256 totalPowerVoteNo;
-        uint256 totalPowerVoteAbsent;
-        for (uint i = 0; i < signers.length; i ++) {
-            totalVotingPowers = totalVotingPowers.add(votingPowers[i]);
-            VoteOption voteOption = proposal.votes[signers[i]];
-            if (voteOption == VoteOption.Yes) {
-                totalPowerVoteYes = totalPowerVoteYes.add(votingPowers[i]);
-            } else if (voteOption == VoteOption.No) {
-                totalPowerVoteNo = totalPowerVoteNo.add(votingPowers[i]);
-            } else {
-                totalPowerVoteAbsent = totalPowerVoteAbsent.add(votingPowers[i]);
-            }
-        }
+        uint256 voteYes;
+        uint256 voteNo;
+        uint256 voteAbsent;
+        (voteYes,  voteNo, voteAbsent) = _getProposalPendingResults(proposalId);
         // update result
-        proposal.results[uint(VoteOption.Yes)] = totalPowerVoteYes;
-        proposal.results[uint(VoteOption.No)] = totalPowerVoteNo;
-        proposal.results[uint(VoteOption.Abstain)] = totalPowerVoteAbsent;
-
+        proposal.results[uint(VoteOption.Yes)] = voteYes;
+        proposal.results[uint(VoteOption.No)] = voteNo;
+        proposal.results[uint(VoteOption.Abstain)] = voteAbsent;
+        uint256 totalVotingPowers = voteYes + voteNo + voteAbsent;
         uint256 quorum = totalVotingPowers.mul(2).div(3).add(1);
-        if (totalPowerVoteYes < quorum) {
+        if (voteYes < quorum) {
             proposal.status = ProposalStatus.Rejected;
-            // burn deposit token here
             return;
         }
 
@@ -169,6 +163,41 @@ contract Params is Ownable {
         // refund deposit
         proposal.proposer.transfer(proposals[proposalId].deposit);
         proposal.status = ProposalStatus.Passed;
+    }
+
+    function _getProposalPendingResults(uint proposalId) private view returns (uint256, uint256, uint256) {
+        address[] memory signers;
+        uint256[] memory votingPowers;
+        (signers, votingPowers) = _staking.getValidatorSets();
+        uint256 totalPowerVoteYes;
+        uint256 totalPowerVoteNo;
+        uint256 totalPowerVoteAbsent;
+        for (uint i = 0; i < signers.length; i ++) {
+            VoteOption voteOption = proposals[proposalId].votes[signers[i]];
+            if (voteOption == VoteOption.Yes) {
+                totalPowerVoteYes = totalPowerVoteYes.add(votingPowers[i]);
+            } else if (voteOption == VoteOption.No) {
+                totalPowerVoteNo = totalPowerVoteNo.add(votingPowers[i]);
+            } else {
+                totalPowerVoteAbsent = totalPowerVoteAbsent.add(votingPowers[i]);
+            }
+        }
+        return (totalPowerVoteYes, totalPowerVoteNo, totalPowerVoteAbsent);
+    }
+
+    function getProposalResults(uint proposalId) external view returns (uint256, uint256, uint256) {
+        require(proposalId < proposals.length, "proposal not found");
+        if (proposals[proposalId].status == ProposalStatus.Pending) {
+            return _getProposalPendingResults(proposalId);
+        }
+        uint256 voteYes = proposals[proposalId].results[uint(VoteOption.Yes)];
+        uint256 voteNo = proposals[proposalId].results[uint(VoteOption.No)];
+        uint256 voteAbstain = proposals[proposalId].results[uint(VoteOption.Abstain)];
+        return (
+            voteYes,
+            voteNo,
+            voteAbstain
+        );
     }
 
 
