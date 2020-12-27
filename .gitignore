@@ -1,1 +1,7 @@
 build
+node_modules
+# Coverage directory used by tools like istanbul
+coverage
+coverage.json
+.coverage_contracts
+.coverage_artifacts
