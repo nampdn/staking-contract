@@ -23,9 +23,9 @@ contract Params is Ownable {
         // staking params
         baseProposerReward,
         bonusProposerReward,
-        maxProposers,
+        maxProposers, 
 
-        // validator params 
+        // validator params :3
         downtimeJailDuration,
         slashFractionDowntime,
         unbondingTime,
@@ -37,7 +37,7 @@ contract Params is Ownable {
         minAmountChangeName,
         minSelfDelegation,
 
-        // minter params
+        // minter params : 13
         inflationRateChange,
         goalBonded,
         blocksPerYear,
