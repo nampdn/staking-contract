@@ -6,196 +6,228 @@ import {IParams} from "./interfaces/IParams.sol";
 
 
 contract Params is Ownable {
+
+    enum ProposalStatus {
+        Passed,
+        Rejected
+    }
+
+    enum VoteOption {
+        Yes,
+        No,
+        Abstain,
+    }
+
+    enum ParamKey {
+        // staking params
+        baseProposerReward,
+        bonusProposerReward,
+        maxProposers,
+        downtimeJailDuration,
+
+        // validator params 
+        downtimeJailDuration,
+        slashFractionDowntime,
+        unbondingTime,
+        slashFractionDoubleSign,
+        signedBlockWindow,
+        minSignedPerWindow,
+        minStake,
+        minValidatorStake,
+        minAmountChangeName,
+        minSelfDelegation,
+
+        // minter params
+        inflationRateChange,
+        goalBonded,
+        blocksPerYear,
+        inflationMax,
+        inflationMin,
+
+        // Proposal
+        Deposit,
+        VotingPeriod
+    }
+
     using SafeMath for uint256;
-    uint256 private _oneDec = 1 * 10**18;
 
-    struct StakingParams {
-        uint256 baseProposerReward;
-        uint256 bonusProposerReward;
-        uint256 maxProposers;
-    }
-
-    struct ValidatorParams {
-        uint256 downtimeJailDuration;
-        uint256 slashFractionDowntime;
-        uint256 unbondingTime;
-        uint256 slashFractionDoubleSign;
-        uint256 signedBlockWindow;
-        uint256 minSignedPerWindow;
-        uint256 minStake;
-        uint256 minValidatorStake;
-        uint256 minAmountChangeName;
-        uint256 minSelfDelegation;
-    }
-
-    struct MintParams {
-        uint256 inflationRateChange;
-        uint256 goalBonded;
-        uint256 blocksPerYear;
-        uint256 inflationMax;
-        uint256 inflationMin;
+    struct Proposal {
+        address payable proposer;
+        ParamKey[] key;
+        uint256[] values;
+        uint256 startTime;
+        uint256 endTime;
+        mapping(address => VoteOption) votes;
+        uint256 deposit;
+        ProposalStatus status;
+        mapping (VoteOption=>uint256) results;
     }
 
     IStaking private _staking;
-    StakingParams public stakingParams;
-    ValidatorParams public validatorParams;
-    MintParams public mintParams;
+    mapping(ParamKey > uint256) public params;
+    Proposal[] public proposals;
 
 
- constructor() public {
-        transferOwnership(msg.sender);
+    constructor() public {
         _staking = IStaking(msg.sender);
 
-        stakingParams = StakingParams({
-            baseProposerReward: 1 * 10**16,
-            bonusProposerReward: 4 * 10**16,
-            maxProposers: 20
-        });
+        // staking params
+        params[ParamKey.baseProposerReward] = 1 * 10**16;
+        params[ParamKey.bonusProposerReward] = 4 * 10**16;
+        params[ParamKey.maxProposers] = 20;
 
-        validatorParams = ValidatorParams({
-            downtimeJailDuration: 300, // 3 days
-            slashFractionDowntime: 5 * 10**16, // 5%
-            unbondingTime: 300, // 7 days
-            slashFractionDoubleSign: 25 * 10**16, //25%
-            signedBlockWindow: 100,
-            minSignedPerWindow: 50 * 10**16, //50%
-            minStake: 1 * 10**16, // 25 000 KAI
-            minValidatorStake: 1 * 10**17, // 12500000 KAI
-            minAmountChangeName: 1 *10**17, // 10000 KAI
-            minSelfDelegation: 1 * 10**17 //25000 KAI
-        });
+        // validator params 
+        params[ParamKey.downtimeJailDuration] = 300;
+        params[ParamKey.slashFractionDowntime] = 5 * 10**16;
+        params[ParamKey.unbondingTime] = 300;
+        params[ParamKey.slashFractionDoubleSign] = 25 * 10**16;
+        params[ParamKey.signedBlockWindow] = 100;
+        params[ParamKey.minSignedPerWindow] = 50 * 10**16;
+        params[ParamKey.minStake] = 1 * 10**16;
+        params[ParamKey.minValidatorStake] = 1 * 10**17;
+        params[ParamKey.minAmountChangeName] = 1 *10**17;
+        params[ParamKey.minSelfDelegation] = 1 * 10**17;
 
-        mintParams = MintParams({
-            inflationRateChange: 1 * 10**16, // 1%
-            goalBonded: 50 * 10**16, // 50%
-            blocksPerYear: 6307200,
-            inflationMax: 5 * 10**16, // 5%
-            inflationMin: 1 * 10**16 // 1%
-        });
+        // minter
+        params[ParamKey.inflationRateChange] =  1 * 10**16;
+        params[ParamKey.goalBonded] =  50 * 10**16;
+        params[ParamKey.blocksPerYear] =  6307200;
+        params[ParamKey.inflationMax] = 5 * 10**16;
+        params[ParamKey.inflationMin] = 1 * 10**16;
+
+        params[ParamKey.Deposit] = 1 * 10**17;
+        params[ParamKey.VotingPeriod] =  604800 // 7 days
     }
 
-    function updateBaseReward(uint256 _baseProposerReward, uint256 _bonusProposerReward) external onlyOwner {
-        stakingParams.baseProposerReward = _baseProposerReward;
-        stakingParams.bonusProposerReward = _bonusProposerReward;
+    function addProposal(ParamKey[] memory keys, uint256[] memory values) public payable returns uint {
+        require(msg.value >= params[ParamKey.Deposit], "min deposit")
+        proposals.push(Proposal({
+            keys: keys, 
+            values: values,
+            proposer: msg.sender,
+            deposit: msg.value,
+            startTime: block.timestamp,
+            endTime: block.timestamp.add(params[ParamKey.VotingPeriod])
+        }))
     }
 
-    function updateMaxValidator(uint256 _maxProposers) external onlyOwner {
-        stakingParams.maxProposers = _maxProposers;
+    function addVote(uint proposalId, VoteOption option) public {
+        require(proposals.length < proposalId, "proposal not found");
+        require(proposals[proposalId].endTime > block.timestamp, "inactive proposal");
+        proposals[proposalId].votes[msg.sender] = option;
     }
 
-    function updateValidatorParams(
-        uint256 _downtimeJailDuration,
-        uint256 _slashFractionDowntime,
-        uint256 _unbondingTime,
-        uint256 _slashFractionDoubleSign,
-        uint256 _signedBlockWindow,
-        uint256 _minSignedPerWindow,
-        uint256 _minStake,
-        uint256 _minValidatorStake,
-        uint256 _minAmountChangeName,
-        uint256 _minSelfDelegation) 
-        external onlyOwner {
-        
-        validatorParams = ValidatorParams({
-            downtimeJailDuration: _downtimeJailDuration,
-            slashFractionDowntime: _slashFractionDowntime,
-            unbondingTime: _unbondingTime, 
-            slashFractionDoubleSign: _slashFractionDoubleSign,
-            signedBlockWindow: _signedBlockWindow,
-            minSignedPerWindow: _minSignedPerWindow,
-            minStake: _minStake, // 10 000 kai
-            minValidatorStake: _minValidatorStake,
-            minAmountChangeName: _minAmountChangeName,
-            minSelfDelegation: _minSelfDelegation
-        });
+    function confirmProposal(uint proposalId) public {
+        require(proposals.length < proposalId, "proposal not found");
+        require(proposals[proposalId].endTime < block.timestamp, "end time");
+        address[] memory signers;
+        uint256[] memory votingPowers;
+        (signers, votingPowers) = staking.getValidatorSets();
+
+        Proposal storage proposal = proposals[proposalId];
+        uint256 totalVotingPowers;
+        uint256 totalPowerVoteYes;
+        uint256 totalPowerVoteNo;
+        uint256 totalPowerVoteAbsent;
+        for (uint i = 0; i < signers.length; i ++) {
+            totalVotingPowers = totalVotingPowers.add(votingPowers[i])
+            VoteOption voteOption = proposal.votes[signers[i]];
+            if (voteOption == VoteOption.Yes) {
+                totalPowerVoteYes = totalPowerVoteYes.add(votingPowers[i]);
+            } else if (voteOption == VoteOption.No) {
+                totalPowerVoteNo = totalPowerVoteNo.add(votingPowers[i]);
+            } else {
+                totalPowerVoteAbsent = totalPowerVoteAbsent.add(votingPowers[i]);
+            }
+        }
+        uint256 quorum = totalVotingPowers.mul(2).div(3).add(1)
+        if totalPowerVoteYes < quorum {
+            // burn deposit token here
+            return
+        }
+
+        // update params
+        for (uint = 0; i < proposal.keys.length; i ++) {
+            params[proposal.keys[i]] = proposal.values[i];
+        }
+        // refund deposit
+        proposal.proposer.transfer(proposals[proposalId].deposit);
+        // update result
+        proposal.results[VoteOption.Yes] = totalPowerVoteYes;
+        proposal.results[VoteOption.No] = totalPowerVoteNo;
+        proposal.results[VoteOption.Abstain] = totalPowerVoteAbsent;
     }
 
-    function updateMintParams(
-        uint256 _inflationRateChange,
-        uint256 _goalBonded,
-        uint256 _blocksPerYear,
-        uint256 _inflationMax,
-        uint256 _inflationMin
-    ) external onlyOwner {
-
-        mintParams = MintParams({
-            inflationRateChange: _inflationRateChange, // 5%
-            goalBonded: _goalBonded,
-            blocksPerYear: _blocksPerYear,
-            inflationMax: _inflationMax,
-            inflationMin: _inflationMin
-        });
-    }
 
     function getBaseProposerReward() external view returns (uint256) {
-        return stakingParams.baseProposerReward;
+        return params[ParamKey.baseProposerReward];
     }
 
     function getBonusProposerReward() external view returns (uint256) {
-        return stakingParams.bonusProposerReward;
+        return params[ParamKey.bonusProposerReward];
     }
 
     function getMaxProposers() external view returns (uint256) {
-        return stakingParams.maxProposers;
+        return params[ParamKey.maxProposers];
     }
 
     function getInflationRateChange() external view returns (uint256) {
-        return mintParams.inflationRateChange;
+        return params[ParamKey.inflationRateChange];
     }
 
     function getGoalBonded() external view returns (uint256) {
-        return mintParams.goalBonded;
+        return params[ParamKey.goalBonded];
     }
 
     function getBlocksPerYear() external view returns (uint256) {
-        return mintParams.blocksPerYear;
+        return params[ParamKey.blocksPerYear];
     }
 
     function getInflationMax() external view returns (uint256) {
-        return mintParams.inflationMax;
+        return params[ParamKey.inflationMax];
     }
 
     function getInflationMin() external view returns (uint256) {
-        return mintParams.inflationMin;
+        return params[ParamKey.inflationMin];
     }
 
     function getDowntimeJailDuration() external view returns (uint256) {
-        return validatorParams.downtimeJailDuration;
+        return params[ParamKey.downtimeJailDuration];
     }
 
     function getSlashFractionDowntime() external view returns (uint256) {
-        return validatorParams.slashFractionDowntime;
+        return params[ParamKey.slashFractionDowntime];
     }
 
     function getUnbondingTime() external view returns (uint256) {
-        return validatorParams.unbondingTime;
+       return params[ParamKey.unbondingTime];
     }
 
     function getSlashFractionDoubleSign() external view returns (uint256) {
-        return validatorParams.slashFractionDoubleSign;
+        return params[ParamKey.slashFractionDoubleSign];
     }
 
     function getSignedBlockWindow() external view returns (uint256) {
-        return validatorParams.signedBlockWindow;
+        return params[ParamKey.signedBlockWindow];
     }
 
     function getMinSignedPerWindow() external view returns (uint256) {
-        return validatorParams.minSignedPerWindow;
+       return params[ParamKey.minSignedPerWindow];
     }
 
     function getMinStake() external view returns (uint256) {
-        return validatorParams.minStake;
+       return params[ParamKey.minStake];
     }
 
     function getMinValidatorStake() external view returns (uint256) {
-        return validatorParams.minValidatorStake;
+        return params[ParamKey.minValidatorStake];
     }
 
     function getMinAmountChangeName() external view returns (uint256) {
-        return validatorParams.minAmountChangeName;
+        return params[ParamKey.minAmountChangeName];
     }
 
     function getMinSelfDelegation() external view returns (uint256) {
-        return validatorParams.minSelfDelegation;
+        return params[ParamKey.minSelfDelegation];
     }
 }
