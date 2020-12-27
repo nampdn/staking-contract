@@ -31,6 +31,7 @@ interface IStaking {
     function setProposalFail() external;
     function addVote() external;
     function sumVotingPowerProposer() external returns (uint256);
+    function getValidatorSets() external view returns (address[] memory, uint256[] memory);
 
     // @dev Emitted when validator is created;
     event CreatedValidator(
