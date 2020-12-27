@@ -140,8 +140,14 @@ contract Params is Ownable {
                 totalPowerVoteAbsent = totalPowerVoteAbsent.add(votingPowers[i]);
             }
         }
+        // update result
+        proposal.results[VoteOption.Yes] = totalPowerVoteYes;
+        proposal.results[VoteOption.No] = totalPowerVoteNo;
+        proposal.results[VoteOption.Abstain] = totalPowerVoteAbsent;
+
         uint256 quorum = totalVotingPowers.mul(2).div(3).add(1)
         if totalPowerVoteYes < quorum {
+            proposal.status = ProposalStatus.Rejected;
             // burn deposit token here
             return
         }
@@ -152,10 +158,7 @@ contract Params is Ownable {
         }
         // refund deposit
         proposal.proposer.transfer(proposals[proposalId].deposit);
-        // update result
-        proposal.results[VoteOption.Yes] = totalPowerVoteYes;
-        proposal.results[VoteOption.No] = totalPowerVoteNo;
-        proposal.results[VoteOption.Abstain] = totalPowerVoteAbsent;
+        proposal.status = ProposalStatus.Passed;
     }
 
 
