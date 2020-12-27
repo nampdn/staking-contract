@@ -511,19 +511,34 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(val4.updateName(name, {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), "Min amount is 10000 KAI")
     })
 
+    it("should not proposal use treasury", async () => {
+        const staking = await Staking.deployed();
+        const val4 = await Validator.at(await staking.allVals(3));
+        var treasuryAddr = await val4.treasury()
+        var treasury = await Treasury.at(treasuryAddr)
+        await utils.assertRevert(treasury.addProposal(web3.utils.toWei("100", "ether"), {from: accounts[4], value: web3.utils.toWei("2", "ether")}), 
+        "Amount must lower or equal treasury balance")
+
+        await utils.assertRevert(treasury.addProposal(web3.utils.toWei("0.1", "ether"), {from: accounts[4], value: web3.utils.toWei("0.001", "ether")}), 
+        "Deposit must greater or equal 10000 KAI")
+    })
+
     it("should proposal use treasury", async () => {
         const staking = await Staking.deployed();
         const val4 = await Validator.at(await staking.allVals(3));
         var treasuryAddr = await val4.treasury()
         var treasury = await Treasury.at(treasuryAddr)
         var treasuryBalance = await web3.eth.getBalance(treasuryAddr)
-
+    
         // proposal
         await treasury.addProposal(web3.utils.toWei("0.1", "ether"), {from: accounts[4], value: web3.utils.toWei("2", "ether")})
         assert.equal(await treasury.allProposal(), "1")
-
+        
         // vote
+        await utils.assertRevert(treasury.addVote(1, {from: accounts[6]}), "Proposal not found")
         await treasury.addVote(0, {from: accounts[6]})
+        await utils.advanceTime(1814402);
+        await utils.assertRevert(treasury.addVote(0, {from: accounts[6]}), "Inactive proposal")
 
         // make sure vote
         var proposal = await treasury.proposals(0)
@@ -534,7 +549,9 @@ contract("Validator", async (accounts) => {
         var proposal1 = await treasury.proposals(0)
         assert.equal(proposal1[0], accounts[4])
         assert.equal(proposal1[5], true)
-        
+        var treasuryBalance2 = await web3.eth.getBalance(treasuryAddr)
+        assert.equal(treasuryBalance2, web3.utils.toWei("2.105484500000000001", "ether"))
+        await utils.assertRevert(treasury.confirmProposal(0, {from: accounts[4]}), "Proposal successed") 
     }) 
 
-})
+})        

@@ -48,7 +48,7 @@ contract Treasury {
 
     function confirmProposal(uint proposalId) payable public {
         require(proposalId < proposals.length, "Proposal not found");
-        require( proposals[proposalId].isSuccess != true, "Proposal was success");
+        require( proposals[proposalId].isSuccess != true, "Proposal successed");
         require(proposals[proposalId].proposer == msg.sender);
 
         address[] memory signers;
