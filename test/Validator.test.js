@@ -109,6 +109,7 @@ contract("Validator", async (accounts) => {
         const valAddr = await staking.allVals(0)
 
         await validator.delegate({from: accounts[0], value: web3.utils.toWei("0.3", "ether")})
+
         await validator.start();
         const delegation = await validator.delegationByAddr(accounts[0])
         assert.equal(delegation.stake.toString(), web3.utils.toWei("0.4", "ether"))
