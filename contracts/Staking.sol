@@ -293,7 +293,7 @@ contract Staking is IStaking, Ownable {
             }
         }
 
-        delete ownerOf[valOf[valAddr]];
+        delete valOf[valAddr];
     }
 
     // get current validator sets
