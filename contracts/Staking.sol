@@ -285,11 +285,9 @@ contract Staking is IStaking, Ownable {
         }
     } 
 
-    uint public a;
     function removeFromAllVal(address valAddr) private {
         for (uint i = 0; i < allVals.length; i ++) {
             if (allVals[i] == valAddr) {
-                a = 1;
                 allVals[i] = allVals[allVals.length - 1];
                 allVals.pop();
             }
