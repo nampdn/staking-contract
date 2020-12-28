@@ -190,7 +190,7 @@ contract Staking is IStaking, Ownable {
         totalBonded = totalBonded.sub(amount);
         balanceOf[from] = balanceOf[from].sub(amount);
         if (balanceOf[from] <= 100) {
-            removeFromAllVal(from);
+            removeVal(from);
         }
     }
 
@@ -285,13 +285,16 @@ contract Staking is IStaking, Ownable {
         }
     } 
 
-    function removeFromAllVal(address valAddr) private {
+    function removeVal(address valAddr) private {
         for (uint i = 0; i < allVals.length; i ++) {
             if (allVals[i] == valAddr) {
                 allVals[i] = allVals[allVals.length - 1];
                 allVals.pop();
             }
         }
+
+        delete ownerOf[valOf[valAddr]];
+        delete valOf[valAddr];
     }
 
     // get current validator sets
