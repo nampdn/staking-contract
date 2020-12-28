@@ -172,8 +172,5 @@ contract("Staking", async (accounts) => {
 
         allVals = await staking.allValsLength();
         assert.equal(allVals.toString(), "1")
-
-        valOf2 = await staking.valOf(valAddr)
-        assert.equal("0x0000000000000000000000000000000000000000", valOf2.toString())
     })
 })
