@@ -73,31 +73,31 @@ contract Params is Ownable {
         _staking = IStaking(msg.sender);
 
         // staking params
-        _setParam(ParamKey.baseProposerReward, 1 * 10**16);
-        _setParam(ParamKey.bonusProposerReward, 4 * 10**16);
+        _setParam(ParamKey.baseProposerReward, 5 * 10**16);
+        _setParam(ParamKey.bonusProposerReward, 5 * 10**16);
         _setParam(ParamKey.maxProposers, 20);
 
         // validator params 
-        _setParam(ParamKey.downtimeJailDuration, 300);
-        _setParam(ParamKey.slashFractionDowntime, 5 * 10**16);
-        _setParam(ParamKey.unbondingTime, 300);
-        _setParam(ParamKey.slashFractionDoubleSign, 25 * 10**16);
-        _setParam(ParamKey.signedBlockWindow, 100);
-        _setParam(ParamKey.minSignedPerWindow, 50 * 10**16);
-        _setParam(ParamKey.minStake, 1 * 10**16);
-        _setParam(ParamKey.minValidatorStake, 1 * 10**17);
-        _setParam(ParamKey.minAmountChangeName, 1 *10**17);
-        _setParam(ParamKey.minSelfDelegation, 1 * 10**17);
+        _setParam(ParamKey.downtimeJailDuration, 3600); // 1h
+        _setParam(ParamKey.slashFractionDowntime, 1 * 10**15); // 0.1%
+        _setParam(ParamKey.unbondingTime, 604800); // 7 days
+        _setParam(ParamKey.slashFractionDoubleSign, 25 * 10**16); //25%
+        _setParam(ParamKey.signedBlockWindow, 10000);
+        _setParam(ParamKey.minSignedPerWindow, 5 * 10**17); // 50%
+        _setParam(ParamKey.minStake, 25 * 10**21); // 25000 KAI
+        _setParam(ParamKey.minValidatorStake, 125 * 10**23); // 12.5M KAI
+        _setParam(ParamKey.minAmountChangeName, 1 *10**22); // 10000 KAI
+        _setParam(ParamKey.minSelfDelegation, 25 * 10**21); // 25000 KAI
 
         // minter
-        _setParam(ParamKey.inflationRateChange, 1 * 10**16);
-        _setParam(ParamKey.goalBonded, 50 * 10**16);
-        _setParam(ParamKey.blocksPerYear, 6307200);
-        _setParam(ParamKey.inflationMax, 5 * 10**16);
-        _setParam(ParamKey.inflationMin, 1 * 10**16);
+        _setParam(ParamKey.inflationRateChange, 1 * 10**16); // 1%
+        _setParam(ParamKey.goalBonded, 4 * 10**16); // 4%
+        _setParam(ParamKey.blocksPerYear, 6220800);
+        _setParam(ParamKey.inflationMax, 5 * 10**16); // 5%
+        _setParam(ParamKey.inflationMin, 19968768 * 10 **9); // 1,9968768%
 
-        _setParam(ParamKey.Deposit, 1 * 10**17);
-        _setParam(ParamKey.VotingPeriod, 604800); // 7 days
+        _setParam(ParamKey.Deposit, 5 * 10**23); // 500000 KAI
+        _setParam(ParamKey.VotingPeriod, 2592000); // 30 days
     }
 
     function _setParam(ParamKey key, uint256 value) internal {

@@ -16,8 +16,8 @@ contract Treasury {
         bool isSuccess;
     }
 
-    uint256 constant public MIN_STAKE = 1000000000000000000; // 10000 KAI
-    uint256 constant public VOTING_PERIOD = 300; // 7 days
+    uint256 constant public MIN_STAKE = 5 * 10**23; // 500000 KAI
+    uint256 constant public VOTING_PERIOD = 2592000; // 30 days
     Proposal[] public proposals;
     address public stakingAdress;
 
