@@ -89,6 +89,7 @@ contract Staking is IStaking, Ownable {
         IValidator(val).setTreasury(treasury);
         IValidator(val).selfDelegate(msg.sender, msg.value);
         address(uint160(address(val))).transfer(msg.value);
+        emit Transfer(address(this), val, msg.value);
     }
 
     function setParams(address _params) external onlyOwner {
