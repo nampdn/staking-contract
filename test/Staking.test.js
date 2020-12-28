@@ -162,9 +162,15 @@ contract("Staking", async (accounts) => {
         assert.equal(valSets[0].length, 1)
         assert.equal(valSets[0][0], accounts[1])
 
+        allVals1 = await staking.allValsLength();
+        assert.equal(allVals1.toString(), "2")
+        
         // stop validator
         await val.undelegate({from: accounts[1]})
         valSets = await staking.getValidatorSets.call();
         assert.equal(valSets[0].length, 0)
+
+        allVals = await staking.allValsLength();
+        assert.equal(allVals.toString(), "1")
     })
 })
