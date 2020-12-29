@@ -186,18 +186,26 @@ contract Params is Ownable {
         return (totalPowerVoteYes, totalPowerVoteNo, totalPowerVoteAbsent);
     }
 
-    function getProposalResults(uint proposalId) external view returns (uint256, uint256, uint256) {
+    function getProposalDetails(uint proposalId) external view returns (uint256, uint256, uint256, ParamKey[] memory, uint256[] memory) {
         require(proposalId < proposals.length, "proposal not found");
+        
+        uint256 voteYes;
+        uint256 voteNo;
+        uint256 voteAbstain;
+
         if (proposals[proposalId].status == ProposalStatus.Pending) {
-            return _getProposalPendingResults(proposalId);
+            (voteYes, voteNo, voteAbstain) = _getProposalPendingResults(proposalId);
+        } else {
+            voteYes = proposals[proposalId].results[uint(VoteOption.Yes)];
+            voteNo = proposals[proposalId].results[uint(VoteOption.No)];
+            voteAbstain = proposals[proposalId].results[uint(VoteOption.Abstain)];
         }
-        uint256 voteYes = proposals[proposalId].results[uint(VoteOption.Yes)];
-        uint256 voteNo = proposals[proposalId].results[uint(VoteOption.No)];
-        uint256 voteAbstain = proposals[proposalId].results[uint(VoteOption.Abstain)];
         return (
             voteYes,
             voteNo,
-            voteAbstain
+            voteAbstain,
+            proposals[proposalId].keys,
+            proposals[proposalId].values
         );
     }
 
