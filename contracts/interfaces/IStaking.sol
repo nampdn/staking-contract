@@ -25,7 +25,6 @@ interface IStaking {
     function burn(uint256 amount, uint reason) external;
     function removeDelegation(address delAddr) external;
     function withdrawRewards(address payable _to, uint256 _amount) external;
-    function updateSigner(address signerAddr) external;
     function startValidator() external;
     function getValidatorSets() external view returns (address[] memory, uint256[] memory);
     function treasury() external view returns(address);

@@ -2,8 +2,8 @@ pragma solidity ^0.5.16;
 import "./Staking.sol";
 
 contract Treasury {
-    constructor(address _stakingAdress) public {
-        stakingAdress = _stakingAdress;
+    constructor(address _stakingAddress) public {
+        stakingAddress = _stakingAddress;
     }
 
     struct Proposal {
@@ -19,7 +19,7 @@ contract Treasury {
     uint256 constant public MIN_STAKE = 5 * 10**23; // 500000 KAI
     uint256 constant public VOTING_PERIOD = 2592000; // 30 days
     Proposal[] public proposals;
-    address public stakingAdress;
+    address public stakingAddress;
 
     function allProposal() public view returns (uint) {
         return proposals.length;
@@ -52,7 +52,7 @@ contract Treasury {
 
         address[] memory signers;
         uint256[] memory votingPowers;
-        (signers, votingPowers) = Staking(stakingAdress).getValidatorSets();
+        (signers, votingPowers) = Staking(stakingAddress).getValidatorSets();
         uint256 totalPowerVoteYes;
         uint256 totalVotingPowers;
         for (uint i = 0; i < signers.length; i ++) {
@@ -79,7 +79,7 @@ contract Treasury {
     function getInforProposal(uint256 proposalId) view public returns (address[] memory) {
         address[] memory signers;
         uint256[] memory votingPowers;
-        (signers, votingPowers) = Staking(stakingAdress).getValidatorSets();
+        (signers, votingPowers) = Staking(stakingAddress).getValidatorSets();
         address[] memory voters = new address[](signers.length);
         uint256 totalPowerVoteYes;
         for (uint i = 0; i < signers.length; i ++) {
