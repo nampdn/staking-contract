@@ -180,14 +180,6 @@ contract Validator is IValidator, Ownable {
         treasury = _treasury;
     }
     
-    // update signer address
-    function updateSigner(address signerAddr) external onlyValidator {
-        require(signerAddr != msg.sender);
-        emit UpdatedSigner(inforValidator.signer, signerAddr);
-        inforValidator.signer = signerAddr;
-        _staking.updateSigner(signerAddr);
-    }
-    
     // delegate for this validator
     function delegate() external payable {
         _delegate(msg.sender, msg.value);
@@ -327,10 +319,11 @@ contract Validator is IValidator, Ownable {
 
     function _checkUndelegateAmount(address _delAddr, uint256 _amount) private view returns (bool) {
          Delegation storage del = delegationByAddr[_delAddr];
-         if (del.stake.sub(_amount) == 0) {
+         uint256 shareToken = _tokenFromShare(del.shares);
+         if (shareToken.sub(_amount) == 0) {
              return true;
          }
-        if (del.stake.sub(_amount) >= IParams(params).getMinStake()) {
+        if (shareToken.sub(_amount) >= IParams(params).getMinStake()) {
             return true;
         }
         return false;

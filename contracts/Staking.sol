@@ -21,7 +21,7 @@ contract Staking is IStaking, Ownable {
     mapping(address => address) public valOf; // Validator of the owner
     mapping(address => uint256) public balanceOf; // Balance of the validator
     mapping(address => bool) public vote;
-    uint256 public totalSupply = 5000000000 * 10**18; // Total Supply
+    uint256 public totalSupply = 4500000000 * 10**18; // +500M (for mining) = 5 Bn
     uint256 public totalBonded; // Total bonded
     uint256 public totalSlashedToken;
     address[] public valSets;
@@ -94,15 +94,6 @@ contract Staking is IStaking, Ownable {
 
     function setParams(address _params) external onlyOwner {
         params = _params;
-    }
-
-    // Update signer address
-    function updateSigner(address signerAddr) external onlyValidator {
-        require(ownerOf[signerAddr] == address(0x0), "user already exists");
-        address oldSignerAddr = valOf[msg.sender];
-        valOf[msg.sender] = signerAddr;
-        ownerOf[oldSignerAddr] = address(0x0);
-        ownerOf[signerAddr] = msg.sender;
     }
 
     function allValsLength() external view returns(uint) {

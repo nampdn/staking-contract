@@ -73,30 +73,30 @@ contract Params is Ownable {
         _staking = IStaking(msg.sender);
 
         // staking params
-        _setParam(ParamKey.baseProposerReward, 5 * 10**16);
-        _setParam(ParamKey.bonusProposerReward, 5 * 10**16);
+        _setParam(ParamKey.baseProposerReward, 5 * 10**16); // 5%
+        _setParam(ParamKey.bonusProposerReward, 5 * 10**16); // 5%
         _setParam(ParamKey.maxProposers, 20);
 
         // validator params 
         _setParam(ParamKey.downtimeJailDuration, 3600); // 1h
         _setParam(ParamKey.slashFractionDowntime, 1 * 10**15); // 0.1%
         _setParam(ParamKey.unbondingTime, 604800); // 7 days
-        _setParam(ParamKey.slashFractionDoubleSign, 25 * 10**16); //25%
-        _setParam(ParamKey.signedBlockWindow, 10000);
+        _setParam(ParamKey.slashFractionDoubleSign, 25 * 10**16); // 25%
+        _setParam(ParamKey.signedBlockWindow, 10000); // 10,000 blocks per windows
         _setParam(ParamKey.minSignedPerWindow, 5 * 10**17); // 50%
-        _setParam(ParamKey.minStake, 25 * 10**21); // 25000 KAI
-        _setParam(ParamKey.minValidatorStake, 125 * 10**23); // 12.5M KAI
-        _setParam(ParamKey.minAmountChangeName, 1 *10**22); // 10000 KAI
-        _setParam(ParamKey.minSelfDelegation, 25 * 10**21); // 25000 KAI
+        _setParam(ParamKey.minStake, 25 * 10**21); // 25,000 KAI
+        _setParam(ParamKey.minValidatorStake, 125 * 10**23); // 12,5M KAI
+        _setParam(ParamKey.minAmountChangeName, 1 *10**22); // 10,000 KAI
+        _setParam(ParamKey.minSelfDelegation, 25 * 10**21); // 25,000 KAI
 
         // minter
-        _setParam(ParamKey.inflationRateChange, 1 * 10**16); // 1%
-        _setParam(ParamKey.goalBonded, 4 * 10**16); // 4%
-        _setParam(ParamKey.blocksPerYear, 6220800);
+        _setParam(ParamKey.inflationRateChange, 2 * 10**16); // 2%
+        _setParam(ParamKey.goalBonded, 15 * 10**16); // 30% = 1,35 Bn KAI
+        _setParam(ParamKey.blocksPerYear, 6307200); // 5s per block
         _setParam(ParamKey.inflationMax, 5 * 10**16); // 5%
-        _setParam(ParamKey.inflationMin, 19968768 * 10 **9); // 1,9968768%
+        _setParam(ParamKey.inflationMin, 2 * 10**16); // 2%
 
-        _setParam(ParamKey.Deposit, 5 * 10**23); // 500000 KAI
+        _setParam(ParamKey.Deposit, 5 * 10**23); // 500,000 KAI
         _setParam(ParamKey.VotingPeriod, 2592000); // 30 days
     }
 
@@ -138,7 +138,6 @@ contract Params is Ownable {
     function confirmProposal(uint proposalId) public {
         require(proposalId < proposals.length, "proposal not found");
         require(proposals[proposalId].status == ProposalStatus.Pending, "proposal status pending");
-        require(proposals[proposalId].endTime < block.timestamp, "Inactive proposal");
 
         Proposal storage proposal = proposals[proposalId];
         uint256 voteYes;
@@ -152,6 +151,7 @@ contract Params is Ownable {
         uint256 totalVotingPowers = voteYes + voteNo + voteAbsent;
         uint256 quorum = totalVotingPowers.mul(2).div(3).add(1);
         if (voteYes < quorum) {
+            require(proposals[proposalId].endTime < block.timestamp, "Inactive proposal");
             proposal.status = ProposalStatus.Rejected;
             address(uint160(address(_staking.treasury()))).transfer(proposal.deposit);
             return;

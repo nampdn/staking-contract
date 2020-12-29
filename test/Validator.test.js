@@ -190,25 +190,6 @@ contract("Validator", async (accounts) => {
         await utils.assertRevert(validator.undelegateWithAmount(amount, {from: accounts[5]}), "delegation not found"); // 'delegation not found
     })
 
-    it ("update signer", async () => {
-        const staking = await Staking.deployed();
-        const valAddr = await staking.allVals(0);
-        const validator = await Validator.at(valAddr);
-        await validator.updateSigner(accounts[1], {from: accounts[0]});
-        const owner = await staking.valOf.call(valAddr);
-        const valAddr2 = await staking.ownerOf.call(accounts[1])
-        assert.equal(owner, accounts[1]);
-        assert.equal(valAddr2, valAddr)
-        await validator.updateSigner(accounts[0], {from: accounts[1]});
-    })
-
-    it ("should not update signer", async () => {
-        const staking = await Staking.deployed();
-        const valAddr = await staking.allVals(0);
-        const validator = await Validator.at(valAddr);
-        await utils.assertRevert(validator.updateSigner(accounts[1], {from: accounts[2]}), "Ownable: caller is not the validator");
-    })
-
     it ("should withdraw", async () => {
         const staking = await Staking.deployed();
 
