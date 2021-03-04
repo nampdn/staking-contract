@@ -133,7 +133,7 @@ contract Params is Ownable {
             status: ProposalStatus.Pending
         }));
 
-        emit AddProposal(keys, _values);
+        emit AddProposal(keys, values);
         return proposals.length - 1;
     }
 
@@ -165,7 +165,7 @@ contract Params is Ownable {
             proposal.status = ProposalStatus.Rejected;
             address(uint160(address(_staking.treasury()))).transfer(proposal.deposit);
 
-            emit TransferToTreasury(address(this), _staking.treasury(), proposalId);
+            emit TransferToTreasury(proposalId, address(this), _staking.treasury());
             return;
         }
 
