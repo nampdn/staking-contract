@@ -7,6 +7,11 @@ import {IParams} from "./interfaces/IParams.sol";
 
 contract Params is Ownable {
 
+    event AddProposal(ParamKey[] _keys, uint256[] _values);
+    event AddVote(uint _proposalId, VoteOption _option, address _from);
+    event ConfirmProposal(uint _proposalId, address _from);
+    event TransferToTreasury(uint _proposalId, address _from, address _to);
+
     enum ProposalStatus {
         Pending,
         Passed,
@@ -127,6 +132,8 @@ contract Params is Ownable {
             endTime: block.timestamp.add(_getParam(ParamKey.VotingPeriod)),
             status: ProposalStatus.Pending
         }));
+
+        emit AddProposal(keys, _values);
         return proposals.length - 1;
     }
 
@@ -134,6 +141,8 @@ contract Params is Ownable {
         require(proposalId < proposals.length, "proposal not found");
         require(proposals[proposalId].endTime > block.timestamp, "inactive proposal");
         proposals[proposalId].votes[msg.sender] = option;
+
+        emit AddVote(proposalId, option, msg.sender);
     }
     function confirmProposal(uint proposalId) public {
         require(proposalId < proposals.length, "proposal not found");
@@ -144,6 +153,7 @@ contract Params is Ownable {
         uint256 voteNo;
         uint256 voteAbsent;
         (voteYes,  voteNo, voteAbsent) = _getProposalPendingResults(proposalId);
+
         // update result
         proposal.results[uint(VoteOption.Yes)] = voteYes;
         proposal.results[uint(VoteOption.No)] = voteNo;
@@ -154,6 +164,8 @@ contract Params is Ownable {
             require(proposals[proposalId].endTime < block.timestamp, "Inactive proposal");
             proposal.status = ProposalStatus.Rejected;
             address(uint160(address(_staking.treasury()))).transfer(proposal.deposit);
+
+            emit TransferToTreasury(address(this), _staking.treasury(), proposalId);
             return;
         }
 
@@ -164,6 +176,8 @@ contract Params is Ownable {
         // refund deposit
         proposal.proposer.transfer(proposals[proposalId].deposit);
         proposal.status = ProposalStatus.Passed;
+
+        emit ConfirmProposal(proposalId, msg.sender);
     }
 
     function _getProposalPendingResults(uint proposalId) private view returns (uint256, uint256, uint256) {

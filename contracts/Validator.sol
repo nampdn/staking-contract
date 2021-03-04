@@ -257,6 +257,7 @@ contract Validator is IValidator, Ownable {
 
         signingInfo.jailedUntil = 0;
         inforValidator.jailed = false;
+        emit Unjail(msg.sender, block.timestamp);
     }
 
     function undelegate() external onlyDelegator{
@@ -540,6 +541,7 @@ contract Validator is IValidator, Ownable {
         _decrementReferenceCount(delegationByAddr[_delAddr].previousPeriod);
         if (rewards > 0) {
             _staking.withdrawRewards(_delAddr, rewards);
+            emit WithdrawRewards(_delAddr, rewards);
         }
     }
     

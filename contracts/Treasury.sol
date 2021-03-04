@@ -2,6 +2,13 @@ pragma solidity ^0.5.16;
 import "./Staking.sol";
 
 contract Treasury {
+
+    event AddProposal(uint256 _value, address _from);
+    event AddVote(uint256 _proposalId, address _from);
+    event ConfirmProposal(uint256 _proposalId, address _from);
+    event TransferToProposer(uint256 _amount, address _to);
+
+
     constructor(address _stakingAddress) public {
         stakingAddress = _stakingAddress;
     }
@@ -37,12 +44,16 @@ contract Treasury {
             endTime: block.timestamp + VOTING_PERIOD,
             isSuccess: false
         }));
+
+        emit AddProposal(value, msg.sender);
     }
 
     function addVote(uint256 proposalId) public {    
         require(proposalId < proposals.length, "Proposal not found");
         require(proposals[proposalId].endTime > block.timestamp, "Inactive proposal");
         proposals[proposalId].votes[msg.sender] = true;
+
+        emit AddVote(proposalId, msg.sender);
     }
 
     function confirmProposal(uint proposalId) payable public {
@@ -69,7 +80,11 @@ contract Treasury {
 
         require(proposals[proposalId].deposit + proposals[proposalId].value <= address(this).balance, "Amount must lower or equal treasury balance");
         msg.sender.transfer(proposals[proposalId].deposit + proposals[proposalId].value);
+        
+        emit TransferToProposer(proposals[proposalId].deposit + proposals[proposalId].value, msg.sender);
         proposals[proposalId].isSuccess = true;
+
+        emit ConfirmProposal(proposalId, msg.sender);
     }
 
     function getTreasuryBalance() view public returns (uint256) {
